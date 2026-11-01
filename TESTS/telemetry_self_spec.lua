@@ -44,27 +44,26 @@ return function(H)
       local store = require("runtime-analysis.telemetry.store")
       local cache_dir = vim.fn.stdpath("cache") .. "/runtime-analysis.nvim/cache"
 
-      -- No namespace resolvable at all (neither title nor telemetry_namespace)
-      -- — nil, not a guessed name, not an error.
+      -- The namespace is docmap's own, whatever tree is mapped: `title` is the
+      -- mapped root's basename ("repos" for a setup rooted at E:/repos) and
+      -- must not name the namespace of docmap's own calls.
       do
         telemetry_self._reset_for_test()
-        local inst = telemetry_self.setup({})
-        eq(inst, nil, "setup: nil when no namespace can be resolved at all")
+        local inst = assert(
+          telemetry_self.setup({ title = "repos", telemetry_namespace = "repos" }),
+          "setup: a real instance"
+        )
+        eq(inst.namespace, "docmap.nvim", "setup: neither title nor telemetry_namespace names it")
+        inst.stop()
       end
 
-      -- telemetry_namespace overrides title, the identical precedence
-      -- telemetry_join.namespace (the read side) already documents — checked
-      -- here by confirming the instance's own namespace, not by inspecting
-      -- private state.
+      -- A spec can still pick its own namespace.
       do
         telemetry_self._reset_for_test()
         local ns = "docmap-nvim-self-telemetry-spec-override"
         store.clear(ns, { dir = cache_dir })
-        local inst = assert(
-          telemetry_self.setup({ title = "wrong-name", telemetry_namespace = ns }),
-          "setup: a real instance when a namespace resolves"
-        )
-        eq(inst.namespace, ns, "setup: telemetry_namespace overrides title")
+        local inst = assert(telemetry_self.setup({ telemetry_self_namespace = ns }))
+        eq(inst.namespace, ns, "setup: telemetry_self_namespace overrides the default")
         inst.stop()
         store.clear(ns, { dir = cache_dir })
       end
@@ -78,9 +77,9 @@ return function(H)
         local ns = "docmap-nvim-self-telemetry-spec-idempotent"
         store.clear(ns, { dir = cache_dir })
         local first =
-          assert(telemetry_self.setup({ title = ns }), "setup: first call returns a real instance")
+          assert(telemetry_self.setup({ telemetry_self_namespace = ns }), "setup: first call returns a real instance")
         local second = assert(
-          telemetry_self.setup({ title = ns }),
+          telemetry_self.setup({ telemetry_self_namespace = ns }),
           "setup: second call also returns a real instance"
         )
         eq(first, second, "setup: a second call returns the identical instance, not a new one")
@@ -102,7 +101,7 @@ return function(H)
         -- `main = "docmap"` wraps — calling its own already-defined
         -- `_reset_for_test` through the wrapped table is exactly the kind of
         -- already-loaded call `M.setup`'s own honest-limits note describes.
-        local inst = telemetry_self.setup({ title = ns })
+        local inst = telemetry_self.setup({ telemetry_self_namespace = ns })
         ok(inst ~= nil, "setup (e2e): a real instance")
 
         -- A function on the resolved module map — resolved_modules() proves

@@ -63,11 +63,13 @@ per-field documentation is in
                             -- when it is not installed
     keys = {},            -- rebind or disable :DocBrowse's keys, by action
 
-    telemetry = true,      -- self-instrument this tree with runtime-
-                            -- analysis.telemetry when it is installed; a
-                            -- no-op when it is not. Set false to opt out.
-    telemetry_namespace = nil,  -- default: opts.title -- the namespace both
-                                -- this and :DocBrowse's telemetry mode use
+    telemetry = true,      -- self-instrument docmap's own modules with
+                            -- runtime-analysis.telemetry (namespace
+                            -- docmap.nvim) when it is installed; a no-op
+                            -- when it is not. Set false to opt out.
+    telemetry_namespace = nil,  -- default: opts.title -- the namespace
+                                -- :DocBrowse's telemetry mode reads for the
+                                -- mapped tree
 
     checks = {},          -- switch a check off, or re-grade it
     theme = "system",     -- theme baked into the generated page

@@ -34,22 +34,20 @@ local M = {}
 ---@type RA.Telemetry.Instance|nil
 local instance = nil
 
----Identical resolution `telemetry_join.namespace` (the read side) already
----uses, duplicated rather than required: a three-line pure-data lookup,
----and pulling in that module here for it would be the wrong direction of
----coupling (the write side depending on the read side's own module).
+---The namespace the wrapped docmap modules write to: docmap's own,
+---`opts.telemetry_self_namespace` for a spec. Never `opts.title` or
+---`opts.telemetry_namespace`: those name the tree being mapped (`title` is its
+---root's basename), so a setup rooted at e.g. `E:/repos` wrote docmap's calls
+---into a namespace `repos` and left `docmap.nvim` empty.
 ---@param opts table
----@return string?
+---@return string
 local function resolve_namespace(opts)
-  return opts.telemetry_namespace or opts.title
+  return opts.telemetry_self_namespace or "docmap.nvim"
 end
 
 ---Start self-instrumentation for this session. A no-op — returns `nil`,
 ---never errors — when `opts.telemetry == false`, when runtime-analysis.nvim
----is not installed, or when no namespace can be resolved at all (an
----unusual `opts` with neither `title` nor `telemetry_namespace` set; a
----guessed namespace risks colliding with an unrelated one already on disk,
----which is worse than instrumenting nothing).
+---is not installed.
 ---@param opts table `Docmap.Opts`, already resolved by `config.build` (has `.title`)
 ---@return RA.Telemetry.Instance? instance
 function M.setup(opts)
