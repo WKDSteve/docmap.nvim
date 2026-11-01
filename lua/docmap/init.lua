@@ -248,60 +248,48 @@ function M.scan_full(opts)
   return ir, findings
 end
 
+---A table that requires `modname` on the first field access and forwards every field to it, so a heavy
+---module stays unloaded until somebody uses it (the generate/check path needs none of these).
+---@param modname string
+---@return table
+local function lazy(modname)
+  return setmetatable({}, {
+    __index = function(_, k)
+      return require(modname)[k]
+    end,
+  })
+end
+
 --- The editor-side map navigator (`:DocBrowse`). Lazily required: it pulls in
 --- `ui.kit`, which nothing on the generate/check path needs.
-M.browse = setmetatable({}, {
-  __index = function(_, k)
-    return require("docmap.editor.browse")[k]
-  end,
-})
+M.browse = lazy("docmap.editor.browse")
 
 --- Structural diff between two maps. Lazily required: pure, and nothing on
 --- the generate/check path needs it.
-M.diff = setmetatable({}, {
-  __index = function(_, k)
-    return require("docmap.core.diff")[k]
-  end,
-})
+M.diff = lazy("docmap.core.diff")
 
 --- The `--check`/`--full` CLI entry point, as a callable module rather than a
 --- script — see cli.lua. Lazily required: only the CLI wrapper and hooks need
 --- it, not `:DocMap` or `install()`.
-M.cli = setmetatable({}, {
-  __index = function(_, k)
-    return require("docmap.core.cli")[k]
-  end,
-})
+M.cli = lazy("docmap.core.cli")
 
 --- Where a diff radiates to: changed lines -> functions -> callers. Lazily
 --- required for the same reason as `diff`: pure, and nothing on the
 --- generate/check path needs it.
-M.history = setmetatable({}, {
-  __index = function(_, k)
-    return require("docmap.core.history")[k]
-  end,
-})
+M.history = lazy("docmap.core.history")
 
 --- Which specs does a change touch, and which modules have specs: the
 --- provider side of the affected-selection contract for a test runner (see
 --- `docs/testing-contract.md`). Lazily required: it shells out to git and reads
 --- spec files, which nothing on the generate/check path does by default.
-M.testing = setmetatable({}, {
-  __index = function(_, k)
-    return require("docmap.testing")[k]
-  end,
-})
+M.testing = lazy("docmap.testing")
 
 --- `generate()` for a *list* of projects, one real headless Neovim
 --- subprocess per project — see editor/generate_all.lua's own header for
 --- why a subprocess and why no usercmd is registered here. Lazily
 --- required: nothing on the single-project generate/check/install path
 --- needs it.
-M.generate_all = setmetatable({}, {
-  __index = function(_, k)
-    return require("docmap.editor.generate_all")[k]
-  end,
-})
+M.generate_all = lazy("docmap.editor.generate_all")
 
 M.render = {
   html = function(...)
