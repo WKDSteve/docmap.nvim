@@ -1,4 +1,5 @@
 ---@module 'docmap.core.render.html'
+-- handrolled-ok: JavaScript inside an HTML string (the wheel cooldown of the page), not Lua
 --- Renders the docmap IR as a single self-contained HTML page.
 ---
 --- Self-contained is a hard requirement, not a preference: the artifact has to
