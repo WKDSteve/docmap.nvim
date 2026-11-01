@@ -299,13 +299,13 @@ flowchart LR
 
 ## Drift
 
-0 errors · 0 warnings · 30 info
+0 errors · 0 warnings · 32 info
 
 No errors or warnings.
 
 
 <details>
-<summary>30 informational findings</summary>
+<summary>32 informational findings</summary>
 
 
 | Check | Message |
@@ -315,6 +315,7 @@ No errors or warnings.
 | `undocumented-param` | complexity has 3 parameter(s) but only 2 @param line(s) |
 | `undocumented-param` | is_ignorable has 2 parameter(s) but only 0 @param line(s) |
 | `unreferenced-module` | docmap.bindings.docs is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.cli is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.config is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.asm is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.c is required by no other file in the tree |
@@ -339,6 +340,7 @@ No errors or warnings.
 | `unreferenced-module` | docmap.core.lang.ts is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.tsx is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.zig is required by no other file in the tree |
+| `unreferenced-module` | docmap.editor.generate_all is required by no other file in the tree |
 | `unreferenced-module` | docmap.mcp is required by no other file in the tree |
 
 </details>
