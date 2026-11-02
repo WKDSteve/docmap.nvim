@@ -130,6 +130,7 @@ local dir = debug.getinfo(1, "S").source:sub(2):match("(.*[/\\])") or "./"
 local H = dofile(dir .. "harness.lua")
 
 local specs = {
+  "harness_spec.lua",
   "docmap_spec.lua",
   "lang_registry_spec.lua",
   "lang_registry_characterization_spec.lua",
@@ -261,6 +262,11 @@ local specs = {
   "usrcmds_git_spec.lua",
   "pick_spec.lua",
   "functions_doc_tag_spacing_spec.lua",
+  "config_build_defaults_spec.lua",
+  "documentation_alias_spec.lua",
+  "ask_dialog_spec.lua",
+  "setup_lazy_spec.lua",
+  "sheets_spec.lua",
 }
 
 --- Straight to stdout rather than through `print`.
