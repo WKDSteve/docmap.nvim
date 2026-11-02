@@ -18,16 +18,12 @@ return {
       note = "its detail has keyword badges",
     },
     {
-      expect = "([...document.querySelectorAll('.bd[data-kw]')].find(e => e.offsetParent !== null).scrollIntoView({ block: 'center' }), true)",
-      note = "bring the badge into view (a scroll closes the card, so this comes first)",
+      expect = "([...document.querySelectorAll('.bd[data-kw]')].find(e => e.offsetParent !== null).focus(), document.activeElement.hasAttribute('data-kw'))",
+      note = "a keyword badge takes the focus (the browser scrolls it into view)",
     },
     {
-      expect = "new Promise(resolve => setTimeout(() => resolve(true), 400))",
-      note = "let the scroll events pass",
-    },
-    {
-      expect = "([...document.querySelectorAll('.bd[data-kw]')].find(e => e.offsetParent !== null).focus({ preventScroll: true }), document.activeElement.hasAttribute('data-kw'))",
-      note = "a keyword badge takes the focus",
+      expect = "new Promise(resolve => setTimeout(() => resolve(true), 700))",
+      note = "let the scroll events pass: the scroll the focus caused does not close the card",
     },
     {
       expect = "document.getElementById('kwpop').classList.contains('on')",
@@ -45,7 +41,7 @@ return {
       note = "Tab moves the focus on to the next focusable thing",
     },
     {
-      expect = "([...document.querySelectorAll('.bd[data-kw]')].find(e => e.offsetParent !== null).focus({ preventScroll: true }), document.getElementById('kwpop').classList.contains('on'))",
+      expect = "([...document.querySelectorAll('.bd[data-kw]')].find(e => e.offsetParent !== null).focus(), document.getElementById('kwpop').classList.contains('on'))",
       note = "back on a badge the card is there again",
     },
   },
