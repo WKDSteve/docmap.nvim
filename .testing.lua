@@ -7,16 +7,18 @@ return {
   plugin = "docmap",
   -- How the spec files are run: "auto" = sniffed per file, "h" = on the project's own TESTS/harness.lua,
   -- "script" = a self-running script in its own process.
-  dialect = "h",
+  -- TESTS/sheets_spec.lua is busted style: one case per test sheet (`sheet:<id>`, testing sheets report).
+  dialect = { ["TESTS/sheets_spec.lua"] = "busted", ["*"] = "h" },
   -- Dependencies (directory names) put on the runtimepath: $<NAME>_DIR, .deps/<name>, ../<name>,
   -- stdpath('data')/lazy/<name>.
-  deps = { "lib.nvim", "runtime-analysis.nvim", "ui.nvim" },
+  deps = { "lib.nvim", "runtime-analysis.nvim", "ui.nvim", "testing.nvim" },
   -- "none" = all specs in one nvim, "file" = one nvim per spec file
   -- (nothing leaks from one file into the next).
   isolated = "none",
   -- Guards (safety nets, see testing.nvim docs/GUARDS.md).
   guards = {
-    fs = "error",
+    -- TESTS/sheets/out holds the page the browser sheets open and their screenshots (git-ignored)
+    fs = { mode = "error", allow = { "TESTS/sheets/out" } },
     -- The specs run in one editor (isolated = "none") and leave no state behind: each takes
     -- H.snapshot() at its start and H.restore() / H.wipe_new() at its end (TESTS/harness.lua),
     -- and TESTS/minimal_init.lua loads vim.lsp up front so its runtime side effects predate the
