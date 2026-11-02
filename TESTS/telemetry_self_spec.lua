@@ -76,8 +76,10 @@ return function(H)
         telemetry_self._reset_for_test()
         local ns = "docmap-nvim-self-telemetry-spec-idempotent"
         store.clear(ns, { dir = cache_dir })
-        local first =
-          assert(telemetry_self.setup({ telemetry_self_namespace = ns }), "setup: first call returns a real instance")
+        local first = assert(
+          telemetry_self.setup({ telemetry_self_namespace = ns }),
+          "setup: first call returns a real instance"
+        )
         local second = assert(
           telemetry_self.setup({ telemetry_self_namespace = ns }),
           "setup: second call also returns a real instance"
