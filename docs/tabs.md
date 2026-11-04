@@ -36,6 +36,13 @@ the top N levels of a deep tree, turning every node that used to sit at that
 depth into its own parallel root — useful the moment a tree is several
 directories deep before anything interesting starts.
 
+Opened without a center in the URL, Deps, Calls and Module Calls do not start
+on the root — a folder that requires nothing and declares no functions — but
+on the node with the most edges of their kind, and say so under the graph; a
+click or the search box re-centers as usual. A center somebody chose is kept,
+and when it has no edge of the view's kind the view explains that instead of
+drawing boxes with nothing between them.
+
 The Deps and Module Calls views' `+ external` toggle answers *why* a
 dependency is there, not just that it is: each external box's tooltip
 breaks down exactly which functions were actually called and how often

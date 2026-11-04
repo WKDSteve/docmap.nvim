@@ -702,6 +702,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .hedge-ext{stroke:var(--ext);stroke-width:2;opacity:.9}
 .hmsg{color:var(--muted);font-size:13px;padding:20px;text-align:center}
 .htrunc{color:var(--warn);font-size:12.5px;margin-top:8px}
+.htrunc.hauto{color:var(--muted)}
 /* Sits directly before `#hdepth`'s button group. "1"/"2"/"3"/"∞" alone
    read as a slider or a zoom control — reported exactly that way after
    watching someone use the page for the first time — because every other
@@ -2262,7 +2263,7 @@ local JS = [[
     });
 
     if(s.tab === "tree" && s.id && byId[s.id]) selectRow(s.id);
-    if(s.tab === "hierarchy") drawHierarchy(s.center || IR.root, s.view || "modules");
+    if(s.tab === "hierarchy") drawHierarchy(s.center || IR.root, s.view || "modules", false, !s.center);
     if(s.tab === "notes") drawNotes();
     if(s.tab === "index") drawIndex();
     if(s.tab === "analysis") drawAnalysis();
@@ -7273,13 +7274,53 @@ local JS = [[
   // a root-hidden forest view was up would silently keep drawing the
   // forest — `state.hideroot` unchanged, the typed match completely
   // ignored — until Enter's real navigate({center}) finally cleared it.
-  function drawHierarchy(centerId, view, forceCenter){
+  // How many edges of a graph view touch one node: requires for Deps, call
+  // sites for Calls, calling module pairs for Module Calls.
+  function graphDegree(view, id){
+    if(view === "deps") return (depOut[id] || []).length + (depIn[id] || []).length;
+    if(view === "modulecalls") return (moduleCallOut[id] || []).length + (moduleCallIn[id] || []).length;
+    if(view === "calls"){
+      var n = byId[id], d = 0;
+      ((n && n.functions) || []).forEach(function(fn){
+        var k = fnKey(id, fn.name);
+        d += (callOut[k] || []).length + (callIn[k] || []).length;
+      });
+      return d;
+    }
+    return 0;
+  }
+
+  // The node a graph view starts on when nobody picked one. The root is a
+  // folder: it requires nothing, declares no functions and calls nothing, so
+  // Deps, Calls and Module Calls centered on it drew one lonely box (or "X
+  // declares no functions") for every project, data or not - which read as
+  // "these views are broken" on a map with a thousand edges in it. Ties go
+  // to the id, so the same map always opens on the same node.
+  function busiestFor(view){
+    var best = null, bestDeg = 0;
+    IR.nodes.forEach(function(n){
+      var d = graphDegree(view, n.id);
+      if(d > bestDeg || (d === bestDeg && d > 0 && best !== null && n.id < best)){
+        best = n.id; bestDeg = d;
+      }
+    });
+    return best;
+  }
+
+  // `implicitCenter`: the URL names no center, so the view may pick a better
+  // one than the root (see busiestFor). A center somebody chose - a click, a
+  // link, the search box - is always kept, empty or not.
+  function drawHierarchy(centerId, view, forceCenter, implicitCenter){
     view = VIEWS[view] ? view : "modules";
     hcenter = (centerId && byId[centerId]) ? centerId : (hcenter && byId[hcenter] ? hcenter : IR.root);
+    var autoCentered = false;
+    if(implicitCenter && isGraphView(view) && graphDegree(view, hcenter) === 0){
+      var busiest = busiestFor(view);
+      if(busiest && busiest !== hcenter){ hcenter = busiest; autoCentered = true; }
+    }
     var center = byId[hcenter];
 
-    var oldNote = hgraphWrap.parentNode.querySelector(".htrunc");
-    if(oldNote) oldNote.remove();
+    hgraphWrap.parentNode.querySelectorAll(".htrunc").forEach(function(el){ el.remove(); });
     drawLegend(view);
 
     var depth = state.depth === 0 ? 0 : (state.depth || 2);
@@ -7302,7 +7343,10 @@ local JS = [[
     else if(hidingRoot) built = layoutModulesRooted(state.hideroot);
     else built = layoutModules(hcenter);
 
-    if(built.count === 0){
+    // A graph view whose walk found boxes but not one edge between them is
+    // empty too: the center alone (Deps, Module Calls) or its functions side
+    // by side (Calls) answer nothing, and said nothing about why.
+    if(built.count === 0 || (isGraphView(view) && built.edges && built.edges.length === 0)){
       clearGraph();
       hpathEl.textContent = hidingRoot
         ? (state.hideroot + " root level" + (state.hideroot === 1 ? "" : "s") + " hidden")
@@ -7473,6 +7517,15 @@ local JS = [[
         void centerEl.offsetWidth;
         centerEl.classList.add("pulse");
       }
+    }
+
+    if(autoCentered){
+      var auto = document.createElement("div");
+      auto.className = "htrunc hauto";
+      auto.textContent = "Started on " + (center.module || center.name) + ", the node with the most " +
+        { deps: "requires", calls: "calls", modulecalls: "module calls" }[view] +
+        " — the root has none of its own. Click a box or search to re-center.";
+      hgraphWrap.parentNode.insertBefore(auto, hgraphWrap.nextSibling);
     }
 
     if(built.truncated){
