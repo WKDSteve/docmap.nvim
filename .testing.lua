@@ -20,9 +20,7 @@ return {
     -- TESTS/sheets/out holds the page the browser sheets open and their screenshots (git-ignored)
     fs = { mode = "error", allow = { "TESTS/sheets/out" } },
     -- The specs run in one editor (isolated = "none") and leave no state behind: each takes
-    -- H.snapshot() at its start and H.restore() / H.wipe_new() at its end (TESTS/harness.lua),
-    -- and TESTS/minimal_init.lua loads vim.lsp up front so its runtime side effects predate the
-    -- specs.
+    -- H.snapshot() at its start and H.restore() / H.wipe_new() at its end (TESTS/harness.lua).
     state = {
       mode = "error",
       -- The Kit* highlight groups (KitNormal, KitAccent, ... and the window-scoped KitNormal_N,
