@@ -156,6 +156,7 @@ local specs = {
   "api_surface_spec.lua",
   "tags_spec.lua",
   "adoption_spec.lua",
+  "map_merge_spec.lua",
   "consumers_spec.lua",
   "consumer_require_spec.lua",
   "testing_provider_spec.lua",

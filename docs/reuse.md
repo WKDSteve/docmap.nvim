@@ -243,6 +243,12 @@ misbehaves under `--amend` and rebase. Bypass a single commit with
 `core.hooksPath` rather than a versioned runner like `lefthook`, deliberately:
 adopting this should cost your plugin one copied file, not a new dependency.
 
+**Shared working trees.** When CI commits the map (below) and someone regenerates it locally too,
+`git pull --rebase --autostash` leaves conflict markers in the map and the autostash behind, and still
+exits 0. The files are generated, so let upstream's win: add `merge=ours` to their lines in
+`.gitattributes`, and run `git config --global merge.ours.driver true` once per machine. Git has no such
+driver built in: without the setting the attribute does nothing and the conflict stays.
+
 ### 3. CI
 
 **The short way: a GitHub Action, and nothing to copy.**
