@@ -36,7 +36,10 @@ return function(H)
     'drawHierarchy(s.center || IR.root, s.view || "modules", false, !s.center)',
     "applyState passes whether the URL named a center"
   )
-  has("function drawHierarchy(centerId, view, forceCenter, implicitCenter){", "drawHierarchy takes it")
+  has(
+    "function drawHierarchy(centerId, view, forceCenter, implicitCenter){",
+    "drawHierarchy takes it"
+  )
   has(
     "if(implicitCenter && isGraphView(view) && graphDegree(view, hcenter) === 0){",
     "only an implicit center without edges is moved"
@@ -44,9 +47,18 @@ return function(H)
 
   -- One degree per view, from the indexes built once at load.
   has("function graphDegree(view, id){", "a degree per graph view")
-  has('if(view === "deps") return (depOut[id] || []).length + (depIn[id] || []).length;', "deps counts requires both ways")
-  has("(moduleCallOut[id] || []).length + (moduleCallIn[id] || []).length", "module calls counts pairs both ways")
-  has("(callOut[k] || []).length + (callIn[k] || []).length", "calls counts call sites of every function")
+  has(
+    'if(view === "deps") return (depOut[id] || []).length + (depIn[id] || []).length;',
+    "deps counts requires both ways"
+  )
+  has(
+    "(moduleCallOut[id] || []).length + (moduleCallIn[id] || []).length",
+    "module calls counts pairs both ways"
+  )
+  has(
+    "(callOut[k] || []).length + (callIn[k] || []).length",
+    "calls counts call sites of every function"
+  )
   has("function busiestFor(view){", "the busiest node is one function")
 
   -- Boxes without one edge between them are empty, and say why.
