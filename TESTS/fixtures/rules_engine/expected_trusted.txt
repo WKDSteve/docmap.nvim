@@ -1,6 +1,6 @@
 PARSE	rules=12	errors=3
 FIX-01	fail
-FIX-02	pass
+FIX-02	fail
 FIX-03	pass
 FIX-04	fail
 FIX-05	fail
