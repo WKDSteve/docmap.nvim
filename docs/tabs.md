@@ -23,7 +23,7 @@ own counts fresh on every open instead, the same on-demand shape the
 History tab already uses for the one other thing that cannot live in a
 static artifact.
 
-The Hierarchy tab draws six graphs over the same IR — **Modules** (directory
+The Hierarchy tab draws six graphs and two layer-free views over the same IR — **Modules** (directory
 hierarchy), **Types** (`@class`/`@alias` collaboration), **Inheritance**,
 **Deps** (the require graph), **Calls** (function-level caller/callee) and
 **Module Calls** (the same call graph collapsed module-to-module, edges
@@ -42,6 +42,16 @@ on the node with the most edges of their kind, and say so under the graph; a
 click or the search box re-centers as usual. A center somebody chose is kept,
 and when it has no edge of the view's kind the view explains that instead of
 drawing boxes with nothing between them.
+
+Two more views read the same directory tree without laying a level out as one
+row, for projects whose levels are too wide for boxes (an nvim config has 310
+namespaces; the Modules view stops at 90 boxes). **Tree** is a folding list
+from the center: a filter keeps every match and the path to it (`tq=` in the
+link), the arrows walk and fold, Enter or a click on a name roots the tree
+there. **Treemap** draws everything under the center as nested areas sized by
+lines of code, or by functions (`tm=functions`): a click zooms into a group, a
+leaf opens in the Tree tab, and ▲ Up and the path above go back. Rows and tiles
+take the same right-click menu as boxes, and dimmed nodes stay dimmed.
 
 The Deps and Module Calls views' `+ external` toggle answers *why* a
 dependency is there, not just that it is: each external box's tooltip

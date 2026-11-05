@@ -702,6 +702,27 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .hedge-ext{stroke:var(--ext);stroke-width:2;opacity:.9}
 .hmsg{color:var(--muted);font-size:13px;padding:20px;text-align:center}
 .htrunc{color:var(--warn);font-size:12.5px;margin-top:8px}
+#halt{border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+#halt-bar{padding:8px;border-bottom:1px solid var(--line);margin:0}
+#halt-bar .hmuted{color:var(--muted);font-size:12.5px}
+#htq{min-width:260px}
+#halt-body{max-height:calc(100vh - 190px);overflow:auto;padding:4px 0}
+.ht-row{display:flex;gap:10px;align-items:baseline;padding:3px 8px;cursor:pointer;white-space:nowrap}
+.ht-row:hover,.ht-row:focus{background:var(--line);outline:none}
+.ht-row.dim{opacity:.45}
+.ht-row.hit .ht-name{text-decoration:underline}
+.ht-tw{width:12px;flex:none;color:var(--muted)}
+.ht-name{font-family:ui-monospace,monospace;font-weight:600}
+.ht-kind,.ht-num{color:var(--muted);font-size:12px}
+.ht-sum{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.tm{position:relative;margin:4px}
+.tm-group,.tm-tile{position:absolute;box-sizing:border-box;overflow:hidden;border:1px solid var(--panel)}
+.tm-group{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
+.tm-head{font-size:11.5px;font-weight:600;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.tm-tile{background:color-mix(in srgb,var(--accent) 30%,var(--panel));font-size:11px;padding:1px 3px;cursor:pointer;white-space:nowrap;text-overflow:ellipsis}
+.tm-tile.tm-solo{background:color-mix(in srgb,var(--accent) 22%,var(--panel))}
+.tm-tile:hover,.tm-head:hover{outline:2px solid var(--accent);outline-offset:-2px}
+.tm-group.dim,.tm-tile.dim{opacity:.4}
 .htrunc.hauto{color:var(--muted)}
 /* Sits directly before `#hdepth`'s button group. "1"/"2"/"3"/"∞" alone
    read as a slider or a zoom control — reported exactly that way after
@@ -2127,6 +2148,10 @@ local JS = [[
       // link would be noise in the common case.
       if((s.view === "deps" || s.view === "modulecalls") && s.ext) parts.push("ext=1");
       if(s.view === "calls" && s.fn) parts.push("fn=" + encodeURIComponent(s.fn));
+      // The Tree view's filter and the Treemap's measure, each only in its
+      // own view and only when set.
+      if(s.view === "tree" && s.tq) parts.push("tq=" + encodeURIComponent(s.tq));
+      if(s.view === "treemap" && s.tm === "functions") parts.push("tm=functions");
       // Hierarchy-scoped, unlike `marks` below: a dimmed box only exists in
       // this tab, so a Tree-tab link carrying `hidden=` would name a control
       // that link's own view does not have — the same rule `dir`/`depth`/
@@ -2203,6 +2228,8 @@ local JS = [[
       else if(k === "asort") s.asort = v || null;
       else if(k === "adir") s.adir = (v === "asc") ? "asc" : "desc";
       else if(k === "q") s.q = v || null;
+      else if(k === "tq") s.tq = v || null;
+      else if(k === "tm") s.tm = (v === "functions") ? "functions" : null;
       // Validated here, not just at the server: this value is interpolated
       // into a fetch URL, and the same whitelist the server applies before it
       // reaches git is the right shape to demand of a hash too. Anything else
@@ -3829,7 +3856,7 @@ local JS = [[
     if(msg) msg.remove();
   }
 
-  var VIEWS = { modules: 1, types: 1, inheritance: 1, deps: 1, calls: 1, modulecalls: 1 };
+  var VIEWS = { modules: 1, types: 1, inheritance: 1, deps: 1, calls: 1, modulecalls: 1, tree: 1, treemap: 1 };
 
   // =====================================================================
   // Notes tab: Doxygen's Deprecated / Todo / Bug / Test lists.
@@ -4268,6 +4295,15 @@ local JS = [[
     // own `focusin` handler already argues against: a `title` never appears
     // on focus, so it left exactly the controls a keyboard user reaches as
     // the only ones with no explanation.
+    "view.tree":
+      "The same directory hierarchy as Modules, as a list you fold: a " +
+      "level is a column of rows instead of a row of boxes, so a level with " +
+      "two hundred modules stays readable. The filter keeps every match and " +
+      "the path to it.",
+    "view.treemap":
+      "Everything under the center as nested areas, sized by lines of code " +
+      "(or functions): where the weight of a wide level sits, at a glance. " +
+      "Click to zoom in.",
     "view.modules":
       "The directory hierarchy itself — every module and namespace, nested " +
       "the way the tree is. The one view with no direction, because " +
@@ -7274,6 +7310,321 @@ local JS = [[
   // a root-hidden forest view was up would silently keep drawing the
   // forest — `state.hideroot` unchanged, the typed match completely
   // ignored — until Enter's real navigate({center}) finally cleared it.
+  // =====================================================================
+  // Tree and Treemap: the Hierarchy for wide levels.
+  //
+  // The box views lay every level out as one row. A config with 300
+  // namespaces gives rows wider than any window (bindings.mappings alone
+  // requires a dozen modules side by side) and the Modules view hits the
+  // 90-box cap. These two views read the same `children` tree without
+  // layers: Tree turns a level into a list (folding, a filter, the
+  // keyboard), Treemap turns it into an area and shows where the weight is.
+  // Both draw into #halt, outside #hgraph-wrap, whose wheel zooms the
+  // diagram - a list has to scroll. Rows and tiles carry `data-id`, so the
+  // context menu (describeTarget) works on them unchanged.
+  // =====================================================================
+  var halt = document.getElementById("halt");
+  var haltBar = document.getElementById("halt-bar");
+  var haltBody = document.getElementById("halt-body");
+  function isAltView(v){ return v === "tree" || v === "treemap"; }
+
+  // Which rows are open, by node id. The reader's, not the map's: it does
+  // not ride in the URL (a link carries the center and the filter, which is
+  // what it takes to show the same thing).
+  var treeOpen = {};
+
+  // Folders first, then by name: the order a file tree has.
+  function kidsOf(id){
+    var n = byId[id];
+    return ((n && n.children) || []).filter(function(c){ return !!byId[c]; })
+      .sort(function(a, b){
+        var na = byId[a], nb = byId[b];
+        var ga = (na.children && na.children.length) ? 0 : 1;
+        var gb = (nb.children && nb.children.length) ? 0 : 1;
+        if(ga !== gb) return ga - gb;
+        var la = (na.name || a).toLowerCase(), lb = (nb.name || b).toLowerCase();
+        return la < lb ? -1 : (la > lb ? 1 : 0);
+      });
+  }
+
+  function statOf(n, metric){
+    var s = n.stats || {};
+    return metric === "functions" ? (s.functions || 0) : (s.lines || 0);
+  }
+
+  // The filter matches name, module and summary; a match keeps every
+  // ancestor up to the center, so the reader sees where it sits.
+  function treeMatches(rootId, q){
+    var keep = {}, hit = {};
+    q = q.toLowerCase();
+    (function walk(id){
+      var n = byId[id];
+      var self = ((n.name || "") + " " + (n.module || "") + " " + (n.summary || "")).toLowerCase().indexOf(q) !== -1;
+      var any = false;
+      kidsOf(id).forEach(function(c){ if(walk(c)) any = true; });
+      if(self) hit[id] = true;
+      if(self || any) keep[id] = true;
+      return self || any;
+    })(rootId);
+    return { keep: keep, hit: hit };
+  }
+
+  function cssEsc(s){
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, "\\$&");
+  }
+
+  function treeBar(){
+    if(haltBar.querySelector("#htq")) return;
+    haltBar.innerHTML =
+      '<input id="htq" type="search" placeholder="Filter by name, module or summary" aria-label="Filter the tree">' +
+      '<button id="htopen" type="button">Expand all</button><button id="htclose" type="button">Collapse</button>' +
+      '<span id="htcount" class="hmuted"></span>';
+    var input = haltBar.querySelector("#htq");
+    input.addEventListener("input", function(){
+      // Replaces the history entry instead of pushing one per keystroke, and
+      // redraws only the list: the input keeps its focus and caret.
+      state.tq = input.value || null;
+      history.replaceState(state, "", serializeState(state));
+      drawTree(hcenter);
+    });
+    input.addEventListener("keydown", function(ev){
+      if(ev.key !== "ArrowDown") return;
+      var first = haltBody.querySelector(".ht-row");
+      if(first){ ev.preventDefault(); first.focus(); }
+    });
+    haltBar.querySelector("#htopen").addEventListener("click", function(){
+      (function all(id){ treeOpen[id] = true; kidsOf(id).forEach(all); })(hcenter);
+      drawTree(hcenter);
+    });
+    haltBar.querySelector("#htclose").addEventListener("click", function(){
+      treeOpen = {};
+      drawTree(hcenter);
+    });
+  }
+
+  function drawTree(centerId){
+    treeBar();
+    var q = state.tq || "";
+    var inputEl = haltBar.querySelector("#htq");
+    if(document.activeElement !== inputEl) inputEl.value = q;
+
+    var m = q ? treeMatches(centerId, q) : null;
+    var rows = [], shown = 0;
+    (function row(id, depth){
+      if(m && !m.keep[id]) return;
+      var n = byId[id];
+      var kids = kidsOf(id);
+      // The center is always open; with a filter every kept row is, or a
+      // match three levels down would hide behind closed parents.
+      var open = id === centerId || !!m || !!treeOpen[id];
+      shown++;
+      var st = n.stats || {};
+      var nums = (st.lines ? st.lines + " lines" : "") + (st.functions ? " · " + st.functions + " fn" : "");
+      rows.push(
+        '<div class="ht-row' + (isHidden(id) ? " dim" : "") + (m && m.hit[id] ? " hit" : "") +
+          '" role="treeitem" tabindex="-1" data-id="' + esc(id) + '"' +
+          (kids.length ? ' aria-expanded="' + open + '"' : "") +
+          ' aria-level="' + (depth + 1) + '" style="padding-left:' + (8 + depth * 18) + 'px">' +
+        '<span class="ht-tw">' + (kids.length ? (open ? "▾" : "▸") : "") + "</span>" +
+        '<span class="ht-name">' + esc(n.name || id) + "</span>" +
+        '<span class="ht-kind">' + esc(n.kind || "") + (kids.length ? " · " + kids.length : "") + "</span>" +
+        '<span class="ht-num">' + nums + "</span>" +
+        (n.summary ? '<span class="ht-sum">' + prose(n.summary) + "</span>" : "") +
+        "</div>"
+      );
+      if(open) kids.forEach(function(c){ row(c, depth + 1); });
+    })(centerId, 0);
+
+    haltBody.setAttribute("role", "tree");
+    haltBody.innerHTML = rows.length ? rows.join("")
+      : '<p class="hmsg">Nothing under ' + esc(byId[centerId].name || centerId) + " matches “" + esc(q) + "”.</p>";
+    var first = haltBody.querySelector(".ht-row");
+    if(first) first.tabIndex = 0;
+    haltBar.querySelector("#htcount").textContent = q ? shown + " shown" : "";
+  }
+
+  function treeToggle(id, open){
+    if(!kidsOf(id).length) return;
+    treeOpen[id] = open === undefined ? !treeOpen[id] : open;
+    drawTree(hcenter);
+    var el = haltBody.querySelector('.ht-row[data-id="' + cssEsc(id) + '"]');
+    if(el){ el.tabIndex = 0; el.focus(); }
+  }
+
+  haltBody.addEventListener("click", function(ev){
+    if(!ev.target.closest) return;
+    if(state.view === "tree"){
+      var r = ev.target.closest(".ht-row");
+      if(!r) return;
+      // The triangle folds; the name re-roots the tree there, the same thing
+      // a click on a box does in the other views.
+      if(ev.target.closest(".ht-tw") || r.dataset.id === hcenter) treeToggle(r.dataset.id);
+      else navigate({ center: r.dataset.id, fn: null });
+      return;
+    }
+    var hit = ev.target.closest(".tm-tile, .tm-head");
+    if(!hit) return;
+    var id = hit.dataset.id || hit.parentNode.dataset.id;
+    if(!byId[id]) return;
+    // Zoom into anything that has children; a leaf opens where its detail
+    // is, the Tree tab.
+    if(kidsOf(id).length) navigate({ center: id, fn: null });
+    else navigate({ tab: "tree", id: id });
+  });
+
+  haltBody.addEventListener("keydown", function(ev){
+    if(state.view !== "tree" || !ev.target.closest) return;
+    var r = ev.target.closest(".ht-row");
+    if(!r) return;
+    var all = Array.prototype.slice.call(haltBody.querySelectorAll(".ht-row"));
+    var i = all.indexOf(r);
+    var id = r.dataset.id;
+    function go(el){
+      if(!el) return;
+      ev.preventDefault();
+      all.forEach(function(x){ x.tabIndex = -1; });
+      el.tabIndex = 0;
+      el.focus();
+    }
+    if(ev.key === "ArrowDown") go(all[i + 1]);
+    else if(ev.key === "ArrowUp"){
+      if(i > 0) go(all[i - 1]);
+      else { ev.preventDefault(); haltBar.querySelector("#htq").focus(); }
+    }
+    else if(ev.key === "Home") go(all[0]);
+    else if(ev.key === "End") go(all[all.length - 1]);
+    else if(ev.key === "ArrowRight"){
+      ev.preventDefault();
+      if(r.getAttribute("aria-expanded") === "false") treeToggle(id, true);
+      else go(all[i + 1]);
+    } else if(ev.key === "ArrowLeft"){
+      ev.preventDefault();
+      if(r.getAttribute("aria-expanded") === "true" && id !== hcenter && !state.tq) treeToggle(id, false);
+      else {
+        var p = byId[id] && byId[id].parent;
+        if(p) go(haltBody.querySelector('.ht-row[data-id="' + cssEsc(p) + '"]'));
+      }
+    } else if(ev.key === "Enter"){
+      ev.preventDefault();
+      navigate({ center: id, fn: null });
+    }
+  });
+
+  // Squarified treemap (Bruls, Huizing, van Wijk 2000): fill along the
+  // shorter side, growing a row while that keeps its worst aspect ratio from
+  // getting worse. `items` must be sorted largest first, values > 0.
+  function squarify(items, x, y, w, h){
+    var out = [];
+    var total = items.reduce(function(a, it){ return a + it.v; }, 0);
+    if(total <= 0 || w <= 0 || h <= 0) return out;
+    var scale = (w * h) / total;
+    var rest = items.map(function(it){ return { it: it, a: it.v * scale }; });
+    function worst(row, side){
+      var s = 0, mx = 0, mn = Infinity;
+      row.forEach(function(r){ s += r.a; mx = Math.max(mx, r.a); mn = Math.min(mn, r.a); });
+      return Math.max(side * side * mx / (s * s), (s * s) / (side * side * mn));
+    }
+    while(rest.length){
+      // Written without two closing brackets in a row: anywhere in this page
+      // they would end the Lua long string the script lives in.
+      var side = Math.min(w, h), first = rest[0], row = [first], k = 1;
+      while(k < rest.length){
+        var next = rest[k];
+        if(worst(row.concat([next]), side) > worst(row, side)) break;
+        row.push(next); k++;
+      }
+      rest = rest.slice(k);
+      var sum = row.reduce(function(a, r){ return a + r.a; }, 0);
+      if(w >= h){
+        var cw = sum / h, cy = y;
+        row.forEach(function(r){ var rh = r.a / cw; out.push({ it: r.it, x: x, y: cy, w: cw, h: rh }); cy += rh; });
+        x += cw; w -= cw;
+      } else {
+        var ch = sum / w, cx = x;
+        row.forEach(function(r){ var rw = r.a / ch; out.push({ it: r.it, x: cx, y: y, w: rw, h: ch }); cx += rw; });
+        y += ch; h -= ch;
+      }
+    }
+    return out;
+  }
+
+  function weighed(id, metric){
+    return kidsOf(id).map(function(c){ return { id: c, v: statOf(byId[c], metric) }; })
+      .filter(function(it){ return it.v > 0; })
+      .sort(function(a, b){ return b.v - a.v; });
+  }
+
+  // A tile's tooltip: name, weight and summary as plain text. esc, not
+  // prose: a `title` attribute shows markup as markup.
+  function titleOf(n, id, v, unit){ return esc(n.name || id) + " · " + v + unit + (n.summary ? " — " + esc(n.summary) : ""); }
+
+  function tmBox(cls, id, r, label, inner){
+    return '<div class="' + cls + (isHidden(id) ? " dim" : "") + '" data-id="' + esc(id) + '" title="' + label +
+      '" style="left:' + r.x.toFixed(1) + "px;top:" + r.y.toFixed(1) + "px;width:" + r.w.toFixed(1) +
+      "px;height:" + r.h.toFixed(1) + 'px">' + inner + "</div>";
+  }
+
+  function drawTreemap(centerId){
+    var metric = state.tm === "functions" ? "functions" : "lines";
+    var unit = metric === "lines" ? " lines" : " fn";
+    haltBar.innerHTML =
+      '<span class="hmuted">Area</span><div class="hview-toggle">' +
+      '<button type="button" class="tm-metric' + (metric === "lines" ? " active" : "") + '" data-tm="lines">Lines</button>' +
+      '<button type="button" class="tm-metric' + (metric === "functions" ? " active" : "") + '" data-tm="functions">Functions</button></div>' +
+      '<span class="hmuted">click a group or tile to zoom in, a leaf opens in Tree · ▲ Up and the path go back</span>';
+    haltBar.querySelectorAll(".tm-metric").forEach(function(b){
+      b.addEventListener("click", function(){ navigate({ tm: b.dataset.tm === "functions" ? "functions" : null }); });
+    });
+
+    var kids = weighed(centerId, metric);
+    if(!kids.length){
+      haltBody.innerHTML = '<p class="hmsg">Nothing under ' + esc(byId[centerId].name || centerId) +
+        " has any" + unit + " to weigh.</p>";
+      return;
+    }
+    var W = Math.max(haltBody.clientWidth - 10, 320);
+    var H = Math.max(Math.round(window.innerHeight - haltBody.getBoundingClientRect().top - 40), 360);
+    var HEAD = 18, html = [];
+    squarify(kids, 0, 0, W, H).forEach(function(r){
+      var n = byId[r.it.id];
+      var label = titleOf(n, r.it.id, r.it.v, unit);
+      var name = esc(n.name || r.it.id);
+      var sub = weighed(r.it.id, metric);
+      // One nested level where there is room for it: the groups of the
+      // center and what each is made of. Deeper is a click away.
+      if(sub.length && r.w > 60 && r.h > HEAD + 24){
+        var inner = '<div class="tm-head">' + name + " · " + r.it.v + unit + "</div>";
+        squarify(sub, 2, HEAD, r.w - 6, r.h - HEAD - 4).forEach(function(c){
+          var cn = byId[c.it.id];
+          var cl = titleOf(cn, c.it.id, c.it.v, unit);
+          inner += tmBox("tm-tile", c.it.id, c, cl, (c.w > 46 && c.h > 16) ? esc(cn.name || c.it.id) : "");
+        });
+        html.push(tmBox("tm-group", r.it.id, r, label, inner));
+      } else {
+        html.push(tmBox("tm-tile tm-solo", r.it.id, r, label, (r.w > 46 && r.h > 16) ? name : ""));
+      }
+    });
+    haltBody.removeAttribute("role");
+    haltBody.innerHTML = '<div class="tm" style="width:' + W + "px;height:" + H + 'px">' + html.join("") + "</div>";
+  }
+
+  function drawAltView(view){
+    var center = byId[hcenter];
+    hgraphWrap.style.display = "none";
+    halt.hidden = false;
+    clearGraph();
+    hgraphWrap.parentNode.querySelectorAll(".htrunc").forEach(function(el){ el.remove(); });
+    hlegendEl.innerHTML = view === "tree"
+      ? '<span class="lg">click a name to root the tree there · ▸ folds · arrows, Enter, Home and End work · right-click for more</span>'
+      : '<span class="lg">area = ' + (state.tm === "functions" ? "functions" : "lines of code") +
+        ' · one level nested · right-click for more</span>';
+    hpathEl.textContent = (center.module || center.path) + (view === "tree" ? " · tree" : " · treemap");
+    if(haltBar.dataset.view !== view) haltBar.innerHTML = "";
+    haltBar.dataset.view = view;
+    if(view === "tree") drawTree(hcenter);
+    else drawTreemap(hcenter);
+  }
+
   // How many edges of a graph view touch one node: requires for Deps, call
   // sites for Calls, calling module pairs for Module Calls.
   function graphDegree(view, id){
@@ -7319,6 +7670,10 @@ local JS = [[
       if(busiest && busiest !== hcenter){ hcenter = busiest; autoCentered = true; }
     }
     var center = byId[hcenter];
+
+    if(isAltView(view)){ drawAltView(view); return; }
+    halt.hidden = true;
+    hgraphWrap.style.display = "";
 
     hgraphWrap.parentNode.querySelectorAll(".htrunc").forEach(function(el){ el.remove(); });
     drawLegend(view);
@@ -7915,6 +8270,13 @@ local JS = [[
       b.classList.toggle("active", parseInt(b.dataset.depth, 10) === (s.depth === 0 ? 0 : (s.depth || 2)));
     });
     var show = isGraphView(s.view) ? "" : "none";
+    // Orientation, gestures, zoom and the SVG export belong to the drawn
+    // diagram; Tree and Treemap are not one.
+    var diag = isAltView(s.view) ? "none" : "";
+    ["hlr", "hgest", "hzoomreset", "hzoomlabel", "hexport"].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.style.display = diag;
+    });
     document.getElementById("hdir").style.display = show;
     document.getElementById("hdepth").style.display = show;
     // External requires/calls exist only in Deps and Module Calls; the
@@ -10135,6 +10497,8 @@ function M.render(ir, findings, opts)
     '<button class="hview-btn" data-view="modulecalls" data-explain="view.modulecalls">Module Calls</button>',
     '<button class="hview-btn" data-view="types" data-explain="view.types">Types</button>',
     '<button class="hview-btn" data-view="inheritance" data-explain="view.inheritance">Inheritance</button>',
+    '<button class="hview-btn" data-view="tree" data-explain="view.tree">Tree</button>',
+    '<button class="hview-btn" data-view="treemap" data-explain="view.treemap">Treemap</button>',
     "</div>",
     -- Direction and depth belong to the directed views only; `syncGraphControls`
     -- hides them in Modules/Types rather than leaving two control groups that
@@ -10192,6 +10556,9 @@ function M.render(ir, findings, opts)
     '<button class="hroot-btn" id="hrootminus" title="Show one more root level">−</button>',
     "</div>",
     '<div id="hgraph-wrap"><div id="hgraph"><div id="hstage"></div></div></div>',
+    -- Tree and Treemap (see isAltView): a list and an area, so they scroll
+    -- and size like a page rather than zoom like the diagram above.
+    '<div id="halt" hidden><div id="halt-bar" class="hctl"></div><div id="halt-body"></div></div>',
     "</div>",
     '<div class="hlegend" id="hlegend"></div>',
     "</div>",

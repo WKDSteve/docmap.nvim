@@ -238,6 +238,24 @@ uninteresting clicks.
 - **Docs:** [`docs/pipeline.md`](../pipeline.md) "Hiding root levels
   (Modules view)" section.
 
+## Tree and Treemap views (wide levels)
+
+Two Hierarchy views for levels too wide for a row of boxes. **Tree** is the
+directory hierarchy as a folding list from the center, with a filter that
+keeps every match and the path to it, and keyboard navigation (arrows,
+Home/End, Enter roots the tree there). **Treemap** draws everything under the
+center as nested areas, one level deep, sized by lines of code or by
+functions; a click zooms in, a leaf opens in the Tree tab. Both read
+`children` and `stats` only, so they work on every map; rows and tiles take
+the node context menu, and dimmed nodes stay dimmed. Graph views start on the
+busiest node when the URL names no center (the root has no edges of its own).
+
+- **Tab:** true
+- **Module:** `core/render/html.lua` (`drawAltView`, `drawTree`,
+  `drawTreemap`, `squarify`; `graphDegree`, `busiestFor` for the start node)
+- **Config:** none
+- **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
+
 ## Call hierarchy in native LSP UI
 
 `opts.callhierarchy` attaches a second, narrow LSP client to Lua buffers
