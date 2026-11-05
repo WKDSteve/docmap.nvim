@@ -89,4 +89,17 @@ return function(H)
 
   -- Controls that belong to the drawn diagram step aside.
   has('["hlr", "hgest", "hzoomreset", "hzoomlabel", "hexport"]', "diagram-only controls are hidden")
+  -- ...and so are their keys: + - 0 would zoom the diagram that is not shown.
+  has(
+    'if(state.tab !== "hierarchy") return;\n    // Tree and Treemap hide the zoom controls; the keys would otherwise\n    // change the zoom of the diagram that is not on screen.\n    if(isAltView(state.view)) return;',
+    "zoom keys stay out of Tree and Treemap"
+  )
+
+  -- "Hidden (n) — show all" reaches rows and tiles, not only diagram boxes.
+  local sync = src:match("function syncHidden%(%)(.-)\n  }\n")
+  ok(sync ~= nil, "wide levels: syncHidden is found")
+  ok(
+    (sync or ""):find('".ht-row[data-id], .tm-group[data-id], .tm-tile[data-id]"', 1, true) ~= nil,
+    "wide levels: syncHidden re-dims tree rows and treemap areas"
+  )
 end

@@ -1099,6 +1099,12 @@ local JS = [[
     Object.keys(hboxes).forEach(function(key){
       hboxes[key].classList.toggle("hidden", isHidden(key));
     });
+    // Tree rows and Treemap areas dim by node id too; "show all" has to
+    // reach them without waiting for the next redraw.
+    var alt = document.getElementById("halt-body");
+    if(alt) alt.querySelectorAll(".ht-row[data-id], .tm-group[data-id], .tm-tile[data-id]").forEach(function(el){
+      el.classList.toggle("dim", isHidden(el.dataset.id));
+    });
     var bar = document.getElementById("hiddenbar");
     if(!bar) return;
     var n = state.hidden.length;
@@ -8076,6 +8082,9 @@ local JS = [[
   // Keyboard equivalents, so the view is not mouse-only.
   document.addEventListener("keydown", function(ev){
     if(state.tab !== "hierarchy") return;
+    // Tree and Treemap hide the zoom controls; the keys would otherwise
+    // change the zoom of the diagram that is not on screen.
+    if(isAltView(state.view)) return;
     if(ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
     if(ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if(ev.key === "+" || ev.key === "="){ ev.preventDefault(); setZoom(hzoom * 1.2); }
