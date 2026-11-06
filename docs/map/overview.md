@@ -186,6 +186,7 @@ flowchart LR
   nlua_docmap_core_doccoverage_lua --> nlua_docmap_core_check_lua
   nlua_docmap_core_doccoverage_lua --> nlua_docmap_core_render
   nlua_docmap_core_docs_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_docs_lua --> nlua_docmap_core_scan_lua
   nlua_docmap_core_endpoint_coverage_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_core_features_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_find_lua --> nlua_docmap_core_check_lua
