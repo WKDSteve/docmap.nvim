@@ -267,7 +267,10 @@ return function(H)
   eq(
     table.concat(mismatches, "\n    "),
     "",
-    "shim behavior: every compared case answers what Neovim answers\n    "
+    -- The first case on the first line: a report that keeps one line per failure still names it.
+    "shim behavior: every compared case answers what Neovim answers, first: "
+      .. ((mismatches[1] or "none"):gsub("%s*\n%s*", " | "))
+      .. "\n    "
   )
 
   -- The deferred half is stated rather than assumed: a corpus that quietly
