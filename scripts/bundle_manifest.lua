@@ -387,6 +387,20 @@ if #groups.rules == 0 then
   )
 end
 
+-- A bundle that lacks a module one of its own needs at run time is no bundle: this stops the build.
+local manifest_rules = dofile(self_dir .. "/manifest_rules.lua")
+local staged = {}
+for _, entries in pairs(groups) do
+  for _, entry in ipairs(entries) do
+    staged[entry.name] = true
+  end
+end
+local lacking = manifest_rules.missing(staged)
+if #lacking > 0 then
+  io.stderr:write("bundle_manifest: the manifest lacks " .. table.concat(lacking, ", ") .. "\n")
+  os.exit(1)
+end
+
 if not report then
   for _, key in ipairs({ "project", "lib", "runtime_analysis", "rules", "rock" }) do
     for _, entry in ipairs(groups[key]) do

@@ -35,6 +35,7 @@ on:
       - "lua/**"
       - "scripts/package.lua"
       - "scripts/bundle_manifest.lua"
+      - "scripts/manifest_rules.lua"
       - "TESTS/fixtures/rules_engine/**"
       - "scripts/build_engine_release.sh"
       - ".github/workflows/release-engine.yml"
