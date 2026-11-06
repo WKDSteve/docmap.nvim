@@ -364,22 +364,6 @@ end
 
 -- ── Navigation ──────────────────────────────────────────────────────────────
 
----@param st table
----@return table
-local function snapshot(st)
-  return {
-    mode = st.mode,
-    id = st.id,
-    fn = st.fn,
-    dir = st.dir,
-    depth = st.depth,
-    cursor = st.cursor,
-    sha = st.sha,
-    filter = st.filter,
-    filter_raw = st.filter_raw,
-  }
-end
-
 -- `sha` travels with the trail so `<C-o>` out of a commit lands back on the
 -- list rather than on the same commit with a different cursor. The analysis
 -- itself is not snapshotted — it is derived, and re-deriving on the way back
@@ -393,56 +377,22 @@ end
 -- snapshots is safe.
 local SNAP_KEYS = { "mode", "id", "fn", "dir", "depth", "cursor", "sha", "filter", "filter_raw" }
 
---- A patch cannot say "clear this field" with `nil`: `pairs` never yields a
---- key whose value is nil, so `{ sha = nil }` *is* the empty table and the
---- move silently keeps the old value. Found the honest way — `-` out of an
---- opened commit redrew the same function list, because `go` had been handed
---- nothing at all. Hence a sentinel.
-local CLEAR = setmetatable({}, {
-  __tostring = function()
-    return "<clear>"
-  end,
-})
+local history = kit.history
+local CLEAR = history.CLEAR
 
 ---Keep the entry for the position being left in step with the window before
 ---moving off it, so coming back restores the row the user was actually on
----rather than the row they arrived at.
----@param st table
-local function sync_snapshot(st)
-  selected(st)
-  local snap = st.history[st.hindex]
-  if snap then
-    snap.cursor = st.cursor
-  end
-end
-
----Record the current position, then apply `changes`.
----
----`history` holds the whole trail **including where we are now**, and `hindex`
----points at it. That is the model the HTML renderer uses and the one every
----browser uses, and it is worth stating because the alternative — recording
----only *past* positions — is what this did first and it could not work: after
----a move `hindex` addressed the entry before the current one, so the first
----`<C-o>` fell off the front and the second landed one stop too far back.
+---rather than the row they arrived at. `selected` reads the cursor back out of
+---the window into `st`; the trail then records `st`.
 ---@param st table
 ---@param changes table
 local function go(st, changes)
-  sync_snapshot(st)
-
-  -- A new move truncates any forward history, exactly like a browser.
-  for i = #st.history, st.hindex + 1, -1 do
-    st.history[i] = nil
-  end
+  selected(st)
+  st.history:record(st)
 
   local was = { mode = st.mode, id = st.id, fn = st.fn }
 
-  for k, v in pairs(changes) do
-    if v == CLEAR then
-      st[k] = nil
-    else
-      st[k] = v
-    end
-  end
+  history.apply(st, changes)
   if changes.cursor == nil then
     st.cursor = 1
   end
@@ -459,25 +409,17 @@ local function go(st, changes)
     st.filter, st.filter_raw = nil, nil
   end
 
-  st.history[#st.history + 1] = snapshot(st)
-  st.hindex = #st.history
+  st.history:push(st)
   render(st)
 end
 
 ---@param st table
 ---@param delta integer
 local function history_step(st, delta)
-  local target = st.hindex + delta
-  if target < 1 or target > #st.history then
-    return
+  selected(st)
+  if st.history:step(st, delta) then
+    render(st)
   end
-  sync_snapshot(st)
-  st.hindex = target
-  local snap = st.history[target]
-  for _, k in ipairs(SNAP_KEYS) do
-    st[k] = snap[k]
-  end
-  render(st)
 end
 
 ---Descend: into a node's children, or onto a function's own call view.
@@ -1035,22 +977,17 @@ local function set_filter(st)
       if not M.is_open() then
         return
       end
-      st.filter = filter.parse(query)
-      st.filter_raw = st.filter and query or nil
+      local parsed = filter.parse(query)
       -- Back to the top: the row the cursor sat on very likely no longer
       -- exists, and carrying a row index into a shorter list lands somewhere
-      -- arbitrary rather than somewhere related.
-      st.cursor = 1
+      -- arbitrary rather than somewhere related. A patch and not a stop, so
+      -- `<C-o>` away and `<C-i>` back returns to the list as narrowed.
+      st.history:patch(st, {
+        filter = parsed or CLEAR,
+        filter_raw = parsed and query or CLEAR,
+        cursor = 1,
+      })
       render(st)
-
-      -- The current position's snapshot, patched in place rather than through
-      -- `sync_snapshot` — that reads the cursor back out of the window, which
-      -- would undo the line above. Written so `<C-o>` away and `<C-i>` back
-      -- returns to the list as narrowed, not as it was before the filter.
-      local snap = st.history[st.hindex]
-      if snap then
-        snap.cursor, snap.filter, snap.filter_raw = st.cursor, st.filter, st.filter_raw
-      end
       st.slots.list:focus()
     end,
   })
@@ -1696,13 +1633,11 @@ function M.open(opts)
     depth = opts.depth or 2,
     cursor = 1,
     entries = {},
-    history = {},
-    hindex = 1,
     hint = hint,
   }
-  -- The trail starts with where we are, not empty: `hindex` always addresses
-  -- a real entry, which is what lets `history_step` be a plain bounds check.
-  state.history[1] = snapshot(state)
+  -- `dedupe` off: every move stays a stop, also one that lands on the same
+  -- position (`-` from a list with nothing to clear).
+  state.history = history.new({ state = state, keys = SNAP_KEYS, dedupe = false })
 
   if handle then
     state.unsubscribe = handle.on_change(function(new_ir)
