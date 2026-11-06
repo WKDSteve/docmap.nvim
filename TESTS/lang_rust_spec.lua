@@ -266,6 +266,42 @@ return function(H)
       .. "edges that names a file rather than a path through the module tree"
   )
 
+  -- ---------------------------------------------------------------------
+  -- What the Rust panel reads: the trait of an impl, and where `unsafe` lives.
+  -- ---------------------------------------------------------------------
+  do
+    local path = write(
+      "src/unsafety.rs",
+      table.concat({
+        "pub struct W;",
+        "pub trait Doer { fn go(&self); }",
+        "impl Doer for W { fn go(&self) {} }",
+        "impl From<u8> for W { fn from(_: u8) -> Self { W } }",
+        "impl W { pub fn plain(&self) {} }",
+        "pub unsafe fn raw() {}",
+        "pub fn two() { unsafe { a() }; unsafe { b() }; }",
+        "pub fn outer() { fn inner() { unsafe { a() } } }",
+        "",
+      }, "\n")
+    )
+    local fn_by = {}
+    for _, f in ipairs((rs.scan_file(path))) do
+      fn_by[f.name] = f
+    end
+    eq(fn_by["W::go"].impl_trait, "Doer", "a trait method names its trait")
+    eq(fn_by["W::from"].impl_trait, "From<u8>", "as written, generics included")
+    eq(fn_by["W::plain"].impl_trait, nil, "an inherent method has none")
+    eq(fn_by["raw"].is_unsafe, true, "unsafe fn")
+    eq(fn_by["two"].is_unsafe, nil, "absent otherwise")
+    eq(fn_by["two"].unsafe_blocks, 2, "its blocks are counted")
+    eq(fn_by["raw"].unsafe_blocks, nil, "absent without one")
+    eq(
+      fn_by["outer"] and fn_by["outer"].unsafe_blocks,
+      nil,
+      "a nested function's block is not its own"
+    )
+  end
+
   local markers = require("docmap.core.markers")
   eq(#markers.scan_source("// TODO: finish this", rs), 1)
 end

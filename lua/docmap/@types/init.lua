@@ -346,6 +346,10 @@
 ---@field owner string? Name of the scope that owns this function — the class, `impl` block, trait, receiver type or inline module it is declared inside, written exactly as it appears at the front of `name`. `nil` for a free function, and `nil` throughout a language that has no such construct (Lua, C, assembly, Erlang). This is the fact behind the qualified name rather than a second copy of it: `Class.helper` at module scope and `helper` inside `Class` produce the same `name`, and only this field tells them apart. Absent throughout an artifact of schema < 6, where a consumer sees every function as unowned — which is the same shape a Lua or C tree has and therefore degrades into a flat list rather than into an error.
 ---@field owner_kind Docmap.ScopeKind? What the owner is. Set and unset together with `owner` — never one without the other.
 ---@field is_hook boolean? True when this function's name matches React's own hook convention (`^use[A-Z]`, the same signal `eslint-plugin-react-hooks` relies on) — set by `core/lang/ecma.lua`, `nil` for languages with no such convention (Lua never sets it).
+---@field decorators string[]? Python: the decorators on its definition by name, top to bottom, without arguments (`@app.route("/x")` is `app.route`). Absent when there is none. A field rather than a backend-only value because the Analysis panel reads it per function, as it reads `is_hook`.
+---@field impl_trait string? Rust: the trait of the `impl` block holding this method, as written (`From<E>`). Absent for an inherent method.
+---@field is_unsafe boolean? Rust: declared `unsafe fn`. Absent otherwise.
+---@field unsafe_blocks integer? Rust: how many `unsafe { }` blocks it holds, a nested function's not counted. Absent when there is none.
 ---@field snippet string? This function's own source, bounded to `core/snippet.lua`'s `MAX_LINES` — the embeddable tier of `docs/ecosystem.md` §3.5's hover preview. `nil` for an empty/invalid span, a real absence rather than an empty string standing in for one.
 ---@field snippet_omitted integer Lines cut off past the cap; `0` when the whole function fit.
 

@@ -587,6 +587,15 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
   text-transform:uppercase;letter-spacing:.03em;padding:4px 8px;border-bottom:1px solid var(--line);
   background:var(--panel);position:sticky;top:0}
 .antable td{padding:5px 8px;border-bottom:1px dashed var(--line);font-family:var(--mono)}
+.dupview{display:flex;gap:4px;margin:8px 0}
+.dupview-btn{font:inherit;font-size:12.5px;padding:2px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);cursor:pointer}
+.dupview-btn.active{background:var(--accent-soft);border-color:var(--accent)}
+.dupcl-mods{display:flex;flex-wrap:wrap;gap:8px}
+.dupcl-mod{flex-basis:220px;min-width:0;border:1px solid var(--line);border-radius:4px;padding:6px 8px;background:var(--panel)}
+.dupcl-name{font-weight:600;font-size:12.5px;margin-bottom:4px;overflow-wrap:anywhere}
+.dupcl-fn{font-size:12.5px;padding:2px 4px;overflow-wrap:anywhere}
+.dupcl-fn:hover{background:var(--accent-soft)}
+.dupcl-line{color:var(--muted)}
 .anrow{cursor:pointer}
 .anrow:hover td{background:var(--accent-soft)}
 .anflag{color:var(--warn);font-size:11.5px;border:1px solid var(--warn);
@@ -2207,6 +2216,7 @@ local JS = [[
       else if(k === "iview") s.iview = (v === "modules") ? "modules" : "functions";
       else if(k === "atool") s.atool = (v === "doc" || v === "deps" || v === "complexity" ||
         v === "duplicates" || v === "plugins" || v === "lazy" || v === "tools" || v === "hooks" ||
+        v === "decorators" || v === "rust" ||
         v === "checklist" || v === "api" || v === "annotations" ||
         v === "docs" || v === "endpoints" || v === "telemetry" || v === "loaded" ||
         v === "startup" ||
@@ -4408,6 +4418,12 @@ local JS = [[
       "Functions named like a React hook (`^use[A-Z]`, the convention " +
       "eslint-plugin-react-hooks itself relies on). Only JavaScript, " +
       "TypeScript and TSX files are checked for this.",
+    "atool.decorators":
+      "Which decorators a Python tree uses, how often, and on which functions. " +
+      "Only Python files are checked for this.",
+    "atool.rust":
+      "Which types implement which traits, and where `unsafe` lives: `unsafe fn` " +
+      "and functions holding `unsafe` blocks. Only Rust files are checked for this.",
     "atool.docs":
       "Every Markdown file in the tree and how often the rest of the " +
       "documentation points at it — which pages are load-bearing, and which " +
@@ -5595,6 +5611,48 @@ local JS = [[
     return parts.join("");
   }
 
+  // The Duplicates panel as a list or as clusters. Not in the URL: a way of looking
+  // at the same groups, not a place.
+  var dupView = "list";
+
+  // The members of one duplicate group by module, largest first, ties by name.
+  function duplicateClusterModules(g){
+    var by = {}, order = [];
+    g.members.forEach(function(m){
+      var name = m.module || m.node;
+      if(!by[name]){ by[name] = []; order.push(name); }
+      by[name].push(m);
+    });
+    order.sort(function(a, b){
+      if(by[a].length !== by[b].length) return by[b].length - by[a].length;
+      return a < b ? -1 : (a > b ? 1 : 0);
+    });
+    return order.map(function(name){ return { module: name, members: by[name] }; });
+  }
+
+  // One group as a cluster: a box per module, wide by how many of the members it
+  // holds, so one missing abstraction (many copies across modules) can be told
+  // from a coincidence at a glance. The rows are the same as in the list: a click
+  // goes to the module, and `sigTrigger` carries the mark for Compare.
+  function renderDuplicateCluster(g){
+    var mods = duplicateClusterModules(g);
+    var html = ['<section class="dupcl"><h3 class="nhead">' + g.members.length +
+      ' functions in ' + mods.length + ' module' + (mods.length === 1 ? '' : 's') + ', ' +
+      g.size + ' nodes</h3><div class="dupcl-mods">'];
+    mods.forEach(function(mod){
+      html.push('<div class="dupcl-mod" style="flex-grow:' + mod.members.length + '">' +
+        '<div class="dupcl-name">' + esc(mod.module) + '</div>');
+      mod.members.forEach(function(m){
+        html.push('<div class="anrow dupcl-fn" data-node="' + esc(m.node) + '">' +
+          esc(m.signature || m.name) + sigTrigger(m.node, m.name) +
+          ' <span class="dupcl-line">:' + m.line + '</span></div>');
+      });
+      html.push('</div>');
+    });
+    html.push('</div></section>');
+    return html.join("");
+  }
+
   // Structural duplicates, straight off `ir.duplicates` — computed in Lua by
   // duplicates.lua rather than here, unlike the fan-in/fan-out panel. That one
   // is an aggregation over data already serialised; this one needs the parse
@@ -5648,6 +5706,15 @@ local JS = [[
       if(groups.length === 0){
         return parts.join("") + '<p class="ntext none">No group matches that filter.</p>';
       }
+    }
+
+    parts.push('<p class="dupview" role="group" aria-label="How to show the groups">' +
+      '<button class="dupview-btn' + (dupView === "list" ? ' active' : '') + '" data-dupview="list">List</button>' +
+      '<button class="dupview-btn' + (dupView === "clusters" ? ' active' : '') + '" data-dupview="clusters">Clusters</button>' +
+      '</p>');
+    if(dupView === "clusters"){
+      groups.forEach(function(g){ parts.push(renderDuplicateCluster(g)); });
+      return parts.join("");
     }
 
     groups.forEach(function(g){
@@ -6174,6 +6241,111 @@ local JS = [[
     return parts.join("");
   }
 
+  // A panel of one row per finding, straight off fields a backend set per
+  // function, in the shape of `renderAnalysisHooks`. The empty state names the
+  // language: a tree without it has none, which is not the same as "none used".
+  function renderLanguageRows(rows, cols, words){
+    if(rows.length === 0) return '<p class="ntext none">' + words.empty + '</p>';
+    var totalRows = rows.length;
+    rows = anFilter(rows);
+    anSort(rows, cols, function(a, b){
+      if(a.name !== b.name) return a.name < b.name ? -1 : 1;
+      if(a.node.id !== b.node.id) return a.node.id < b.node.id ? -1 : 1;
+      return a.line - b.line;
+    });
+    var parts = [];
+    parts.push('<p class="nsub">' + words.summary(totalRows) +
+      anFilterNote(rows.length, totalRows) + '</p>');
+    if(rows.length === 0){
+      return parts.join("") + '<p class="ntext none">Nothing matches that filter.</p>';
+    }
+    parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
+    rows.forEach(function(r){
+      var cells = cols.map(function(c){
+        var text = c.get(r);
+        var mark = c.key === "fname" ? sigTrigger(r.node.id, r.fn.name) : "";
+        return '<td>' + esc(String(text)) + mark + '</td>';
+      });
+      parts.push('<tr class="anrow" data-node="' + esc(r.node.id) + '">' + cells.join("") + '</tr>');
+    });
+    parts.push("</tbody></table>");
+    return parts.join("");
+  }
+
+  // Python decorators, off `fn.decorators`: what a tree decorates with and where.
+  // One row per use, with how often that name occurs: sorted by name the uses of
+  // one decorator stand together, sorted by Uses the most common comes first.
+  function renderAnalysisDecorators(){
+    var rows = [], uses = {};
+    IR.nodes.forEach(function(n){
+      var module = n.module || n.path;
+      (n.functions || []).forEach(function(fn){
+        (fn.decorators || []).forEach(function(d){
+          uses[d] = (uses[d] || 0) + 1;
+          rows.push({
+            node: n, fn: fn, name: d, fname: fn.name, module: module, line: fn.line,
+            haystack: d + " " + fn.name + " " + module
+          });
+        });
+      });
+    });
+    rows.forEach(function(r){ r.uses = uses[r.name]; });
+    return renderLanguageRows(rows, [
+      { label: "Decorator", key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: "Uses", key: "uses", get: function(r){ return r.uses; }, initial: "desc" },
+      { label: "Function", key: "fname", get: function(r){ return r.fname; }, initial: "asc" },
+      { label: "Declared in", key: "module", get: function(r){ return r.module; }, initial: "asc" },
+      { label: "Line", key: "line", get: function(r){ return r.line; }, initial: "asc" }
+    ], {
+      empty: "No function with a decorator was found. Only Python files are " +
+        "checked for this, so a tree without Python has none.",
+      summary: function(total){
+        return total + " use" + (total === 1 ? "" : "s") + " of " +
+          Object.keys(uses).length + " decorator" + (Object.keys(uses).length === 1 ? "" : "s") + ".";
+      }
+    });
+  }
+
+  // Rust structure, off `fn.impl_trait`, `fn.is_unsafe` and `fn.unsafe_blocks`. It
+  // answers two questions: which types implement which traits, and where `unsafe`
+  // lives. A trait impl without a method (`impl Send for T {}`) is no row: the
+  // field sits on the method, and the map records functions.
+  function renderAnalysisRust(){
+    var rows = [];
+    IR.nodes.forEach(function(n){
+      var module = n.module || n.path;
+      (n.functions || []).forEach(function(fn){
+        function row(kind, name, detail){
+          rows.push({
+            node: n, fn: fn, kind: kind, name: name, detail: detail, fname: fn.name,
+            module: module, line: fn.line,
+            haystack: kind + " " + name + " " + fn.name + " " + module
+          });
+        }
+        if(fn.impl_trait) row("impl", fn.impl_trait + " for " + fn.owner, "");
+        if(fn.is_unsafe) row("unsafe", "unsafe fn", "");
+        if(fn.unsafe_blocks) row("unsafe", "unsafe block",
+          fn.unsafe_blocks + " block" + (fn.unsafe_blocks === 1 ? "" : "s"));
+      });
+    });
+    return renderLanguageRows(rows, [
+      { label: "Kind", key: "kind", get: function(r){ return r.kind; }, initial: "asc" },
+      { label: "What", key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: "Function", key: "fname", get: function(r){ return r.fname; }, initial: "asc" },
+      { label: "Detail", key: "detail", get: function(r){ return r.detail; }, initial: "asc" },
+      { label: "Declared in", key: "module", get: function(r){ return r.module; }, initial: "asc" },
+      { label: "Line", key: "line", get: function(r){ return r.line; }, initial: "asc" }
+    ], {
+      empty: "No trait implementation and no <code>unsafe</code> was found. Only " +
+        "Rust files are checked for this, so a tree without Rust has none.",
+      summary: function(total){
+        var impl = rows.filter(function(r){ return r.kind === "impl"; }).length;
+        return impl + " trait method" + (impl === 1 ? "" : "s") + ", " +
+          (total - impl) + " place" + (total - impl === 1 ? "" : "s") + " with <code>unsafe</code>.";
+      }
+    });
+  }
+
   // The documentation corpus itself (`ir.docs.files`) — every `.md` file
   // `core/docs.lua` scanned, with how many code-span mentions it made.
   // ecosystem.md §3.4 calls this "cheap, once the corpus scan exists": no
@@ -6323,7 +6495,8 @@ local JS = [[
   var analysisCache = {};
 
   function anCacheKey(atool){
-    return atool + "|" + (state.asort || "") + "|" + (state.adir || "") + "|" + (state.q || "");
+    return atool + "|" + (state.asort || "") + "|" + (state.adir || "") + "|" + (state.q || "") +
+      "|" + dupView;
   }
 
   ///Render one panel from scratch. Sort and filter come from `state`.
@@ -6354,6 +6527,8 @@ local JS = [[
     if(atool === "complexity") return renderAnalysisComplexity();
     if(atool === "duplicates") return renderAnalysisDuplicates();
     if(atool === "hooks") return renderAnalysisHooks();
+    if(atool === "decorators") return renderAnalysisDecorators();
+    if(atool === "rust") return renderAnalysisRust();
     if(atool === "lazy") return renderAnalysisLazy();
     if(atool === "docs") return renderAnalysisDocs();
     if(atool === "endpoints") return renderAnalysisEndpoints();
@@ -6367,6 +6542,7 @@ local JS = [[
       state.atool === "complexity" || state.atool === "duplicates" ||
       state.atool === "plugins" || state.atool === "lazy" ||
       state.atool === "tools" || state.atool === "hooks" ||
+      state.atool === "decorators" || state.atool === "rust" ||
       state.atool === "docs" || state.atool === "endpoints" || state.atool === "telemetry" ||
       state.atool === "loaded" || state.atool === "checklist" ||
       state.atool === "api" || state.atool === "annotations" ||
@@ -6422,6 +6598,13 @@ local JS = [[
     host.querySelectorAll(".anrow").forEach(function(tr){
       tr.addEventListener("click", function(){
         navigate({ tab: "tree", id: tr.dataset.node });
+      });
+    });
+
+    host.querySelectorAll(".dupview-btn").forEach(function(b){
+      b.addEventListener("click", function(){
+        dupView = b.dataset.dupview;
+        drawAnalysis();
       });
     });
 
@@ -10611,6 +10794,8 @@ function M.render(ir, findings, opts)
     '<button class="anview-btn plugin-gated" data-atool="tools" data-explain="atool.tools">Tools</button>',
     '<button class="anview-btn" data-atool="checklist" data-explain="atool.checklist">Checklist</button>',
     '<button class="anview-btn" data-atool="hooks" data-explain="atool.hooks">Hooks</button>',
+    '<button class="anview-btn" data-atool="decorators" data-explain="atool.decorators">Decorators</button>',
+    '<button class="anview-btn" data-atool="rust" data-explain="atool.rust">Rust</button>',
     '<button class="anview-btn" data-atool="docs" data-explain="atool.docs">Docs</button>',
     '<button class="anview-btn" data-atool="endpoints" data-explain="atool.endpoints">Endpoints</button>',
     -- The runtime-fed tools as one group at the end of the toolbar: what ran, as opposed to what the

@@ -344,6 +344,41 @@ return function(H)
   -- Markers come from `#` comments and only those. A "TODO" inside a
   -- docstring is prose the author published on purpose.
   -- ---------------------------------------------------------------------
+  -- ---------------------------------------------------------------------
+  -- Decorators, by name and top to bottom, without their arguments. A field
+  -- on the function, read by the Analysis panel; absent when there is none.
+  -- ---------------------------------------------------------------------
+  do
+    local deco_file = vim.fn.tempname() .. ".py"
+    local fh = assert(io.open(deco_file, "w"))
+    fh:write(table.concat({
+      "import functools",
+      "",
+      "@app.route('/x', methods=['GET'])",
+      "@functools.lru_cache",
+      "def view():",
+      "    pass",
+      "",
+      "def plain():",
+      "    pass",
+      "",
+      "class Thing:",
+      "    @property",
+      "    def value(self):",
+      "        return 1",
+      "",
+    }, "\n"))
+    fh:close()
+    local deco = {}
+    for _, f in ipairs((py.scan_file(deco_file))) do
+      deco[f.name] = f
+    end
+    eq(table.concat(deco["view"].decorators, " "), "app.route functools.lru_cache", "name only")
+    eq(deco["plain"].decorators, nil, "the field stays absent without one")
+    eq(deco["Thing.value"].decorators[1], "property", "a method's decorator too")
+    os.remove(deco_file)
+  end
+
   local markers = require("docmap.core.markers")
   eq(#markers.scan_source("# TODO: finish this", py), 1)
 end

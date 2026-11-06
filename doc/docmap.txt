@@ -43,7 +43,8 @@ at a repository whose files carry `---@module` and it produces:
                                structural duplicates, lazy.nvim plugin specs,
                                declared external tools (lib.nvim.deps),
                                React hooks (functions named like
-                               `^use[A-Z]`), the documentation corpus (which
+                               `^use[A-Z]`), Python decorators, Rust trait
+                               impls and `unsafe`, the documentation corpus (which
                                `.md` files exist and how much they
                                reference), and call-based API routes
                                (Express/Fastify/Koa-shaped). The Features tab

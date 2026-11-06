@@ -885,7 +885,8 @@ function M.scan_file(path)
 
   ---@param node TSNode `function_definition`
   ---@param owner string? Enclosing class name, for a qualified display name.
-  local function record_function(node, owner)
+  ---@param decorators string[]? What `decorators_of` found on its definition.
+  local function record_function(node, owner, decorators)
     local name_node = child_of(node, "identifier")
     if not name_node then
       return
@@ -932,6 +933,7 @@ function M.scan_file(path)
       -- see `Docmap.ScopeKind` for why it is recorded anyway.
       owner = owner,
       owner_kind = owner and "class" or nil,
+      decorators = decorators,
       see = {},
       overload = {},
       todo = {},
@@ -940,10 +942,32 @@ function M.scan_file(path)
     }
   end
 
+  ---The decorators on a `decorated_definition`, by name and top to bottom:
+  ---`@app.route("/x")` is `app.route`. The arguments stay out: the question is
+  ---what a tree decorates with, and a route per argument would hide it.
+  ---Recorded per function (`Docmap.FunctionInfo.decorators`), not per class: the
+  ---panel jumps to a function, and a class has no row to land on.
+  ---@param node TSNode
+  ---@return string[]? names `nil` when there is none, so the field stays absent.
+  local function decorators_of(node)
+    if node:type() ~= "decorated_definition" then
+      return nil
+    end
+    local names = {}
+    for child in node:iter_children() do
+      if child:type() == "decorator" then
+        local text = text_of(child, src):gsub("^@%s*", "")
+        local name = vim.trim((text:match("^[^(]*")))
+        if name ~= "" then
+          names[#names + 1] = name
+        end
+      end
+    end
+    return #names > 0 and names or nil
+  end
+
   ---Unwrap `@decorator`-wrapped definitions so a `@property` is still a
-  ---function and a `@dataclass` is still a class. The decorator itself is
-  ---not modelled — the IR has no field for it, and recording the name
-  ---without its meaning would be a list nobody could act on.
+  ---function and a `@dataclass` is still a class.
   ---@param node TSNode
   ---@return TSNode
   local function undecorate(node)
@@ -974,7 +998,7 @@ function M.scan_file(path)
         }
       end
     elseif kind == "function_definition" then
-      record_function(node, nil)
+      record_function(node, nil, decorators_of(top))
     elseif kind == "class_definition" then
       local name_node = child_of(node, "identifier")
       local class_name = name_node and text_of(name_node, src)
@@ -991,7 +1015,7 @@ function M.scan_file(path)
         for member in block:iter_children() do
           local m = undecorate(member)
           if m:type() == "function_definition" then
-            record_function(m, class_name)
+            record_function(m, class_name, decorators_of(member))
           end
         end
       end

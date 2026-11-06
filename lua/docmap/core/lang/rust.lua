@@ -367,6 +367,36 @@ local function is_internal(node, src, inherited)
   return text_of(vis, src):gsub("%s+", "") ~= "pub"
 end
 
+---Is this an `unsafe fn`? `true` or `false`; the caller stores only `true`.
+---@param node TSNode `function_item`
+---@param src string
+---@return boolean
+local function unsafe_modifier(node, src)
+  local mods = child_of(node, "function_modifiers")
+  return mods ~= nil and text_of(mods, src):find("unsafe", 1, true) ~= nil
+end
+
+---How many `unsafe { }` blocks a function holds, a nested function's not counted: those are
+---its own row. `nil` when there is none, so the field stays absent.
+---@param node TSNode `function_item`
+---@return integer?
+local function unsafe_blocks(node)
+  local count = 0
+  local function walk(n)
+    for child in n:iter_children() do
+      local kind = child:type()
+      if kind == "unsafe_block" then
+        count = count + 1
+      end
+      if kind ~= "function_item" then
+        walk(child)
+      end
+    end
+  end
+  walk(node)
+  return count > 0 and count or nil
+end
+
 ---@param node TSNode? `parameters`
 ---@param src string
 ---@return string[]
@@ -742,7 +772,7 @@ function M.scan_file(path)
   ---@param inherited boolean? The enclosing trait's visibility, when inside one.
   ---@param kind Docmap.ScopeKind? What `scope` is, when there is one. Rust is the language that most needs the distinction kept: `x::helper`, `Widget::new` and `Doer::go` are written identically and are an inline module's function, an inherent method and a trait method.
   ---@param module_scope string? The inline module the function sits in, which a method's `scope` (its type) does not say.
-  local function record_function(node, scope, inherited, kind, module_scope)
+  local function record_function(node, scope, inherited, kind, module_scope, impl_trait)
     local name_node = child_of(node, "identifier")
     if not name_node then
       return
@@ -763,6 +793,9 @@ function M.scan_file(path)
       internal = is_internal(node, src, inherited),
       owner = kind and scope or nil,
       owner_kind = scope and kind or nil,
+      impl_trait = impl_trait,
+      is_unsafe = unsafe_modifier(node, src) or nil,
+      unsafe_blocks = unsafe_blocks(node),
       see = {},
       overload = {},
       todo = {},
@@ -857,13 +890,16 @@ function M.scan_file(path)
           ty = ty:field("name")[1]
         end
         local owner = ty and ty:type() == "type_identifier" and text_of(ty, src) or scope
+        -- The trait as written, generics and path included: `From<E>` is not `From<F>`.
+        local trait = child:field("trait")[1]
+        local trait_name = trait and text_of(trait, src) or nil
         local body = child_of(child, "declaration_list")
         if body then
           for member in body:iter_children() do
             if member:type() == "function_item" then
               -- `impl` rather than the type's own `struct`/`enum` kind: the
               -- block is what groups these, and one type can have several.
-              record_function(member, owner, nil, "impl", scope)
+              record_function(member, owner, nil, "impl", scope, trait_name)
             end
           end
         end

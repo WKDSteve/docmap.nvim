@@ -3691,3 +3691,23 @@ the non-test functions of `freshness.rs` by hand, 12 of 12, no wrong edge.
 - **Tests:** `rust_calls_spec` (the `TESTS/fixtures/rscalls/` crate,
   `cargo check` clean, fifteen edges counted by hand, the trait-impl owner,
   and the `::` resolver on a hand-built IR); CI now builds the Rust grammar
+
+## Decorators and Rust panels, duplicate clusters (2026-11-06)
+
+**Decorators** (Analysis): which decorators a Python tree uses, how often, and on which
+functions. `FunctionInfo.decorators` holds the names without arguments; a field rather
+than a value computed for the panel, because the panel reads it per function as it reads
+`is_hook`. Additive and absent when empty, so no schema bump. Class decorators are not
+listed: a class has no row to jump to.
+
+**Rust** (Analysis): which types implement which traits (`FunctionInfo.impl_trait`) and
+where `unsafe` lives (`is_unsafe`, `unsafe_blocks`). A trait impl without a method
+(`impl Send for T {}`) is no row, because the fields sit on functions.
+
+**Clusters** (Duplicates panel, next to the list): a box per module, wide by how many
+members it holds, so one missing abstraction across modules can be told from a
+coincidence. The rows carry the same marks as the list, so the Compare tab works from it.
+
+Driven by hand on a tree with Python, one with Rust and one with Lua duplicates: rows,
+jump to the module, the mark and the Compare counter. Specs: `lang_python_spec`,
+`lang_rust_spec`, `analysis_language_panels_spec` (the wiring).
