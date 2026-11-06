@@ -1668,6 +1668,9 @@ local batch_tried = {}
 ---@type table<string, true>
 local swept = {}
 
+---Is `uv.fs_realpath` running? See `prefetch_below`.
+local resolving = false
+
 ---Does `dir` hold anything? An empty directory is never asked about: the
 ---walk finds no entry of it to classify.
 ---@param dir string
@@ -1720,10 +1723,16 @@ end
 ---
 ---Done once per directory: a second sweep would only meet what the first
 ---could not list, and would read the whole directory again to find it.
+---
+---Off while `uv.fs_realpath` runs (`resolving`): it asks about one entry per
+---ancestor and walks nothing below them, so a sweep of `C:/` or of
+---`C:/Program Files (x86)` would be up to `MAX_PREFETCH` directories of work per
+---ancestor for nothing (over 60 s on a GitHub Windows runner). A walk that comes
+---later still sweeps: skipping sets no `swept` mark.
 ---@param dir string A directory that has been listed.
 ---@param census Standalone.WinLinks.Census Its listing.
 local function prefetch_below(dir, census)
-  if swept[census_key(dir)] then
+  if resolving or swept[census_key(dir)] then
     return
   end
   swept[census_key(dir)] = true
@@ -2254,7 +2263,7 @@ end
 ---@return string|nil resolved
 ---@return string|nil err
 ---@return string|nil code
-function uv.fs_realpath(path)
+local function realpath(path)
   if type(path) ~= "string" or path == "" then
     return nil, "ENOENT: no such file or directory: " .. tostring(path), "ENOENT"
   end
@@ -2345,6 +2354,22 @@ function uv.fs_realpath(path)
     resolved = resolved:gsub("/", "\\")
   end
   return resolved
+end
+
+---`realpath`, without listing ahead (see `prefetch_below`).
+---@param path string
+---@return string|nil resolved
+---@return string|nil err
+---@return string|nil code
+function uv.fs_realpath(path)
+  local outer = resolving
+  resolving = true
+  local ran, resolved, err, code = pcall(realpath, path)
+  resolving = outer
+  if not ran then
+    error(resolved, 0)
+  end
+  return resolved, err, code
 end
 
 ---@param path string

@@ -703,6 +703,33 @@ return function(H)
     return world
   end
 
+  -- `uv.fs_realpath` asks about one entry per ancestor and walks nothing below
+  -- them: listing ahead there cost over 60 s under `C:/Program Files (x86)` on a
+  -- GitHub Windows runner. A walk that comes later still gets its batches.
+  do
+    local world = windows_world()
+    local shim = load_shim(world.lfs, true)
+    local real_popen = io.popen
+    io.popen = world.popen
+    local ran, err = pcall(function()
+      local resolved = shim.uv.fs_realpath("C:/tree/src/core/deep/f.lua")
+      eq(
+        (tostring(resolved):gsub("\\", "/")),
+        "C:/tree/src/core/deep/f.lua",
+        "realpath: resolves the path"
+      )
+      eq(#world.batches, 0, "realpath: lists nothing ahead")
+      ok(#world.commands <= 5, "realpath: one listing per ancestor: " .. #world.commands)
+      for _ in shim.fs.dir("C:/tree/docs") do
+      end
+      ok(#world.batches > 0, "realpath: a later walk still lists ahead")
+    end)
+    io.popen = real_popen
+    if not ran then
+      error(err, 0)
+    end
+  end
+
   do
     local world = windows_world()
     local shim = load_shim(world.lfs, true)
