@@ -292,7 +292,7 @@ flowchart LR
 | &nbsp;&nbsp;&nbsp;&nbsp;`glossary` |  |  |  |
 | &nbsp;&nbsp;`render` |  |  |  |
 | `editor` |  |  | [README](../../lua/docmap/editor/README.md) |
-| &nbsp;&nbsp;`docmap.editor.browse` | `:DocBrowse` — the module map inside the editor. | 42 | [README](../../lua/docmap/editor/browse/README.md) · [src](../../lua/docmap/editor/browse/init.lua) |
+| &nbsp;&nbsp;`docmap.editor.browse` | `:DocBrowse` — the module map inside the editor. | 40 | [README](../../lua/docmap/editor/browse/README.md) · [src](../../lua/docmap/editor/browse/init.lua) |
 | `integrations` |  |  |  |
 | `docmap.mcp` | An MCP (Model Context Protocol) server exposing this repository's module map to a coding agent. | 1 | [src](../../lua/docmap/mcp/init.lua) |
 | `docmap.testing` | Which specs does a change touch, and what do the specs say about the map. | 20 | [README](../../lua/docmap/testing/README.md) · [src](../../lua/docmap/testing/init.lua) |
