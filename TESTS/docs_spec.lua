@@ -244,4 +244,82 @@ return function(H)
   eq(result.missing[1].node, "n/scan", "docs: ... and the node to attribute it to")
 
   vim.fn.delete(tmp, "rf")
+
+  -- ---------------------------------------------------------------------
+  -- corpus -- vendored and generated directories are not entered
+  -- ---------------------------------------------------------------------
+  -- The scanner leaves `scan.VENDOR_DIRS` alone by name, wherever they appear,
+  -- and so does the corpus. The saving is in what the walk never asks the file
+  -- system: the standalone build on Windows starts one `cmd.exe` for every
+  -- directory it lists or looks into, so a `target/` with hundreds of
+  -- directories is only cheap when nothing in it is touched.
+  do
+    local safe_fs = require("docmap.core.safe_fs")
+    local base = (vim.fn.tempname():gsub("\\", "/"))
+    for _, rel in ipairs({
+      "docs/g.md",
+      "docs/guide/deep.md",
+      "docs/map/overview.md",
+      "src/s.md",
+      -- Only the exact name is a vendor directory, not a name that starts like one.
+      "build_notes/n.md",
+      -- The same names, wherever they appear.
+      "src/target/inner.md",
+      "docs/build/guide.md",
+      "target/x/y.md",
+      "dist/a.md",
+      "build/b.md",
+      "out/o.md",
+      "vendor/v.md",
+      "venv/lib/z.md",
+      "bower_components/p/q.md",
+      "node_modules/dep/readme.md",
+      ".git/hooks/h.md",
+    }) do
+      vim.fn.mkdir(vim.fs.dirname(base .. "/" .. rel), "p")
+      vim.fn.writefile({ "# " .. rel }, base .. "/" .. rel)
+    end
+    local root = (vim.uv.fs_realpath(base):gsub("\\", "/"))
+
+    -- Every directory the walk asks about: one it lists, or the parent of a
+    -- path it looks at.
+    local touched, seen = {}, {}
+    local function note(dir)
+      local rel = (dir:gsub("\\", "/")):sub(#root + 2)
+      rel = rel == "" and "." or rel
+      if not seen[rel] then
+        seen[rel] = true
+        touched[#touched + 1] = rel
+      end
+    end
+    local real = safe_fs.host
+    safe_fs.host = setmetatable({
+      scandir = function(path)
+        note(path)
+        return real.scandir(path)
+      end,
+      lstat = function(path)
+        note((path:gsub("\\", "/")):match("^(.*)/[^/]+$"))
+        return real.lstat(path)
+      end,
+    }, { __index = real })
+    local ran, found = pcall(docs.corpus, { root = root, out_dir = "docs/map" })
+    safe_fs.host = real
+    vim.fn.delete(base, "rf")
+    if not ran then
+      error(found, 0)
+    end
+
+    eq(
+      table.concat(found, " "),
+      "build_notes/n.md docs/g.md docs/guide/deep.md src/s.md",
+      "docs: dot-directories, out_dir and scan.VENDOR_DIRS are not in the corpus, a name that merely starts like one is"
+    )
+    table.sort(touched)
+    eq(
+      table.concat(touched, " "),
+      ". build_notes docs docs/guide src",
+      "docs: ... and none of them is listed or looked into"
+    )
+  end
 end

@@ -123,7 +123,10 @@ write and read above. Checkout content alone cannot do this; it takes a second
 process with write access to the tree.
 
 **Reading.** The source walk, the source roots, `.docmap.json`, the prose
-corpus (every `.md` under the root), the tests directory, the Features and
+corpus (every `.md` under the root, except `out_dir`, dot-directories and the
+vendored or generated directories the scanner skips by name, such as `target`,
+`dist`, `build` and `out`: `docs/build/guide.md` is not read or checked), the
+tests directory, the Features and
 Checklist folders, the targets of README links and the committed map follow a
 link only if, resolved one step at a time without opening anything on the way,
 it stays inside the project. The committed map is read by `--check`, the app's

@@ -1,5 +1,5 @@
 # Builds the standalone engine (scripts/package.lua's full-fidelity output)
-# plus its four tree-sitter grammars, for Linux and Windows, and publishes
+# plus its tree-sitter grammars, for Linux and Windows, and publishes
 # them as assets on a single rolling release rather than a numbered one.
 #
 # Why rolling: this repository has no version-tag scheme of its own, and

@@ -1154,8 +1154,10 @@ This holds whoever set `out_dir` (the default, a flag, your options or a
 project too. It covers `module_map.json`, `index.html`, `overview.md`,
 `coverage.svg` and `overview.pdf`.
 
-Reading: the source walk, the source roots, `.docmap.json`, the prose corpus,
-the tests directory, the Features and Checklist folders, README link targets,
+Reading: the source walk, the source roots, `.docmap.json`, the prose corpus
+(without `out_dir`, dot-directories and the vendored or generated directories
+the scanner skips by name, such as `build`, so `docs/build/guide.md` is not
+checked), the tests directory, the Features and Checklist folders, README link targets,
 the install manifest (`docs/install.json`, `docs/INSTALL.md`), the spec roots
 of `spec_state` and the committed map follow a link only if, resolved one step
 at a time, it stays inside the project. The committed map is read by

@@ -267,7 +267,7 @@ local function types_entries(ir, st)
     return {
       {
         kind = "message",
-        label = "(no type data — regenerate with :DocMap full)",
+        label = "(no type data — :DocMap full reads it through lua-language-server)",
       },
     }
   end

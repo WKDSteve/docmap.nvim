@@ -3711,3 +3711,63 @@ coincidence. The rows carry the same marks as the list, so the Compare tab works
 Driven by hand on a tree with Python, one with Rust and one with Lua duplicates: rows,
 jump to the module, the mark and the Compare counter. Specs: `lang_python_spec`,
 `lang_rust_spec`, `analysis_language_panels_spec` (the wiring).
+
+## The prose corpus leaves vendor directories alone (2026-11-06)
+
+`docs.corpus` skips `scan.VENDOR_DIRS` by name, as the source walk does. On docmap-desktop that
+took the walk from 207 listed directories to 12 and from 721 `lstat` calls to 102; the standalone
+build on Windows starts one `cmd.exe` per directory it touches. The corpus lists were identical
+on every real repository measured.
+
+The price, accepted on purpose: Markdown below a directory with one of those names, such as
+`docs/build/guide.md`, is no prose any more, so `doc-references-missing` and the dead-link check
+no longer read it. Not yet measured on a Windows runner (`engine-links-binary-check`).
+
+## Entries caught up on 2026-11-06
+
+These shipped without an entry here. The dates are the commits'; the reasoning is in each
+commit message, and the behaviour is in the page named.
+
+**`orphaned-class-alias` and `test-references-missing` (2026-08-20, `761b193`).** The first is
+`info`: a `@class` or `@alias` that nothing names, reported only when LuaLS enrichment ran, because
+a missing `types_detail` means "never looked", not "no use". The second is `warn`: a spec names
+`mod.member` through a `require` binding and the module has no such member. See
+[`pipeline.md`](pipeline.md).
+
+**`tag-require-missing` and `tag-file-unavailable` (2026-08-20, `7c08f51`).** `tag_files` also
+checks now: a require of this tree that the other project's map no longer declares is a `warn`, the
+mirror of `consumer-require-missing`; a map that cannot be read is an `info`. Built over requires
+rather than `@see`, because the counted `@see` targets gave such a check nothing to do.
+
+**`@media print` (2026-08-20, `aa785ab`).** The page prints whole: scrolling panes are unclipped,
+the colours are forced light, controls are dropped, and rows are not cut by a page break. What
+prints is what is on screen; collapsed branches stay collapsed.
+
+**`:DocMap pick` (2026-08-20, `2525b83`).** The name you know, the line it lives on, without opening
+the browser. Uses `pickers.nvim` when present, otherwise `kit.select`. See
+[`commands.md`](commands.md).
+
+**`K` in the browser (`editor/browse/init.lua`).** In the detail pane, the glossary card for the word
+under the cursor, and only inside a code span; [`WORKFLOW.md`](WORKFLOW.md) has the measurement behind
+that limit. The page's own keyword hover came first (2026-08-18, `2cd7950`).
+
+**GitHub Action (2026-08-20, `81ac944`).** `action.yml` runs the `--check` gate with nothing to copy
+into the repository. See [`reuse.md`](reuse.md) for the path that does copy.
+
+**Language support, optional tools and Mason in `:checkhealth` (2026-08-20, `6029ec6`).** A language
+section per language actually present in the source roots: grammar loaded, none needed, or missing
+with the `:TSInstall` line. The optional-tools section names `lua-language-server` and, only there,
+`:Mason`; the same sentence in a committed page would be advice about a program the reader may not
+be running.
+
+**MCP server (2026-08-11).** `scripts/mcp_server.lua` gives an agent the module tree, the require
+and call graphs and the findings as tools. See [`mcp.md`](mcp.md).
+
+**Compiler Explorer, comparing and a local instance.** The Compare tab opens two marked functions
+side by side, and the link can point at an instance you run yourself, stored in `localStorage` and
+never in the artifact. See [`pipeline.md`](pipeline.md). No first-click question was built: the
+public address stays the default until you set one.
+
+**`--breaking=<ref>` (2026-10-23, `125d43f`).** Fails a branch that removes or changes a published
+function, compared with the committed map at `<ref>`. Exit 0, 1, or 2 for no verdict. It runs instead
+of the map check, so `--check` needs its own step. See [`pipeline.md`](pipeline.md).

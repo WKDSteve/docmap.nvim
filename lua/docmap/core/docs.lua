@@ -733,14 +733,19 @@ end
 ---`out_dir` is excluded and that is not optional: the generated map contains
 ---an `overview.md` naming every module and function in the tree, so
 ---including it would make every entity "documented" by the very artifact
----this is trying to enrich. Dot-directories, `node_modules` and `.deps` are
----excluded as the ordinary noise they are.
+---this is trying to enrich. Dot-directories and the vendored or generated ones
+---the scanner skips too (`scan.VENDOR_DIRS`: `node_modules`, `target`, `dist`,
+---`build`, ...) are excluded as the ordinary noise they are: not read, and not
+---listed either. So Markdown below a directory with one of those names, such as
+---`docs/build/guide.md`, is no prose here and is not checked for references.
 ---@param opts Docmap.Opts
 ---@return string[] repo-relative paths
 function M.corpus(opts)
   local root = opts.root:gsub("\\", "/"):gsub("/+$", "")
   local out_dir = (opts.out_dir or "docs/map"):gsub("^/+", ""):gsub("/+$", "")
   local out_abs = root .. "/" .. out_dir
+  -- The scanner's own list, so both walks leave the same trees alone.
+  local vendor = require("docmap.core.scan").VENDOR_DIRS
 
   -- `safe_fs`, not `lib.nvim.fs.collect_recursive`: this walks the whole
   -- repository, and that walker statted every link to classify it and listed a
@@ -752,7 +757,7 @@ function M.corpus(opts)
         return true
       end
       local name = p:match("([^/]+)$") or ""
-      return name:sub(1, 1) == "." or name == "node_modules"
+      return name:sub(1, 1) == "." or vendor[name] == true
     end
     return false
   end)
