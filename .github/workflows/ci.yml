@@ -69,15 +69,22 @@ jobs:
       - run: scripts/ci.sh luacheck
 
   tests:
-    name: tests (${{ matrix.os }})
+    name: tests (${{ matrix.os }}, Neovim ${{ matrix.nvim }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       # One platform failing must not cancel the others: which of the three
       # broke is the whole information content of this job.
       fail-fast: false
+      # Three platforms on stable, plus the promised minimum on Linux only: the
+      # version floor is an API question, which does not depend on the platform.
+      # TESTS/min_version_spec.lua keeps this line and the docs together.
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        nvim: [stable]
+        include:
+          - os: ubuntu-latest
+            nvim: v0.11.4
     defaults:
       run:
         # Windows runners default to PowerShell; one shell on all three keeps
@@ -134,7 +141,7 @@ jobs:
       - uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
-          version: stable
+          version: ${{ matrix.nvim }}
       # Builds real javascript/typescript/tsx/go grammars from source into
       # .deps/ts-parsers, so the specs that need a parser run their real
       # assertions here instead of their stated skip path — which, before
@@ -179,11 +186,12 @@ jobs:
           exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
           bash scripts/test.sh --json "$RUNNER_TEMP/testing-ir.json"
       - name: Conformance gate
+        if: matrix.nvim == 'stable'
         run: bash scripts/test.sh conformance
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: test-output-tests-${{ matrix.os }}
+          name: test-output-tests-${{ matrix.os }}-${{ matrix.nvim }}
           path: |
             ${{ runner.temp }}/test-output.log
             ${{ runner.temp }}/testing-ir.json

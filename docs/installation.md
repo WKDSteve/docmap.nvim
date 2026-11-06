@@ -4,7 +4,7 @@ Every plugin manager, and the one setting that decides which repository a
 `:DocMap` acts on. The short version lives in [the README](../README.md); this
 page is the complete one.
 
-Requires Neovim 0.10+ (`vim.uv`, `vim.treesitter`) and
+Requires Neovim 0.11+ (`lib.nvim` calls the positional `vim.validate`) and
 [`lib.nvim`](https://github.com/WKDSteve/lib.nvim).
 
 <details open>

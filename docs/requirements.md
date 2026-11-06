@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Neovim | **0.10+** — `vim.uv` and `vim.treesitter` |
+| Neovim | **0.11+** — `lib.nvim` calls the positional `vim.validate` |
 | [lib.nvim](https://github.com/WKDSteve/lib.nvim) | required — `notify`, `fs.*`, `usercmd`, `map`, `debounce`, `autocmd`, `cross.uv.spawn_capture` |
 | A Treesitter parser per language | required for that language's backend; a missing grammar costs precision, not the map — see [languages.md](languages.md) |
 

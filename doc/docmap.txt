@@ -76,7 +76,7 @@ filesystem, and the scanner never knows what will be drawn.
 ==============================================================================
 2. REQUIREMENTS                                     *docmap-requirements*
 
-    - Neovim 0.10+  (vim.uv, vim.treesitter)
+    - Neovim 0.11+  (lib.nvim calls the positional vim.validate)
     - a treesitter Lua parser  (functions, call edges and symbols come from it)
     - lib.nvim      https://github.com/WKDSteve/lib.nvim
     - git, optional — :DocMap diff/impact/serve and :DocBrowse history
