@@ -220,6 +220,27 @@ return function(H)
   -- separately from real mismatches so the message says which it is.
   local unresolved = {}
 
+  -- The same folder can answer to two names: an app packaged for Windows gets
+  -- `AppData\Local` redirected, so a run standing in `...\AppData\Local\x` gets
+  -- `...\Packages\<app>\LocalCache\Local\x` from Neovim's realpath and the name it stands
+  -- under from the shim's. That is where the run stands, not how the shim behaves, so
+  -- exactly that one prefix is evened out. Comparing the targets instead would also pass
+  -- a shim that leaves `..` in a path.
+  local function slashes(path)
+    return (path:gsub("\\", "/"))
+  end
+  local cwd = slashes(saved_vim.fn.getcwd())
+  local real_cwd = slashes(saved_vim.uv.fs_realpath(cwd) or cwd)
+  ---@param answer string
+  ---@return string
+  local function even_out_cwd(answer)
+    local from, to = answer:find(real_cwd, 1, true)
+    if real_cwd == cwd or not from then
+      return answer
+    end
+    return answer:sub(1, from - 1) .. cwd .. answer:sub(to + 1)
+  end
+
   for _, case in ipairs(cases.sorted()) do
     if case.needs == "puc" then
       -- Still resolved against the editor, even though the shim side waits
@@ -237,7 +258,7 @@ return function(H)
       compared = compared + 1
       if want == "missing" or want:sub(1, 13) == "unknown-kind:" then
         unresolved[#unresolved + 1] = case.id .. " -> " .. want
-      elseif want ~= got then
+      elseif even_out_cwd(want) ~= even_out_cwd(got) then
         local line = ("%s\n      neovim: %s\n      shim:   %s"):format(case.id, want, got)
         if case.why then
           line = line .. "\n      case:   " .. case.why
