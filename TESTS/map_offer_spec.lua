@@ -97,6 +97,30 @@ return function(H)
     restore()
   end
 
+  -- answered later (the shared dialog answers on a later loop turn): nothing happens before, then as for the sync answer
+  for _, late in ipairs({ true, false }) do
+    answering(late)
+    local pending
+    ask.confirm = function(question, yes_label, cb)
+      asked[#asked + 1] = { question = question, yes = yes_label }
+      pending = cb
+    end
+    local cfg, target = fresh()
+    local opener = open.opener(cfg, notify, "DocMap", make_map(target))
+    eq(opener(), false, "late " .. tostring(late) .. ": the call reports it did not open")
+    eq(#asked, 1, "late " .. tostring(late) .. ": asked once")
+    eq(generated, 0, "late " .. tostring(late) .. ": nothing is made before the answer")
+    eq(#opened, 0, "late " .. tostring(late) .. ": nothing is opened before the answer")
+    pending(late)
+    eq(
+      generated,
+      late and 1 or 0,
+      "late " .. tostring(late) .. ": the answer decides whether the map is made"
+    )
+    eq(#opened, late and 1 or 0, "late " .. tostring(late) .. ": ...and whether it is opened")
+    restore()
+  end
+
   -- a generation that made no page: told once, not asked again
   do
     answering(true)
