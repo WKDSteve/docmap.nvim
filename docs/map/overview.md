@@ -3,7 +3,7 @@
 > **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**6 modules** · 7 namespaces · 137 helper files
+**7 modules** · 8 namespaces · 149 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
@@ -292,6 +292,8 @@ flowchart LR
 | &nbsp;&nbsp;`lang` |  |  |  |
 | &nbsp;&nbsp;&nbsp;&nbsp;`glossary` |  |  |  |
 | &nbsp;&nbsp;`render` |  |  |  |
+| &nbsp;&nbsp;&nbsp;&nbsp;`html` |  |  |  |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`docmap.core.render.html.js` | The script of the generated page: the slices in `html/js/`, joined in order. |  | [src](../../lua/docmap/core/render/html/js/init.lua) |
 | `editor` |  |  | [README](../../lua/docmap/editor/README.md) |
 | &nbsp;&nbsp;`docmap.editor.browse` | `:DocBrowse` — the module map inside the editor. | 40 | [README](../../lua/docmap/editor/browse/README.md) · [src](../../lua/docmap/editor/browse/init.lua) |
 | `integrations` |  |  |  |
@@ -300,18 +302,19 @@ flowchart LR
 
 ## Drift
 
-0 errors · 0 warnings · 32 info
+0 errors · 0 warnings · 44 info
 
 No errors or warnings.
 
 
 <details>
-<summary>32 informational findings</summary>
+<summary>44 informational findings</summary>
 
 
 | Check | Message |
 |---|---|
 | `dead-function` | M._reset is marked @internal and nothing in the tree calls it |
+| `missing-readme` | lua/docmap/core/render/html/js has no README.md |
 | `undocumented-param` | M.rank has 4 parameter(s) but only 3 @param line(s) |
 | `undocumented-param` | complexity has 3 parameter(s) but only 2 @param line(s) |
 | `undocumented-param` | is_ignorable has 2 parameter(s) but only 0 @param line(s) |
@@ -341,6 +344,17 @@ No errors or warnings.
 | `unreferenced-module` | docmap.core.lang.ts is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.tsx is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.zig is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.01_marks_and_dimming is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.02_explorer_and_state is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.03_tree_findings_tabs_hierarchy is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.04_directed_views_and_notes is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.05_features_help_index is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.06_analysis_tools is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.07_analysis_panels is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.08_history_tree_treemap is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.09_zoom_graph_export is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.10_search_menus_popups is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.11_quicks_compare_init is required by no other file in the tree |
 | `unreferenced-module` | docmap.editor.generate_all is required by no other file in the tree |
 | `unreferenced-module` | docmap.mcp is required by no other file in the tree |
 
