@@ -132,7 +132,7 @@ Three cases yield a changed file with no function attribution, all
 legitimate rather than errors, collected in `unattributed` rather than
 dropped: the path is not a scanned node, the IR predates function scanning,
 or the lines sit outside every function (module-level code — which is why a
-commit editing only the `local JS = [[…]]` block in `render/html.lua`
+commit editing only the script slices under `render/html/js/` (long strings, no function in them)
 correctly attributes nothing).
 
 Nothing here excludes the generated artifacts, and it should not — that is a
@@ -2242,8 +2242,8 @@ match one feature's needs.
 
 **A sharp edge specific to this file's own architecture**, worth stating
 plainly since it cost a debugging pass: the entire embedded client-side
-script sits inside one Lua `[[...]]` long string (`local JS = [[ ... ]]`
-near this file's own top), which ends at the *first* literal `]]` it finds,
+script sits inside Lua `[[...]]` long strings (one per slice, `render/html/js/*.lua`;
+`html.lua` only requires them), each of which ends at the *first* literal `]]` it finds,
 Lua-syntax-blind to what that text means in JS. A link-matching regex
 written the ordinary way, `[^\]]`, contains exactly that byte pair and
 silently truncated the whole script mid-file. Written as `[^\x5d]` instead
