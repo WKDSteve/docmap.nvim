@@ -24,11 +24,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local root = (vim.fn.getcwd():gsub("\\", "/"))
-  local path = root .. "/lua/docmap/core/render/html.lua"
-  local fd = assert(io.open(path, "rb"), "fence spec: html.lua must be readable")
-  local src = fd:read("*a")
-  fd:close()
+  local src = H.html_source()
 
   -- ── The routing guarantee, which holds with or without node ──────────────
   --

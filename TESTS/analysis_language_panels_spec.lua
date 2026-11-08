@@ -9,10 +9,7 @@
 return function(H)
   local ok = H.ok
 
-  local path = (vim.fn.getcwd():gsub("\\", "/")) .. "/lua/docmap/core/render/html.lua"
-  local fd = assert(io.open(path, "rb"), "html.lua must be readable")
-  local src = fd:read("*a")
-  fd:close()
+  local src = H.html_source()
 
   local function has(needle, what)
     ok(src:find(needle, 1, true) ~= nil, what)

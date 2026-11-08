@@ -201,6 +201,7 @@ local specs = {
   "prose_render_spec.lua",
   "startup_graph_spec.lua",
   "fence_render_spec.lua",
+  "html_assets_spec.lua",
   "hierarchy_gestures_spec.lua",
   "hierarchy_default_center_spec.lua",
   "hierarchy_wide_levels_spec.lua",

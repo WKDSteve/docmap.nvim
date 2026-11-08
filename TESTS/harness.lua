@@ -114,6 +114,22 @@ function H.slurp(path)
   return content
 end
 
+--- The source text of the page renderer: `render/html.lua` followed by the files its stylesheet and its script
+--- live in (`render/html/css.lua`, `render/html/js/*.lua`). The specs that pin what the page's own script says read
+--- the text, not the generated page, and the script is no longer in `html.lua` alone.
+---@return string
+function H.html_source()
+  local root = (vim.fn.getcwd():gsub("\\", "/")) .. "/lua/docmap/core/render"
+  local parts = { assert(H.slurp(root .. "/html.lua"), "html.lua must be readable") }
+  parts[#parts + 1] = assert(H.slurp(root .. "/html/css.lua"), "html/css.lua must be readable")
+  local slices = vim.fn.glob(root .. "/html/js/*.lua", false, true)
+  table.sort(slices)
+  for _, file in ipairs(slices) do
+    parts[#parts + 1] = assert(H.slurp(file), file .. " must be readable")
+  end
+  return table.concat(parts, "\n")
+end
+
 ---@param list any[]
 ---@return table<any, true>
 local function set_of(list)

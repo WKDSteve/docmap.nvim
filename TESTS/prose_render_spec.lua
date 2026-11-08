@@ -22,10 +22,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local path = (vim.fn.getcwd():gsub("\\", "/")) .. "/lua/docmap/core/render/html.lua"
-  local fd = assert(io.open(path, "rb"), "prose spec: html.lua must be readable")
-  local src = fd:read("*a")
-  fd:close()
+  local src = H.html_source()
 
   ok(
     src:find("function prose(s){", 1, true) ~= nil,
