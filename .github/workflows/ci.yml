@@ -185,12 +185,16 @@ jobs:
       # nothing. Linux on stable only: the page is the same everywhere. The
       # version is the one mdview.nvim pins; `TESTING_PLAYWRIGHT_DIR` is the
       # folder whose `node_modules` holds it (kept outside the checkout).
+      # `PLAYWRIGHT_BROWSERS_PATH` pins where chromium lives: the spec's child
+      # editor has its own cache directory and would look there otherwise.
       - name: Playwright chromium for the browser sheets
         if: matrix.os == 'ubuntu-latest' && matrix.nvim == 'stable'
         run: |
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/pw-browsers"
           npm install --prefix "$RUNNER_TEMP/pw" --no-save --no-package-lock playwright-core@1.64.1
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright-core" install --with-deps chromium
           echo "TESTING_PLAYWRIGHT_DIR=$RUNNER_TEMP/pw" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
       # Directly, not through `scripts/ci.sh tests`, so the JSON result (the
       # IR) can be written next to the log. `scripts/ci.sh tests` runs the same
       # runner for a local all-gates run.
