@@ -762,4 +762,26 @@ return function(H)
   eq(walk_after, 0, "fresh: walk_files asks the disk again, and finds the link")
 
   vim.fn.delete(base, "rf")
+
+  -- A root as Windows hands it out: backslashes, and an 8.3 short name whose canonical spelling is the long one
+  -- (the temp folder of a hosted runner is `C:\Users\RUNNER~1\...`). A file below it is below it: neither spelling
+  -- of the root matched the slashed path before, so the map of `:DocMap` counted as missing there.
+  if vim.fn.has("win32") == 1 then
+    local long = vim.fn.tempname() .. "-a-folder-with-a-long-name"
+    vim.fn.mkdir(long .. "/docs/map", "p")
+    H.write(long .. "/docs/map/index.html", { "<html></html>" })
+    local short =
+      vim.trim(vim.fn.system({ "cmd", "/c", "for %I in (" .. long .. ") do @echo %~sI" }))
+    if vim.v.shell_error == 0 and short ~= "" and short:lower() ~= long:lower() then
+      safe_fs.forget()
+      ok(
+        safe_fs.is_file(short, short .. "/docs/map/index.html"),
+        "a root with a short name and backslashes holds its files: " .. short
+      )
+      ok(safe_fs.is_file(long, long .. "/docs/map/index.html"), "and so does its long spelling")
+    else
+      print("n/a  no 8.3 short name for " .. long .. ": the short-name case is not checked here")
+    end
+    vim.fn.delete(long, "rf")
+  end
 end

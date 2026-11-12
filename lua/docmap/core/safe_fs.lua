@@ -252,7 +252,9 @@ end
 ---@return string?
 local function strip_root(root, abs)
   abs = slashed(abs)
-  local bases = { root }
+  -- `root` as a caller wrote it (`vim.fn.tempname()` on Windows has backslashes): with the slashes of `abs`, or a
+  -- root whose canonical spelling is another one (a 8.3 short name such as `RUNNER~1`) matched neither spelling
+  local bases = { (slashed(root):gsub("/+$", "")) }
   local alternative = real_root(root)
   if alternative and alternative ~= root then
     bases[2] = alternative
