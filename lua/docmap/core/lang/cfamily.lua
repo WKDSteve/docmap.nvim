@@ -5,6 +5,11 @@
 --- that differ in what they can express and agree almost entirely on how a
 --- function, a comment and an include look.
 ---
+--- **Calls across a header and its source (decided 2026-11-12).** A call resolves in the calling file first, then
+--- through the files it `#include`s: the first included header that declares the name, and from there the definition
+--- in the header's source of the same stem (`a.h` -> `a.c`/`a.cpp`/...) when there is one, else the prototype. See
+--- `call_via_includes` at the end of this file; the resolver step is in `core/calls.lua`.
+---
 --- **The problem Phase 5 of the multi-language work warned about,
 --- and the answer taken.** A `.h` prototype and its `.c` body are two nodes
 --- describing one function, and `Docmap.FunctionInfo` models one
@@ -389,6 +394,50 @@ local function is_static(node, src)
   return false
 end
 
+---Every call whose callee is a plain name (`f(x)`) or a qualified one (`ns::f(x)`, `Thing::go(x)`), attributed to the
+---function whose span holds it. Rows are 0-based.
+---
+---**What is deliberately not a call site here.** `obj.method()` and `ptr->method()` (a `field_expression`) name a
+---member of a value whose type this backend cannot see: `obj` could be anything, and the resolver would read `obj` as
+---a module alias. Function-pointer calls through a name (`(*fp)(x)`) and macros that expand to calls are the same
+---kind of unknown. Skipping them is a missing edge, never a wrong one.
+---
+---**Overloads collapse.** A name is one entry in the resolver's index, so `f(int)` and `f(double)` in one file are one
+---target and a call to either draws the same edge. Telling them apart would need the argument types.
+---@param root TSNode
+---@param src string
+---@param ranges { name: string, srow: integer, erow: integer }[]
+---@param grammar string
+---@return Docmap.RawCall[]
+local function extract_calls(root, src, ranges, grammar)
+  local out = {}
+  -- `qualified_identifier` is a node of the C++ grammar only; C has no `ns::f`
+  local pattern = grammar == "cpp"
+      and "(call_expression function: [(identifier) (qualified_identifier)] @callee)"
+    or "(call_expression function: (identifier) @callee)"
+  local ok, query = pcall(vim.treesitter.query.parse, grammar, pattern)
+  if not ok then
+    return out
+  end
+  for id, node in query:iter_captures(root, src) do
+    if query.captures[id] == "callee" then
+      local srow = node:range()
+      local callee = vim.treesitter.get_node_text(node, src)
+      if not callee:find("\n") then
+        local from_fn
+        for _, r in ipairs(ranges) do
+          if srow >= r.srow and srow <= r.erow then
+            from_fn = r.name
+            break
+          end
+        end
+        out[#out + 1] = { callee = callee, from_fn = from_fn, line = srow + 1 }
+      end
+    end
+  end
+  return out
+end
+
 ---Build a backend table for one C-family language.
 ---@param name string
 ---@param grammar string
@@ -611,7 +660,14 @@ function M.backend(name, grammar, extensions, roots)
           target = text_of(system, src):match("^<(.*)>$")
         end
         if target then
-          requires[#requires + 1] = { module = target, line = node:start() + 1 }
+          requires[#requires + 1] = {
+            module = target,
+            line = node:start() + 1,
+            -- A quoted include is looked up beside the including file first, which is the `./` reading; without
+            -- it `"util.h"` is a bare name and never resolved to a node of the tree. A system include (`<...>`)
+            -- stays what it was: external until a project proves otherwise.
+            fallback = quoted and { module = "./" .. target } or nil,
+          }
         end
         return
       elseif kind == "function_definition" then
@@ -744,7 +800,13 @@ function M.backend(name, grammar, extensions, roots)
     end
     walk(root)
 
-    return fns, {}, requires, symbols, {}, {}, lines, {}
+    -- `fns` already carry the span, 1-based; the extractor wants 0-based rows.
+    local ranges = {}
+    for _, fn in ipairs(fns) do
+      ranges[#ranges + 1] = { name = fn.name, srow = fn.line - 1, erow = fn.line_end - 1 }
+    end
+
+    return fns, extract_calls(root, src, ranges, grammar), requires, symbols, {}, {}, lines, {}
   end
 
   backend = {
@@ -785,6 +847,17 @@ function M.backend(name, grammar, extensions, roots)
 
     parse_header = parse_header,
     scan_file = scan_file,
+
+    emits_calls = true,
+
+    ---**The resolution rule for a call across a header and its source.** A call to `f(...)` that is not declared in
+    ---the calling file resolves through the files it `#include`s (`Docmap.LangBackend.call_via_includes`): the
+    ---first included header that declares `f` is the callee's home. The edge then goes to the *definition* when that
+    ---header has a source file of the same stem next to it (`a.h` and `a.c`, `a.cpp`, `a.cc`, `a.cxx`) that defines
+    ---`f`, and to the header's prototype when it does not. The prototype is the published surface, but an edge that
+    ---stopped there would leave every body unreached, and a function with no inbound call is what `dead-function`
+    ---reports. Same-file calls resolve first, to the body (or the `static` function) in the calling file itself.
+    call_via_includes = true,
   }
   return backend
 end

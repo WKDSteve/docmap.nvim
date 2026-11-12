@@ -363,11 +363,43 @@ function M.build(ir, opts)
     end
   end
 
+  local via_includes = languages_where(function(backend)
+    return backend.call_via_includes == true
+  end)
+
+  ---A header's source of the same stem (`a.h` -> `a.c`, `a.cpp`, ...) when this tree holds one that declares `name`:
+  ---the definition behind a prototype.
+  ---@param header_id string
+  ---@param name string
+  ---@return string? node
+  local function definition_of(header_id, name)
+    local path = ir.nodes[header_id].path
+    local stem = path and path:match("^(.*)%.[%w+]+$")
+    if not stem then
+      return nil
+    end
+    for _, ext in ipairs({ "c", "cc", "cpp", "cxx", "c++" }) do
+      local candidate = by_path[stem .. "." .. ext]
+      if
+        candidate
+        and candidate ~= header_id
+        and index[candidate]
+        and index[candidate].by_name[name]
+      then
+        return candidate
+      end
+    end
+    return nil
+  end
+
   local edges = {}
   local seen = {}
 
   for _, id in ipairs(ir.order) do
     local node = ir.nodes[id]
+    -- The nodes this file `#include`s that sit in the tree, for a language that resolves through them
+    local included = {}
+    local include_resolved = node.language and via_includes[node.language] or false
 
     local aliases = {}
     -- Bare names a named import bound into this file's scope, and the member
@@ -392,6 +424,10 @@ function M.build(ir, opts)
         node.source or node.path,
         req
       )
+
+      if include_resolved and target then
+        included[#included + 1] = target
+      end
 
       if reading.alias then
         if target then
@@ -516,6 +552,23 @@ function M.build(ir, opts)
             confidence = "exact"
           elseif imported and imported.external then
             record_external_call(calls_external_acc, imported.external, imported.member)
+          elseif include_resolved and #included > 0 then
+            -- C and C++: the file's own names came first above; now the first included header that declares the
+            -- name, and behind it the definition in the header's own source file when there is one.
+            for _, header in ipairs(included) do
+              if index[header].by_name[call.callee] then
+                local body = definition_of(header, call.callee)
+                to_id = body or header
+                to_fn = index[to_id].by_name[call.callee]
+                confidence = "exact"
+                break
+              end
+            end
+            if not to_id and unique_bare[call.callee] then
+              to_id = unique_bare[call.callee].node
+              to_fn = unique_bare[call.callee].fn
+              confidence = "heuristic"
+            end
           elseif unique_bare[call.callee] then
             to_id = unique_bare[call.callee].node
             to_fn = unique_bare[call.callee].fn

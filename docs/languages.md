@@ -323,8 +323,8 @@ DOCMAP_TS_DIR=C:/tools/docmap-grammars nvim --headless -u NONE -l scripts/parity
 | `tsx` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `zig` | ✓ | — | ✓ | — | — | ✓ | ✓ | — | ✓ | ✓ | — |
 | `java` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
-| `c` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ |
-| `cpp` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
+| `c` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `cpp` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | `asm` | ✓ | — | ✓ | — | — | ✓ | ✓ | — | ✓ | ✓ | — |
 | `python` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `csharp` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
@@ -400,9 +400,10 @@ These are the failure the parity pass was looking for, and it found them.
 They are simply not built, they had no sentence anywhere before this pass, and
 saying so is the point:
 
-- **Call edges: seven backends of twenty-three**: `go` became the fifth on
-  2026-08-20, `python` and `rust` the sixth and seventh on 2026-10-23. The
-  other sixteen return `{}` from `scan_file`'s second slot,
+- **Call edges: nine backends of twenty-three**: `go` became the fifth on
+  2026-08-20, `python` and `rust` the sixth and seventh on 2026-10-23, `c` and
+  `cpp` the eighth and ninth on 2026-11-12. The
+  other fourteen return `{}` from `scan_file`'s second slot,
   so the Hierarchy tab's Calls and Module Calls views, `:DocMap why`, the
   call-hierarchy LSP integration and `dead-function`'s call-edge tier are
   still empty there. This remains the largest single gap in the tool; it was

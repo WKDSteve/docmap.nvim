@@ -3692,6 +3692,29 @@ the non-test functions of `freshness.rs` by hand, 12 of 12, no wrong edge.
   `cargo check` clean, fifteen edges counted by hand, the trait-impl owner,
   and the `::` resolver on a hand-built IR); CI now builds the Rust grammar
 
+## Call edges for C and C++ (2026-11-12)
+
+The eighth and ninth backends with call sites. The decision is the one the task asked for: a call is resolved in the
+calling file first, then through the files it `#include`s: the first included header that declares the name is the
+callee's home, and the edge goes to the **definition** in the header's own source (`a.h` to `a.c`, `a.cpp`, `a.cc`,
+`a.cxx`) when there is one, to the prototype when there is not. An edge that stopped at the prototype would leave every
+body with no inbound call, which is exactly what `dead-function` reports. The rule is one backend field
+(`call_via_includes`) and one branch in `core/calls.lua`.
+
+**A quoted include never resolved before.** `#include "util.h"` was recorded as the bare module `util.h`, which the
+relative resolver (only `./` and `../`) never matched, so C had no require edges to headers either. It now carries the
+`./util.h` reading as its `fallback`; `<system.h>` stays external.
+
+What is a call site: a plain name (`f(x)`) or, in C++, a qualified one (`ns::f(x)`). `obj.m()` and `p->m()` are not:
+the type of `obj` is unknown here and the resolver would read it as a module alias; a missing edge, never a wrong one.
+Overloads collapse into one target (a name is one index entry); telling them apart needs argument types.
+
+- **Modules:** `core/lang/cfamily.lua` (`extract_calls`, `fallback` on quoted includes, `emits_calls`,
+  `call_via_includes`), `core/calls.lua` (the include step, `definition_of`), `@types` (`call_via_includes`)
+- **Tests:** `c_calls_spec` (`TESTS/fixtures/ccalls`: a header, its source, a C++ overload pair; five edges counted by
+  hand). **Not done:** the measurement on a real tree against a hand count (the earlier C measurement used
+  `antirez/sds`); no real C tree is on this machine.
+
 ## Decorators and Rust panels, duplicate clusters (2026-11-06)
 
 **Decorators** (Analysis): which decorators a Python tree uses, how often, and on which
