@@ -25,7 +25,8 @@ function M.opener(cfg, notify, command_name, generate)
   ---@return boolean opened
   local function open(hash, made)
     local target = cfg.root .. "/" .. (cfg.out_dir or "docs/map") .. "/index.html"
-    if vim.uv.fs_stat(target) == nil then
+    -- Through `safe_fs`: a page that is a link leading out of the project is not opened (it counts as missing).
+    if not require("docmap.core.safe_fs").is_file(cfg.root, target) then
       if generate and not made then
         require("docmap.ask").yesno(
           ("No map generated yet. Generate it now (:%s) and open it?"):format(command_name),

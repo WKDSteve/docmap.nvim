@@ -68,24 +68,23 @@ local DEPS = {
 
 local version_ok = require("lib.nvim.health").version_ok
 
----Count the `.lua` files directly under `dir`, recursively, without loading
----the scanner: the point of this check is to answer "is `source` pointing at
----anything" even when the scan itself is what is failing.
+---Count the `.lua` files under `dir`, recursively, without loading the scanner: the point of this check is to
+---answer "is `source` pointing at anything" even when the scan itself is what is failing.
+---
+---Walks through `core/safe_fs`, like the scan does: a link is followed only while it stays inside `root`, so a
+---source or tests directory that is a link out of the project counts as empty rather than being read (and a link
+---back up the tree cannot make the walk run forever).
+---@param root string
 ---@param dir string
 ---@return integer
-local function count_lua(dir)
+local function count_lua(root, dir)
   local n = 0
-  local function walk(d)
-    for name, kind in vim.fs.dir(d) do
-      local p = d .. "/" .. name
-      if kind == "directory" then
-        walk(p)
-      elseif name:sub(-4) == ".lua" then
-        n = n + 1
-      end
+  local ok, files = pcall(require("docmap.core.safe_fs").walk_files, root, dir)
+  for _, f in ipairs(ok and files or {}) do
+    if f:sub(-4) == ".lua" then
+      n = n + 1
     end
   end
-  pcall(walk, dir)
   return n
 end
 
@@ -98,27 +97,26 @@ end
 ---
 ---Bounded the same way `count_lua` is: no scanner, no config, so it still
 ---answers when a scan is what is broken.
+---@param root string
 ---@param dir string
 ---@return table<string, boolean>
-local function languages_under(dir)
+local function languages_under(root, dir)
   local seen = {}
   local registry = require("docmap.core.lang_registry")
-  local function walk(d)
-    for name, kind in vim.fs.dir(d) do
-      local p = d .. "/" .. name
-      if kind == "directory" then
-        walk(p)
-      else
-        local backend = registry.for_file(name)
-        if backend then
-          seen[backend.name] = true
-        end
-      end
+  local ok, files = pcall(require("docmap.core.safe_fs").walk_files, root, dir)
+  for _, f in ipairs(ok and files or {}) do
+    local backend = registry.for_file(f:match("[^/]*$"))
+    if backend then
+      seen[backend.name] = true
     end
   end
-  pcall(walk, dir)
   return seen
 end
+
+-- Exported for the same reason `serve.safe_sha` is: a rule about links that cannot be run without a whole health
+-- report does not get tested.
+M.count_lua = count_lua
+M.languages_under = languages_under
 
 function M.check()
   -- Environment ------------------------------------------------------------
@@ -425,13 +423,13 @@ function M.check()
   -- into one would hide whichever half is broken.
   for _, src in ipairs(sources) do
     local source_dir = cfg.root .. "/" .. src
-    if vim.fn.isdirectory(source_dir) == 0 then
+    if not require("docmap.core.safe_fs").is_dir(cfg.root, source_dir) then
       h_error(("source directory does not exist: %s"):format(source_dir), {
         "A :DocMap here would scan nothing and write an empty map.",
         "Set opts.root or opts.source, or run from the repository you meant.",
       })
     else
-      local n = count_lua(source_dir)
+      local n = count_lua(cfg.root, source_dir)
       if n == 0 then
         -- Not a warning for a non-Lua root: `src/` full of TypeScript is a
         -- perfectly good source root, and this counter only knows `.lua`.
@@ -467,7 +465,7 @@ function M.check()
 
   local present = {}
   for _, src in ipairs(sources) do
-    for name in pairs(languages_under(cfg.root .. "/" .. src)) do
+    for name in pairs(languages_under(cfg.root, cfg.root .. "/" .. src)) do
       present[name] = true
     end
   end
@@ -537,7 +535,7 @@ function M.check()
   )
 
   local tests_dir = cfg.root .. "/" .. (cfg.tests_dir or "TESTS")
-  if vim.fn.isdirectory(tests_dir) == 0 then
+  if not require("docmap.core.safe_fs").is_dir(cfg.root, tests_dir) then
     h_warn(("%s does not exist"):format(cfg.tests_dir or "TESTS"), {
       "Not an error: a tree with no tests is a valid tree.",
       "But every function will be left `tested = false`, so the Analysis tab's",
@@ -551,7 +549,7 @@ function M.check()
     -- fixture under `tests_dir` contributes mentioned names exactly like a
     -- spec does. Counting only spec-shaped names here would report a smaller
     -- number than the one the coverage figure is actually derived from.
-    local n = count_lua(tests_dir)
+    local n = count_lua(cfg.root, tests_dir)
     if n == 0 then
       h_warn(("%s exists but holds no .lua files"):format(cfg.tests_dir or "TESTS"), {
         "Same consequence as a missing directory: fn.tested stays false everywhere,",

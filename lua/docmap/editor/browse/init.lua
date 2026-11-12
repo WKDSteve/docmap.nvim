@@ -816,7 +816,8 @@ local function open_in_browser(st, made)
     .. "/"
     .. (st.opts.out_dir or "docs/map")
     .. "/index.html"
-  if not vim.uv.fs_stat(target) then
+  -- Through `safe_fs`: a map page that is a link leading out of the project is not served to the browser.
+  if not require("docmap.core.safe_fs").is_file(source.norm_root(st.opts.root), target) then
     local handle = not made and require("docmap.editor.registry").get(st.opts.root) or nil
     if handle then
       -- the page is offered to be made, then handed the position as asked

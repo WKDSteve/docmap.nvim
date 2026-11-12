@@ -89,7 +89,7 @@ function M.autoload(cfg, notify)
     -- the default one it deliberately opted out of.
     local resolved = require("docmap.config").build(project.root, { title = project.title })
     local map_path = resolved.root .. "/" .. resolved.out_dir .. "/module_map.json"
-    if vim.fn.filereadable(map_path) == 0 then
+    if not require("docmap.core.safe_fs").is_file(resolved.root, map_path) then
       missing[#missing + 1] = project
     end
   end
