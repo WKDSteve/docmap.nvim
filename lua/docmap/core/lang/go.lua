@@ -47,6 +47,9 @@ M.grammar = "go"
 ---@type string[]
 M.extensions = { "go" }
 
+---Keyword and stdlib explanations for the page's in-place lookup.
+M.glossary = require("docmap.core.lang.glossary.go")
+
 ---The import path is the identity, and it is derived from the directory
 ---rather than declared in the file. Nothing tag-shaped can be missing.
 M.module_tag = false

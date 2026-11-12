@@ -89,6 +89,9 @@ M.grammar = "python"
 ---@type string[]
 M.extensions = { "py", "pyi" }
 
+---Keyword and stdlib explanations for the page's in-place lookup (`py` and `pyi` share this one table).
+M.glossary = require("docmap.core.lang.glossary.python")
+
 ---Python's identity is its import path, which is its file path — the same
 ---answer Zig, C and assembly give, reached by a different route: the import
 ---system resolves against `sys.path` and package directories, never against

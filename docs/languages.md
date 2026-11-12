@@ -76,13 +76,13 @@ real answer and not a gap.
 | `tsx` | `tsx` | `.tsx` | `index.tsx` | false | *(true)* | `//` | `/* */` | yes |
 | `zig` | `zig` | `.zig` | — | false | **false** | `//` | — | — |
 | `java` | `java` | `.java` | — | false | *(true)* | `//` | `/* */` | — |
-| `c` | `c` | `.c` `.h` | — | false | *(true)* | `//` | `/* */` | — |
+| `c` | `c` | `.c` `.h` | — | false | *(true)* | `//` | `/* */` | yes |
 | `cpp` | `cpp` | `.cpp` `.cc` `.cxx` `.c++` `.hpp` `.hh` `.hxx` | — | false | *(true)* | `//` | `/* */` | — |
 | `asm` | **none** | `.s` `.asm` `.nasm` `.inc` | — | false | **false** | `;` `#` `//` `@` | `/* */` | — |
-| `python` | `python` | `.py` `.pyi` | `__init__.py` | false | true | `#` | — | — |
+| `python` | `python` | `.py` `.pyi` | `__init__.py` | false | true | `#` | — | yes |
 | `csharp` | `c_sharp` | `.cs` | — | false | true | `//` | `/* */` | — |
-| `go` | `go` | `.go` | — | false | **false** | `//` | `/* */` | — |
-| `rust` | `rust` | `.rs` | `mod.rs` | false | **false** | `//` | `/* */` | — |
+| `go` | `go` | `.go` | — | false | **false** | `//` | `/* */` | yes |
+| `rust` | `rust` | `.rs` | `mod.rs` | false | **false** | `//` | `/* */` | yes |
 | `php` | `php` | `.php` | — | false | true | `//` `#` | `/* */` | — |
 | `ruby` | `ruby` | `.rb` | — | false | **false** | `#` | `=begin =end` | — |
 | `kotlin` | `kotlin` | `.kt` `.kts` | — | false | true | `//` | `/* */` | — |
@@ -323,13 +323,13 @@ DOCMAP_TS_DIR=C:/tools/docmap-grammars nvim --headless -u NONE -l scripts/parity
 | `tsx` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `zig` | ✓ | — | ✓ | — | — | ✓ | ✓ | — | ✓ | ✓ | — |
 | `java` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
-| `c` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
+| `c` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ |
 | `cpp` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `asm` | ✓ | — | ✓ | — | — | ✓ | ✓ | — | ✓ | ✓ | — |
-| `python` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| `python` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `csharp` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
-| `go` | ✓ | — | ✓ | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | — |
-| `rust` | ✓ | ✓ | ✓ | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| `go` | ✓ | — | ✓ | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `rust` | ✓ | ✓ | ✓ | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `php` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `ruby` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `kotlin` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
@@ -387,11 +387,11 @@ displayed — but YARD is a gem and RDoc ships with the language with no
 per-parameter form, so Ruby is *not judged* by it. That is why nine backends
 declare `param_docs = false` while only eight have this cell blank.
 
-**Glossary — nineteen blanks, a decision rather than a gap.** A backend
+**Glossary — fifteen blanks, a decision rather than a gap.** A backend
 without one decorates nothing, which is the honest degradation; falling back
 to another language's keywords would explain `goto` in a file where it means
 something else. Adding one is per-language work with a maintenance cost, and
-the two that exist were written because somebody hovers those words.
+the eight that exist (Lua, the ECMA family, Python, Rust, Go and C) were written because somebody hovers those words.
 
 ### The two blanks with no language behind them
 

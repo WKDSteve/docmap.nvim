@@ -16,6 +16,10 @@ local M = require("docmap.core.lang.cfamily").backend(
   { "src", "lib", "source" }
 )
 
+-- C only, not C++: `cpp.lua` claims neither `.c` nor `.h`, and its keywords (`const`, `static`, `auto`) mean other
+-- things, so it decorates nothing until it has a glossary of its own. `c` and `h` share this one table.
+M.glossary = require("docmap.core.lang.glossary.c")
+
 require("docmap.core.lang_registry").register(M.name, M)
 
 return M

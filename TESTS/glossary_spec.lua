@@ -20,7 +20,7 @@ return function(H)
       table.sort(exts)
       return table.concat(exts, ",")
     end)(),
-    "js,jsx,lua,ts,tsx",
+    "c,go,h,js,jsx,lua,py,pyi,rs,ts,tsx",
     -- `jsx` appearing here is not incidental: this assertion is what noticed
     -- `js.lua` claiming a fifth extension, which is exactly the drift a
     -- literal list is for.
@@ -31,6 +31,25 @@ return function(H)
   -- renderer emits it once and references it three times.
   eq(glossaries.js, glossaries.ts, "glossary: js and ts share one table")
   eq(glossaries.ts, glossaries.tsx, "glossary: ... and tsx the same one")
+  eq(glossaries.py, glossaries.pyi, "glossary: py and pyi share one table")
+  eq(glossaries.c, glossaries.h, "glossary: c and h share one table")
+
+  -- Rust paths are written with `::`, which the page's tokenizer does not match as a dotted run: a stdlib table
+  -- there could never decorate anything, so the language declares none rather than a dead one.
+  eq(glossaries.rs.stdlib, nil, "glossary: Rust has keywords only (its paths use ::, not .)")
+  -- C++ is a different language with the same `const`/`static`; it must not borrow C's answers.
+  eq(glossaries.cpp, nil, "glossary: C++ has none until it has its own")
+  eq(glossaries.hpp, nil, "glossary: ... nor its headers")
+
+  -- The conventions that look like keywords carry the explanation of a symbol the tokenizer cannot see.
+  ok(glossaries.py.keywords.self ~= nil, "glossary: python explains self")
+  ok(glossaries.go.keywords.defer ~= nil, "glossary: go explains defer")
+  ok(glossaries.rs.keywords.unsafe ~= nil, "glossary: rust explains unsafe")
+  ok(glossaries.c.keywords.static ~= nil, "glossary: c explains static")
+  ok(
+    glossaries.go.stdlib["fmt.Errorf"] ~= nil,
+    "glossary: go has dotted stdlib entries the page can reach"
+  )
 
   for ext, gl in pairs(glossaries) do
     local where = "glossary[" .. ext .. "]"

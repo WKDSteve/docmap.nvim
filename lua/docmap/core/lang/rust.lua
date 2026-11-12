@@ -81,6 +81,9 @@ M.grammar = "rust"
 ---@type string[]
 M.extensions = { "rs" }
 
+---Keyword and prelude explanations for the page's in-place lookup.
+M.glossary = require("docmap.core.lang.glossary.rust")
+
 ---A Rust file's module path is its position under `src/`, never a tag inside
 ---it. Nothing tag-shaped can be missing.
 M.module_tag = false
