@@ -180,6 +180,49 @@ return function(H)
     )
   end
 
+  -- `$<NAME>_DIR` wins over a declared `local_path` that is not there: the
+  -- worktree of `testing ci commit` has no `../lib.nvim` beside it, but the
+  -- run names the checkout as `LIB_NVIM_DIR`. Without the variable the same
+  -- declaration falls back to the flat shape; an entry without `local_path`
+  -- ignores the variable (it stays unverified on every machine).
+  do
+    local root = H.tmpfile("_extrepo_env_root")
+    local checkout = H.tmpfile("_extrepo_env_checkout")
+    write(checkout, "lua/plenary/async/init.lua", { "return {}" })
+    local saved = vim.env.PLENARY_NVIM_DIR
+    local function run(entry)
+      local ir = scan_requiring(root, { "plenary.async" })
+      external_repos.resolve(ir, { root = root, external_repos = { plenary = entry } })
+      return ir.tag_links["plenary.async"].html
+    end
+    local declared = { repo = "nvim-lua/plenary.nvim", local_path = "../not_beside_the_tree" }
+    local dir_link = "https://github.com/nvim-lua/plenary.nvim/blob/main/lua/plenary/async/init.lua"
+    local flat_link = "https://github.com/nvim-lua/plenary.nvim/blob/main/lua/plenary/async.lua"
+    vim.env.PLENARY_NVIM_DIR = nil
+    eq(
+      run(declared),
+      flat_link,
+      "resolve: a declared checkout that is not there gives the flat shape"
+    )
+    vim.env.PLENARY_NVIM_DIR = checkout
+    eq(
+      run(declared),
+      dir_link,
+      "resolve: $PLENARY_NVIM_DIR names the checkout when local_path is not there"
+    )
+    eq(
+      run("nvim-lua/plenary.nvim"),
+      flat_link,
+      "resolve: without local_path the variable is not read"
+    )
+    eq(
+      external_repos.env_var({ repo = "WKDSteve/lib.nvim", name = "lib.nvim" }),
+      "LIB_NVIM_DIR",
+      "env_var: the dependency convention"
+    )
+    vim.env.PLENARY_NVIM_DIR = saved
+  end
+
   -- Longest, dot-bounded prefix wins — same rule as tagfiles.match_prefix,
   -- verified independently here since the implementation duplicates it
   -- rather than sharing it (different value shapes).

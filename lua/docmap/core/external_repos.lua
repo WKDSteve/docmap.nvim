@@ -111,7 +111,18 @@ local function normalize(entry)
     branch = entry.branch or "main",
     lua_root = entry.lua_root or "lua",
     local_path = entry.local_path,
+    name = entry.name,
   }
+end
+
+---The variable that names a checkout of `cfg` the way every dependency of this
+---ecosystem is named (`lib.nvim` -> `LIB_NVIM_DIR`; testing.nvim's `deps`, the
+---scripts' `ensure`): from `cfg.name`, else the repository part of `cfg.repo`.
+---@param cfg Docmap.ExternalRepo
+---@return string
+function M.env_var(cfg)
+  local name = cfg.name or cfg.repo:match("[^/]+$") or cfg.repo
+  return (name:upper():gsub("[^%w]", "_")) .. "_DIR"
 end
 
 ---@param path string
@@ -142,6 +153,14 @@ end
 local function checkout_dir(cfg, root)
   if not cfg.local_path then
     return nil
+  end
+  -- A checkout named by its variable wins over the declared place: a tree away from its siblings (the worktree of
+  -- `testing ci commit`, a snapshot, a WSL mirror) has no `../lib.nvim`, and the flat-shape fallback would make the
+  -- map differ from the one committed. Only for an entry that declared `local_path`: one without stays unverified on
+  -- every machine.
+  local named = os.getenv(M.env_var(cfg))
+  if named and named ~= "" then
+    return (named:gsub("\\", "/"):gsub("/+$", ""))
   end
   local declared = cfg.local_path:gsub("\\", "/"):gsub("/+$", "")
   if declared:match("^%a:/") or declared:sub(1, 1) == "/" then
