@@ -325,6 +325,21 @@ function M.start(cfg)
           return 200, "application/json", vim.json.encode({ docmap = true })
         end,
       },
+      -- `rules/validate` takes the model's answer as the request body. A GET query is no place for a whole answer, so
+      -- this is the one POST route; it comes before the general api route (which answers GET only). It only checks the
+      -- answer against the tree and answers a proposal: nothing is written, nothing runs. The body is bounded by the
+      -- server (1 MiB, the same limit `rules_api` applies to an answer file) and is required.
+      {
+        path = "/api/rules/validate",
+        method = "POST",
+        query = { select = plain },
+        body = true,
+        body_required = true,
+        handler = function(req)
+          local with_answer = vim.tbl_extend("force", {}, cfg, { rules_answer = req.body })
+          return api_answer("rules/validate", with_answer, query_param(req.query))
+        end,
+      },
       -- Every route `core/api.lua` owns, dispatched by name: the set is data on that module, so a route added
       -- there reaches this host and the standalone one without either being told. `commit/<sha>` is not a fixed
       -- key there -- `core.api` itself recognises and validates that shape, so anything under `/api/` is handed

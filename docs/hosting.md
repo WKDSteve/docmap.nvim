@@ -156,6 +156,9 @@ come from `rules.settings`, the same resolution `:Rules check` uses: the project
   `/api/rules/run?select=...` (`select=` as on the command line). That server passes **no trust**: there is no
   `--trust=` to name, and the trust of `rules.nvim`'s own settings (`setup({ trust })`, `$RULES_TRUST`) is not
   taken over, so every `lua_predicate` there reports `predicate not trusted`. Run predicates with `:Rules check`.
+  **Decided 2026-11-12: it stays that way.** A predicate is Lua code, and this server is reachable by any page that
+  can send a request to loopback, so handing it the editor's trust would let a page cause code to run. The decision
+  is the editor's, taken in the editor (`:Rules check`); the desktop app has its own trust store for it.
 
 ### `rules/plan` and `rules/validate`
 
@@ -186,8 +189,9 @@ exist once. Neither route sends anything or opens a connection; sending a reques
   is not the schema is `unclear` with the text in `raw`; a rule that is not sent is `unclear` whatever the answer says.
 - Bounds: a selection over 64 KiB or 4096 items, an answer over 1 MiB and a plan whose requests add up to more than
   16 MiB are refused with a reason (`available: false`), never read in full or printed.
-- `:DocMap serve` answers `/api/rules/plan?select=...`; `/api/rules/validate` there has no way to receive an answer
-  (a GET query is no place for one) and says so.
+- `:DocMap serve` answers `/api/rules/plan?select=...` by GET and `POST /api/rules/validate?select=<ID>` with the
+  model's answer as the request body (required, at most 1 MiB; a GET there still says that a query is no place for an
+  answer). Validating only compares the answer with the tree and returns a proposal: nothing is written or run.
 
 **The join logic stays in Lua.** `docmap-desktop` runs a small HTTP server
 that forwards `/api/*` here; its Rust side is transport only. `core/api.lua`
