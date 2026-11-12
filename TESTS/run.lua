@@ -274,6 +274,9 @@ local specs = {
   "ask_dialog_spec.lua",
   "setup_lazy_spec.lua",
   "sheets_spec.lua",
+  "min_version_spec.lua",
+  "release_script_spec.lua",
+  "manifest_rules_spec.lua",
 }
 
 --- Straight to stdout rather than through `print`.
