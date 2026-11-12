@@ -3,7 +3,7 @@
 > **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**7 modules** · 8 namespaces · 149 helper files
+**7 modules** · 8 namespaces · 153 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
