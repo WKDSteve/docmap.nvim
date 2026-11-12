@@ -28,6 +28,25 @@ work="$(mktemp -d)"
 mkdir -p "$repo/$OUT_DIR"
 out="$(cd "$repo/$OUT_DIR" && pwd)"
 
+# What this script takes from the network is fixed here: a file with another sha256 fails the build. lua.org
+# resets connections and once handed over a cut tarball that `tar` read from a pipe ("gzip: unexpected end of file",
+# five of six release runs red on 2026-11-12): a download is retried, written to a file and checked before use.
+# Lua 5.4.8: the sha256 lua.org lists on its download page; dkjson and luastatic: a commit, not `master`.
+LUA_SHA256=4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae
+DKJSON_COMMIT=e72ba0c9f5d8b8746fc306f6189a819dbb5cd0be
+DKJSON_SHA256=9d3e5c82dcd572a6a4b764d705f72b948094124b0e338cec0d6dfefea59693b7
+LUASTATIC_COMMIT=c3e1b2ef8f998230fb4c47935e4bdcb1610abab5
+LUASTATIC_SHA256=6fbd8a529a3e5ec2c8609d09f02dcf12ce2f54bae179a673ff555217343f3388
+
+# fetch <url> <file> <sha256>
+fetch() {
+  curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 -o "$2" "$1"
+  echo "$3  $2" | sha256sum -c - >/dev/null || {
+    echo "error: $1 does not have the pinned sha256 $3" >&2
+    exit 1
+  }
+}
+
 echo "== PUC Lua 5.4 from source"
 # Not the distro package: Arch's own `lua54` ships no static `.a` at all
 # (measured, PORTABILITY.md Step 6), and relying on whatever a given
@@ -44,7 +63,8 @@ echo "== PUC Lua 5.4 from source"
 # script's own host interpreter needs exactly that: `scripts/package.lua`
 # `require()`s `lfs` (dynamically) before it ever gets to producing the
 # static bundle.
-curl -sL https://www.lua.org/ftp/lua-5.4.8.tar.gz | tar xz -C "$work"
+fetch https://www.lua.org/ftp/lua-5.4.8.tar.gz "$work/lua-5.4.8.tar.gz" "$LUA_SHA256"
+tar xzf "$work/lua-5.4.8.tar.gz" -C "$work"
 LUA_MAKE=linux
 [ -n "$EXE_EXT" ] && LUA_MAKE=mingw
 (
@@ -120,7 +140,7 @@ LTS_LINK_LIBS=()
 
 echo "== dynamic lfs + dkjson (so the host interpreter running package.lua can require() them)"
 gcc -O2 -fPIC -shared -I"$LUAINC" "$work/luafilesystem/src/lfs.c" "${LTS_LINK_LIBS[@]}" -o "$work/lfs.dyn.so"
-curl -sL -o "$work/dkjson.lua" https://raw.githubusercontent.com/LuaDist/dkjson/master/dkjson.lua
+fetch "https://raw.githubusercontent.com/LuaDist/dkjson/$DKJSON_COMMIT/dkjson.lua" "$work/dkjson.lua" "$DKJSON_SHA256"
 
 echo "== dynamic lua_tree_sitter.so (so bundle_manifest.lua's probe run can see the real treesitter closure)"
 (
@@ -129,7 +149,7 @@ echo "== dynamic lua_tree_sitter.so (so bundle_manifest.lua's probe run can see 
 )
 
 echo "== luastatic (a plain Lua script, not a build target)"
-curl -sL -o "$work/luastatic.lua" https://raw.githubusercontent.com/ers35/luastatic/master/luastatic.lua
+fetch "https://raw.githubusercontent.com/ers35/luastatic/$LUASTATIC_COMMIT/luastatic.lua" "$work/luastatic.lua" "$LUASTATIC_SHA256"
 
 echo "== 23 grammars via the tree-sitter CLI"
 # The same mechanism .github/workflows/ci.yml's own `tests` job already
