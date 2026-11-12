@@ -134,6 +134,7 @@ flowchart LR
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_find_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_findings_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_history_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_telemetry_join_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_telemetry_self_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_timing_lua
