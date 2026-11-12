@@ -76,7 +76,7 @@ M.list = {
     events = { "VimLeavePre" },
     owner = "docmap.editor.serve",
     scope = "global",
-    lifetime = "Created by `start()`; removed by `stop()` along with its augroup.",
+    lifetime = "Created by `lib.nvim.net.server` when `start()` first runs it (one hook for every server of the session); the socket itself is closed by `stop()`.",
     why = "Shut the local map server down with the editor, so no listening socket outlives the Neovim session that opened it.",
   },
 }

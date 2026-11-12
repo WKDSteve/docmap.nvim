@@ -145,6 +145,7 @@ local specs = {
   "readers_editor_links_spec.lua",
   "check_readme_links_spec.lua",
   "serve_links_spec.lua",
+  "serve_routes_spec.lua",
   "tools_links_spec.lua",
   "spec_roots_links_spec.lua",
   "win_links_spec.lua",

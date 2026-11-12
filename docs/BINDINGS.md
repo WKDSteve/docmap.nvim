@@ -133,6 +133,6 @@ Flush pinned trails to `stdpath('state')`. Never into the repository — a trail
 ### `VimLeavePre` — global
 
 **Owner:** `docmap.editor.serve`  
-**Lifetime:** Created by `start()`; removed by `stop()` along with its augroup.
+**Lifetime:** Created by `lib.nvim.net.server` when `start()` first runs it (one hook for every server of the session); the socket itself is closed by `stop()`.
 
 Shut the local map server down with the editor, so no listening socket outlives the Neovim session that opened it.

@@ -23,35 +23,20 @@
 ---
 --- ## Security posture
 ---
---- Small surface, but a real one — a socket and a subprocess. Three rules,
---- all enforced below rather than documented and hoped for:
+--- Small surface, but a real one -- a socket and a subprocess. The transport (loopback bind, whitelist routes,
+--- `Host` check against DNS rebinding, bounded input, teardown on `VimLeavePre`, handlers on the main loop where
+--- `vim.system():wait()` is allowed) is `lib.nvim.net.server`; this file only declares the routes. What stays
+--- here is what is docmap's own:
 ---
---- 1. **Bind `127.0.0.1`, never `0.0.0.0`.** This is a personal tool on a
----    personal machine; there is no case where the network needs it.
---- 2. **Validate every `<sha>` against `^[0-9a-f]{7,40}$` before it reaches
----    git.** Without that, a request path is argument injection into a
----    subprocess. The check is a whitelist, not an escape.
---- 3. **No path parameter can leave `out_dir`.** Static serving takes a bare
----    filename, and anything containing a separator or a dot-dot is rejected
----    before it becomes a path.
---- 4. **No file is served through a link that leaves the project.** The
----    served directory is the repository's to name, so `out_dir` or a file in
----    it can be a link to somebody else's file; the read goes through
+--- 1. **Validate every `<sha>` against `^[0-9a-f]{7,40}$` before it reaches git** (`core/api.lua`). Without that,
+---    a request path is argument injection into a subprocess. The check is a whitelist, not an escape.
+--- 2. **No path parameter can leave `out_dir`.** Static serving takes a bare filename, and anything containing a
+---    separator or a dot-dot is rejected before it becomes a path.
+--- 3. **No file is served through a link that leaves the project.** The served directory is the repository's to
+---    name, so `out_dir` or a file in it can be a link to somebody else's file; the read goes through
 ---    `core/safe_fs.lua`, which follows only links that stay inside.
----
---- Plus a lifecycle rule: the server is torn down on `VimLeavePre`, so
---- quitting the editor cannot leave a listening socket behind.
----
---- ## Why the handlers run through `vim.schedule`
----
---- libuv read callbacks are a fast-event context: `vim.system():wait()` — and
---- anything else built on `vim.wait` — cannot run there. Every request is
---- therefore parsed in the callback but *handled* on the main loop, which is
---- also what makes it safe to touch the IR and call git at all.
 
 local M = {}
-
-local uv = vim.uv
 
 ---Shared with `init.lua`'s `write_artifacts` (SEC-42) — see that module for
 ---the whitelist. Required once at module load, not per request: it is a pure
@@ -61,11 +46,10 @@ local uv = vim.uv
 local safe_out_dir = require("docmap.core.safe_out_dir")
 local safe_fs = require("docmap.core.safe_fs")
 
----The single running server, if any. Module-level state, which this file is
----the only owner of — the alternative (a handle the caller stores) would put
----lifecycle management on every call site for a thing there is only ever one
----of per editor session.
----@type { server: uv.uv_tcp_t, port: integer, cfg: table, clients: table<uv.uv_tcp_t, boolean>, augroup: integer? }|nil
+---The single running server, if any. Module-level state, which this file is the only owner of -- the
+---alternative (a handle the caller stores) would put lifecycle management on every call site for a thing there
+---is only ever one of per editor session.
+---@type { handle: Lib.Net.Server.Handle, port: integer, cfg: table }|nil
 local current = nil
 
 ---Two paths name the same repository when they normalise the same.
@@ -80,48 +64,7 @@ local function normalize_root(p)
   return (tostring(p or ""):gsub("\\", "/"):gsub("/+$", ""))
 end
 
----@param code integer
----@return string
-local function status_text(code)
-  return ({
-    [200] = "OK",
-    [400] = "Bad Request",
-    [404] = "Not Found",
-    [405] = "Method Not Allowed",
-    [500] = "Internal Server Error",
-  })[code] or "OK"
-end
-
----Write one response and close. `Connection: close` on purpose: keep-alive
----would need a state machine per socket to know where one request ends and
----the next begins, and this serves a handful of requests per session.
----@param client uv.uv_tcp_t
----@param code integer
----@param content_type string
----@param body string
-local function respond(client, code, content_type, body)
-  if not client or client:is_closing() then
-    return
-  end
-  local head = table.concat({
-    ("HTTP/1.1 %d %s"):format(code, status_text(code)),
-    "Content-Type: " .. content_type,
-    "Content-Length: " .. #body,
-    -- The map is local and private; no proxy or browser should keep a copy of
-    -- an answer that is only true for the current working tree.
-    "Cache-Control: no-store",
-    "Connection: close",
-    "",
-    "",
-  }, "\r\n")
-  client:write(head .. body, function()
-    if not client:is_closing() then
-      client:close()
-    end
-  end)
-end
-
----An error as `respond` takes it: status, content type, body.
+---An error as a route handler answers it: status, content type, body.
 ---@param code integer
 ---@param message string
 ---@return integer code
@@ -129,13 +72,6 @@ end
 ---@return string body
 local function error_answer(code, message)
   return code, "application/json", vim.json.encode({ error = message })
-end
-
----@param client uv.uv_tcp_t
----@param code integer
----@param message string
-local function respond_error(client, code, message)
-  respond(client, error_answer(code, message))
 end
 
 ---Run git in the repo and return stdout, or nil plus stderr.
@@ -183,28 +119,35 @@ function M.api_param(query)
   return require("docmap.core.api").decode_param(raw)
 end
 
----Encode one `core.api` answer as this server's JSON response.
+---Answer one `core.api` route as JSON.
 ---
----Every data route is thin on purpose: their bodies moved to `core/api.lua`
----so the standalone build can answer the identical questions for
----`docmap-desktop`'s own host, and two hosts computing the same join
----separately is exactly how they would come to disagree. What stays here is
----what is genuinely this transport's: the socket, the status code, the
----encoding, and the one thing only Neovim can supply — `git` via
----`vim.system`.
----@param client uv.uv_tcp_t
+---Every data route is thin on purpose: their bodies moved to `core/api.lua` so the standalone build can answer
+---the identical questions for `docmap-desktop`'s own host, and two hosts computing the same join separately is
+---exactly how they would come to disagree. What stays here is what is genuinely this transport's: the status
+---code, the encoding, and the one thing only Neovim can supply -- `git` via `vim.system`.
 ---@param name string A `core.api` route name, or `commit/<sha>`.
 ---@param cfg table
----@param query string|nil Raw query string, `?`-prefixed.
-local function respond_api(client, name, cfg, query)
+---@param param string|nil The decoded optional parameter (`snapshot`, `n` or `select`).
+---@return integer code
+---@return string content_type
+---@return string body
+local function api_answer(name, cfg, param)
   local api = require("docmap.core.api")
-  local param = M.api_param(query)
   cfg.git = cfg.git or git
   local result, err = api.answer(name, cfg, param)
   if not result then
-    return respond_error(client, 404, err or "no such endpoint")
+    return error_answer(404, err or "no such endpoint")
   end
-  return respond(client, 200, "application/json", vim.json.encode(result))
+  return 200, "application/json", vim.json.encode(result)
+end
+
+---The optional parameter of an `/api/` request out of the server's already decoded query table: whichever of the
+---three keys is present (no route reads more than one).
+---@param query table<string, string>
+---@return string|nil
+local function query_param(query)
+  local v = query.snapshot or query.n or query.select
+  return (v ~= nil and v ~= "") and v or nil
 end
 
 ---Accept a request path only if it is a bare filename inside `out_dir`.
@@ -289,96 +232,6 @@ function M.static_answer(cfg, name)
   return 200, ctype, body
 end
 
----@param cfg table
----@param client uv.uv_tcp_t
----@param name string
-local function route_static(cfg, client, name)
-  respond(client, M.static_answer(cfg, name))
-end
-
----Dispatch one parsed request. Runs on the main loop (see the module header).
----@param cfg table
----@param client uv.uv_tcp_t
----@param method string
----@param target string
-local function handle(cfg, client, method, target)
-  if method ~= "GET" then
-    return respond_error(client, 405, "only GET is served")
-  end
-
-  local path, query = target:match("^([^?]*)(.*)$")
-  path = path or "/"
-  query = query or ""
-
-  -- "Is a docmap server behind this origin?" — the one question the page
-  -- could not answer, and the reason a *published* copy of the map showed
-  -- the wrong error. `historyAvailable()` in the page tests the protocol,
-  -- so on GitHub Pages (`https:`) the four server-backed panels considered
-  -- themselves live, fetched, got the host's 404 and reported "Is it still
-  -- running? `:DocMap serve` starts it" — advice that is simply false there.
-  --
-  -- Deliberately trivial and unauthenticated, like every other route here:
-  -- this server binds 127.0.0.1 only, so answering "yes, I am a docmap
-  -- server" tells a caller nothing it could not already tell by fetching
-  -- any other endpoint.
-  if path == "/api/ping" then
-    return respond(client, 200, "application/json", vim.json.encode({ docmap = true }))
-  end
-
-  -- Every route `core/api.lua` owns, dispatched by name rather than one
-  -- `if` per route: the set is data on that module, so a route added there
-  -- reaches this host and the standalone one without either being told.
-  -- `commit/<sha>` is included even though it is not a fixed key in
-  -- `core.api.routes` — `M.answer` itself recognises and validates that
-  -- shape, so it is enough to let anything under `/api/` fall through to
-  -- it (the `/api/ping` case above already returned) and let `core.api`
-  -- say no rather than re-deciding the shape here.
-  if path:match("^/api/") then
-    return respond_api(client, path:sub(6), cfg, query)
-  end
-
-  return route_static(cfg, client, path:gsub("^/", ""))
-end
-
----@param cfg table
----@param client uv.uv_tcp_t
-local function on_connection(cfg, client)
-  local buf = ""
-  client:read_start(function(err, chunk)
-    if err or not chunk then
-      if not client:is_closing() then
-        client:close()
-      end
-      return
-    end
-
-    buf = buf .. chunk
-    -- Wait for the full header block. Only GET is served, so there is no body
-    -- to read past it — the headers are the whole request.
-    if not buf:find("\r\n\r\n", 1, true) then
-      -- A client that never completes a request must not be able to grow this
-      -- without bound.
-      if #buf > 64 * 1024 then
-        client:close()
-      end
-      return
-    end
-
-    local method, target = buf:match("^(%u+)%s+(%S+)%s+HTTP/")
-    client:read_stop()
-
-    vim.schedule(function()
-      if not method then
-        return respond_error(client, 400, "malformed request")
-      end
-      local ok, herr = pcall(handle, cfg, client, method, target)
-      if not ok then
-        respond_error(client, 500, tostring(herr))
-      end
-    end)
-  end)
-end
-
 ---@return boolean
 function M.is_running()
   return current ~= nil
@@ -444,85 +297,74 @@ function M.start(cfg)
   end
   cfg.out_dir = out_dir
 
-  local server = uv.new_tcp()
-  if not server then
-    return nil, "could not create a TCP handle"
-  end
-
-  -- Port 0 lets the OS pick a free one, which avoids both a hardcoded port
-  -- colliding with something else and a retry loop looking for a free one.
-  -- It stays the default for exactly that reason.
-  --
-  -- `opts.serve_port` overrides it for the one case the default cannot
-  -- serve: a URL that has to survive a restart, because it is bookmarked or
-  -- written into another tool's configuration. A fixed port can be taken,
-  -- and then the bind fails and says so — which is the honest outcome, and
-  -- better than silently landing somewhere else than the URL the reader
-  -- already saved.
+  -- `opts.serve_port` overrides the OS-assigned port for the one case the default cannot serve: a URL that has
+  -- to survive a restart, because it is bookmarked or written into another tool's configuration. A fixed port can
+  -- be taken, and then the bind fails and says so -- which is the honest outcome, and better than silently landing
+  -- somewhere else than the URL the reader already saved.
   local port_wanted = tonumber(cfg and cfg.serve_port) or 0
   if port_wanted < 0 or port_wanted > 65535 or port_wanted % 1 ~= 0 then
-    server:close()
     return nil, ("serve_port is not a port number: %s"):format(tostring(cfg.serve_port))
   end
 
-  local ok_bind, bind_err = pcall(function()
-    -- 127.0.0.1 only. Never 0.0.0.0: this is a personal tool on a personal
-    -- machine, and binding wider would expose the repo's source to the
-    -- network for no gain whatsoever.
-    assert(server:bind("127.0.0.1", port_wanted))
-  end)
-  if not ok_bind then
-    server:close()
+  local function plain(v)
+    return type(v) == "string" and #v <= 512 and not v:find("[%z-W]")
+  end
+  local query = { snapshot = plain, n = plain, select = plain }
+
+  local handle, serr = require("lib.nvim.net.server").start({
+    name = "docmap",
+    port = port_wanted ~= 0 and port_wanted or nil,
+    routes = {
+      -- "Is a docmap server behind this origin?" -- the one question the page could not answer, and the reason
+      -- a *published* copy of the map showed the wrong error. Deliberately trivial: this server binds 127.0.0.1
+      -- only, so answering "yes, I am a docmap server" tells a caller nothing it could not already tell by
+      -- fetching any other endpoint.
+      {
+        path = "/api/ping",
+        handler = function()
+          return 200, "application/json", vim.json.encode({ docmap = true })
+        end,
+      },
+      -- Every route `core/api.lua` owns, dispatched by name: the set is data on that module, so a route added
+      -- there reaches this host and the standalone one without either being told. `commit/<sha>` is not a fixed
+      -- key there -- `core.api` itself recognises and validates that shape, so anything under `/api/` is handed
+      -- to it and `core.api` says no rather than this re-deciding the shape.
+      {
+        pattern = "^/api/(.+)$",
+        captures = { plain },
+        query = query,
+        handler = function(req)
+          return api_answer(req.params[1], cfg, query_param(req.query))
+        end,
+      },
+      -- Everything else is a bare filename in `out_dir` (the empty one is `index.html`).
+      {
+        pattern = "^/([^/]*)$",
+        captures = {
+          function(v)
+            return M.safe_static_name(v) ~= nil
+          end,
+        },
+        handler = function(req)
+          return M.static_answer(cfg, req.params[1])
+        end,
+      },
+    },
+  })
+  if not handle then
     return nil,
       ("bind failed%s: %s"):format(
         port_wanted ~= 0 and (" on port " .. port_wanted) or "",
-        tostring(bind_err)
+        tostring(serr)
       )
   end
 
-  local name = server:getsockname()
-  local port = name and name.port
-  if not port then
-    server:close()
-    return nil, "could not determine the bound port"
-  end
-
-  local ok_listen, listen_err = pcall(function()
-    assert(server:listen(64, function(lerr)
-      if lerr then
-        return
-      end
-      local client = uv.new_tcp()
-      if not client then
-        return
-      end
-      server:accept(client)
-      on_connection(cfg, client)
-    end))
-  end)
-  if not ok_listen then
-    server:close()
-    return nil, "listen failed: " .. tostring(listen_err)
-  end
-
-  -- Quitting the editor must not leave a listening socket behind. This is the
-  -- lifecycle obligation that comes with having a runtime at all, so it is
-  -- wired at start rather than left to the user remembering `serve stop`.
-  local augroup = vim.api.nvim_create_augroup("lib_docmap_serve", { clear = true })
-  require("lib.nvim.bindings.autocmd").create("VimLeavePre", function()
-    M.stop()
-  end, {
-    group = augroup,
-    desc = "docmap.editor.serve: close the map server on exit",
-  })
-
-  current = { server = server, port = port, cfg = cfg, augroup = augroup }
+  current = { handle = handle, port = handle.port, cfg = cfg }
   return M.info().url
 end
 
----Stop the server. Idempotent — stopping twice, or when none ever ran, is a
----no-op rather than an error, matching `uninstall()`'s tolerance elsewhere in
----this module.
+---Stop the server. Idempotent -- stopping twice, or when none ever ran, is a no-op rather than an error. The
+---`VimLeavePre` teardown is `lib.nvim.net.server`'s.
 ---@return boolean stopped True when a server was actually running.
 function M.stop()
   if not current then
@@ -530,13 +372,7 @@ function M.stop()
   end
   local c = current
   current = nil
-
-  if c.augroup then
-    pcall(vim.api.nvim_del_augroup_by_id, c.augroup)
-  end
-  if not c.server:is_closing() then
-    c.server:close()
-  end
+  c.handle.stop()
   return true
 end
 
