@@ -101,6 +101,32 @@ center to move. Zoom, pan, dimming, the right-click menu and the SVG export
 work as in the box views. Past 600 modules a layer shows its first ones, those
 in a broken rule first, and the page says so.
 
+**Routes** draws file-based routing as a tree, because there the nesting of
+the directories is the information: which segment sits in which, what a
+layout wraps, where the dynamic parts are. It reads the **Next.js**
+conventions off the paths of the scanned files, both routers. In an `app`
+directory a route is where a `page` or a `route` file is; `layout`, `loading`,
+`error`, `not-found` and the other special files are noted on their segment;
+`[id]` is a dynamic segment, `[...rest]` a catch-all, `[[...rest]]` an
+optional one; a `(group)` is no part of the URL; an `@slot` and an
+intercepting `(.)segment` are drawn without a URL of their own; a `_private`
+folder and every colocated helper file are no route. A `pages` directory
+counts only with evidence (`_app`, `_document`, or a file that imports
+`next`), because many projects have a `pages` folder that routes nothing;
+then every file in it is a route, `index` is its directory and `api/` holds
+handlers. A box says the segment as written on disk and, below it, the URL
+when it is a route (with "handler" for a request handler) or what it is
+instead; a route has a heavier left edge, a group, a slot and an interceptor
+a dashed frame, and the tooltip lists the files of the segment. With the
+center outside every route tree all trees are drawn side by side; a click
+re-centers on a segment's directory (the link carries it as `center=`), and
+▲ Up goes back. Zoom, Sideways, dimming, the right-click menu and the SVG
+export work as in Modules. SvelteKit, Nuxt and Remix are not read: their
+route files are `.svelte`/`.vue` files or need a naming table of their own.
+Routes registered by a call (`app.get("/path", handler)`) are rows in the
+Analysis tab's Endpoints panel, which says when a tree routes by file and
+links here. The exact rule is in `core/endpoints.lua`.
+
 **Coupling** is the one view that is not a tree or a graph but a scatter plot:
 every module at or below the center that has a require edge is a dot, placed
 by how many modules it requires (fan-out, across) and how many require it

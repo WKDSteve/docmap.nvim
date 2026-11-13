@@ -333,6 +333,23 @@ as having no order. The check and the view use one crossing test
   `module_map.json` does not.
 - **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
 
+## Routes view (file-based routing as a tree)
+
+File-based routing among the Hierarchy views: the Next.js `app` and `pages`
+directories as route trees, a box per segment, with the URL where a page or
+a handler makes it a route. Dynamic segments, catch-alls, route groups,
+slots and intercepting routes are recognized and named as written; private
+folders and colocated files are left out. It is the other half of the
+endpoint inventory: call-based routes are rows in the Endpoints panel,
+file-based ones are a tree because the nesting is the information. Read off
+the paths of the scanned nodes; no file is opened for it.
+
+- **Module:** `core/endpoints.lua` (`file_routes`, with the recognition
+  rule), `core/render/html/js/10b_maps.lua` (`layoutRoutes`, `routeBoxSpec`)
+- **Config:** none; `view=routes` and `center=<directory>` in the link. The
+  page payload carries `routes`; `module_map.json` does not.
+- **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
+
 ## Coupling view (fan-in against fan-out)
 
 A scatter plot among the Hierarchy views: each module a dot, by how many

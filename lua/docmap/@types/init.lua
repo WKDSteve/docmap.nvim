@@ -436,8 +436,9 @@
 
 ---One call-based route registration — `app.get("/path", handler)`-shaped,
 ---see `core/endpoints.lua`'s header for exactly what is and is not
----recognized, and why file-based routing (Next.js/SvelteKit/Nuxt/Remix) is
----a separate, unbuilt concept rather than a bent version of this one.
+---recognized, and why file-based routing is a separate thing rather than a
+---bent version of this one (`file_routes` in the same module, drawn by the
+---Routes view of the Hierarchy).
 ---@class Docmap.EndpointSpec
 ---@field method string HTTP method, lowercase, as written (`"get"`, `"post"`, ... or `"all"`).
 ---@field path string Route path as written, including any Express-style params (`":id"`).

@@ -175,6 +175,9 @@ function M.render(ir, findings, opts)
     -- page like `glossaries` and is not in `module_map.json`. Absent when no rule is declared, which the
     -- view says in words.
     layers = require("docmap.core.layers").map(ir, opts.layers),
+    -- The file-based route trees (the Next.js `app` and `pages` conventions), for the Routes view. Read
+    -- off the paths of the nodes above, nothing else; absent when the tree has none.
+    routes = require("docmap.core.endpoints").file_routes(ir),
   })
   -- `</script>` inside JSON would terminate the block early.
   payload = payload:gsub("</", "<\\/")
@@ -405,6 +408,7 @@ function M.render(ir, findings, opts)
     '<button class="hview-btn" data-view="treemap" data-explain="view.treemap">Treemap</button>',
     '<button class="hview-btn" data-view="rings" data-explain="view.rings">Rings</button>',
     '<button class="hview-btn" data-view="layers" data-explain="view.layers">Layers</button>',
+    '<button class="hview-btn" data-view="routes" data-explain="view.routes">Routes</button>',
     '<button class="hview-btn" data-view="coupling" data-explain="view.coupling">Coupling</button>',
     "</div>",
     -- Direction and depth belong to the directed views only; `syncGraphControls`

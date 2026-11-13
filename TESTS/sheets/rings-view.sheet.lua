@@ -79,6 +79,10 @@ return {
     },
     { shot = "chain-light" },
     { scheme = "dark" },
+    {
+      wait = "new Promise(done => setTimeout(() => done(true), 450))",
+      note = "the colours of the other theme have faded in",
+    },
     { shot = "chain-dark" },
     { scheme = "light" },
     { press = "=", note = "the zoom keys work as in the other diagram views" },

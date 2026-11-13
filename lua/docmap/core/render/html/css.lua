@@ -773,6 +773,15 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .hnode.lv-from,.hlegend .bx.lv-from{border-color:var(--error);border-width:2px}
 .hnode.lv-from .hkind{color:var(--error)}
 .hmap-note button{padding:2px 8px;font-size:12px;margin-left:4px}
+/* The Routes view. The kind of a segment is in its name as written on disk
+   (brackets, parentheses, @); a box that is a route has a heavier left edge
+   and its URL below the name, one that only groups is dashed. */
+.hnode.rt-route,.hlegend .bx.rt-route{border-left:4px solid var(--accent)}
+.hnode.rt-handler{border-left-style:double}
+.hnode.rt-group,.hnode.rt-slot,.hnode.rt-intercept{border-style:dashed}
+.hnode.rt-group .hnm,.hnode.rt-slot .hnm{color:var(--muted)}
+.hnode.rt-dynamic .hnm,.hnode.rt-catchall .hnm,.hnode.rt-optional .hnm{color:var(--fn)}
+.hnode.rt-root .hnm{color:var(--mod)}
 .hnode.ring-out,.hlegend .bx.ring-out{border-style:dashed}
 .hnode.ring-out .hnm{color:var(--muted)}
 .hnode.ring-unref,.hlegend .bx.ring-unref{border-color:var(--warn);border-width:2px}

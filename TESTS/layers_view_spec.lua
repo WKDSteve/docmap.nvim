@@ -281,7 +281,7 @@ return function(H)
     ok(src:find(needle, 1, true) ~= nil, "layers: " .. msg)
   end
   has('data-view="layers" data-explain="view.layers">Layers</button>', "a Layers button")
-  has("rings: 1, layers: 1, coupling: 1 };", "a known view")
+  has("rings: 1, layers: 1, routes: 1, coupling: 1 };", "a known view")
   has('else if(view === "layers") built = layoutLayers();', "drawHierarchy hands it off")
   has('function isMapView(v){ return v === "rings" || v === "layers"; }', "a map of the whole tree")
   has('"view.layers":', "the view explains itself")

@@ -341,6 +341,9 @@ return [[
         nodeId: cls.nodeId, recenter: cls.nodeId
       };
     }
+    // A segment of a route tree is no node of the map; the Routes view knows
+    // what its box says.
+    if(view === "routes") return routeBoxSpec(key);
     if(view === "calls"){
       var entry = fnByKey[key];
       if(!entry) return null;
@@ -472,6 +475,7 @@ return [[
   function sw(mod, text){ return { sw: mod, text: text }; }
   var LEGEND = {
     modules: [ sw("", "contains"), sw("type", "type reference") ],
+    routes:  [ sw("", "segment contains segment") ],
     types:   [ sw("type", "field references class") ],
     inheritance: [ sw("ext", "inherits from (arrow points at the base class)") ],
     deps:    [ sw("dep", "requires at load time"),
@@ -489,6 +493,7 @@ return [[
       return '<span class="lg"><span class="sw ' + it.sw + '"></span>' + esc(it.text) + '</span>';
     });
     items = items.concat(tintLegend());
+    if(view === "routes") items = items.concat(routeLegend());
     items.push('<span class="lg">wheel zooms · shift+wheel pans · ' +
       (isGraphView(view) ? 'zoom past the edge changes depth' : 'zoom right in to open a module') +
       ' · right-click for more</span>');
@@ -520,6 +525,12 @@ return [[
     if(view === "modulecalls"){
       return '<p class="hmsg">' + esc(center.name) + ' has no resolved call edges to or from another module — either it doesn’t call across module boundaries, or nothing else calls into it.</p>';
     }
+    if(view === "routes"){
+      return '<p class="hmsg">No file-based routes in this map. The view draws the Next.js conventions: an ' +
+        '<code>app</code> directory with <code>page</code> or <code>route</code> files, or a <code>pages</code> ' +
+        'directory with <code>_app</code> or files that import <code>next</code>. Routes registered by a call ' +
+        '(<code>app.get("/path", handler)</code>) are in the Analysis tab, under Endpoints.</p>';
+    }
     if(view === "layers"){
       return '<p class="hmsg">No layers are declared for this map. A rule in <code>.docmap.json</code> such as ' +
         '<code>"layers": [{ "from": "app.core", "to": "app.ui" }]</code> (the core may not require the UI) ' +
@@ -544,7 +555,7 @@ return [[
   }
 
   var VIEWS = { modules: 1, types: 1, inheritance: 1, deps: 1, calls: 1, modulecalls: 1, tree: 1, treemap: 1,
-                rings: 1, layers: 1, coupling: 1 };
+                rings: 1, layers: 1, routes: 1, coupling: 1 };
 
   // =====================================================================
   // Notes tab: Doxygen's Deprecated / Todo / Bug / Test lists.

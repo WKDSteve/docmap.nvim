@@ -1088,8 +1088,9 @@ return [[
   // recognizes these during the scan, the same shape `n.plugins` already
   // is. See that module's own header for what counts as a route
   // (Express/Fastify/Koa-shaped `app.get(path, handler)`) and what does
-  // not — `docs/ecosystem.md` §3.1 puts file-based routing
-  // (Next.js/SvelteKit/Nuxt/Remix) in a Hierarchy view instead, not here.
+  // not — `docs/ecosystem.md` §3.1 puts file-based routing in a Hierarchy
+  // view instead, not here: that is the Routes view (`layoutRoutes`), and
+  // this panel points at it.
   //
   // Sorted by path, ascending, by default — the same reasoning
   // `renderAnalysisPlugins` gives for repo: an inventory ("what routes does
@@ -1114,10 +1115,19 @@ return [[
       });
     });
 
+    // File-based routes are a tree, not rows: the Routes view of the
+    // Hierarchy draws them. Said here either way, so a tree that routes by
+    // file does not read as a tree without routes.
+    var fileRoutes = (IR.routes || {}).routes || 0;
+    var fileRoutesLine = fileRoutes
+      ? 'This tree also has ' + fileRoutes + ' file-based route' + (fileRoutes === 1 ? '' : 's') +
+        ' (the Next.js <code>app</code> and <code>pages</code> directories): ' +
+        '<a href="#tab=hierarchy&view=routes">the Routes view of the Hierarchy</a> draws them.'
+      : 'File-based routing (the Next.js <code>app</code> and <code>pages</code> directories) is drawn by ' +
+        'the Routes view of the Hierarchy; this tree has none.';
     if(rows.length === 0){
       return '<p class="ntext none">No call-based route registration found in this ' +
-        'tree. See <code>core/endpoints.lua</code> for what is recognized — file-based ' +
-        'routing (Next.js and similar) is a separate, unbuilt concept, not this.</p>';
+        'tree. See <code>core/endpoints.lua</code> for what is recognized. ' + fileRoutesLine + '</p>';
     }
 
     var totalRows = rows.length;

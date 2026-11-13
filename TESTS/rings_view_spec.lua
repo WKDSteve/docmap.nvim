@@ -18,7 +18,10 @@ return function(H)
 
   -- ── The wiring ───────────────────────────────────────────────────────────
   has('data-view="rings" data-explain="view.rings">Rings</button>', "a Rings button")
-  has("rings: 1, layers: 1, coupling: 1 };", "a known view (an unknown one falls back to Modules)")
+  has(
+    "rings: 1, layers: 1, routes: 1, coupling: 1 };",
+    "a known view (an unknown one falls back to Modules)"
+  )
   has('else if(view === "rings") built = layoutRings(hcenter);', "drawHierarchy hands it off")
   has(
     "var laid = built.positions ? { positions: built.positions, maxRowWidth: 0 } : layerPositions(built.layers);",

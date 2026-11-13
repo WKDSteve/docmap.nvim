@@ -627,6 +627,7 @@ return [[
     else if(view === "modulecalls") built = layoutModuleCalls(hcenter, state.dir || "out", depth, !!state.ext);
     else if(view === "rings") built = layoutRings(hcenter);
     else if(view === "layers") built = layoutLayers();
+    else if(view === "routes") built = layoutRoutes(hcenter);
     else if(hidingRoot) built = layoutModulesRooted(state.hideroot);
     else built = layoutModules(hcenter);
 
@@ -696,7 +697,7 @@ return [[
     if(lrBtn) lrBtn.classList.toggle("active", isLR());
   var centerKey = hcenter;
     if(view === "types") centerKey = built.layers[0] && built.layers[0][0];
-    else if(view === "inheritance" || isMapView(view)) centerKey = built.centerKey;
+    else if(view === "inheritance" || view === "routes" || isMapView(view)) centerKey = built.centerKey;
     else if(view === "calls") centerKey = wantFn || (built.layers[0] && built.layers[0][0]);
     // A forest has no single "middle" — every layer-0 box is equally a
     // root, so none of them gets the highlight ring a real center would.

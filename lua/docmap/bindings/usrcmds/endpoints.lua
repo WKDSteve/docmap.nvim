@@ -10,8 +10,9 @@
 ---
 --- See `core/endpoints.lua`'s header for what is and is not recognized —
 --- call-based routing (Express/Fastify/Koa-shaped) only; file-based routing
---- (Next.js/SvelteKit/Nuxt/Remix) belongs in a Hierarchy view instead, per
---- `docs/ecosystem.md` §3.1, and is not what this lists.
+--- (the Next.js `app` and `pages` directories) is the Routes view of the
+--- page's Hierarchy instead, per `docs/ecosystem.md` §3.1, and is not what
+--- this lists.
 
 local list = require("lib.nvim.ui.list")
 

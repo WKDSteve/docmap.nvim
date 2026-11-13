@@ -1,11 +1,16 @@
 ---@module 'docmap.core.endpoints'
---- Call-based route registrations — Express/Fastify/Koa-shaped
---- `app.get(path, handler)` calls — recognized in an already-parsed JS/TS/TSX
---- tree. The "call-based routing" half of `docs/ecosystem.md` §3.1's split;
---- file-based routing (Next.js/SvelteKit/Nuxt/Remix) is explicitly the other
---- half and belongs in a Hierarchy view instead, not attempted here — a
+--- Routes, both halves of `docs/ecosystem.md` §3.1's split.
+---
+--- **Call-based** route registrations — Express/Fastify/Koa-shaped
+--- `app.get(path, handler)` calls — are recognized in an already-parsed
+--- JS/TS/TSX tree (`extract`, below) and listed by the Endpoints panel.
+---
+--- **File-based** routing is the other half and deliberately not a list: a
 --- route's parent directory carries real structure there, and flattening it
---- into a list would lose the fact worth showing.
+--- would lose the fact worth showing. `file_routes`, at the end of this file,
+--- reads the Next.js `app` and `pages` conventions off the paths of the
+--- scanned nodes and returns route trees for the Routes view of the
+--- Hierarchy; its recognition rule is stated there.
 ---
 --- ## What is recognized, stated narrowly
 ---
@@ -178,6 +183,353 @@ function M.extract(root, src, lang, fns, requires)
     return a.line < b.line
   end)
   return out
+end
+
+-- =====================================================================
+-- File-based routing: the other half
+-- =====================================================================
+--
+-- A call-based route is one line in one file; a file-based route is a
+-- place in a directory tree, and what a reader wants from it is the tree:
+-- which segment nests in which, what a layout wraps, where the dynamic
+-- parts are. So this half is not found per file during the parse. It reads
+-- the paths of the nodes the scan already has and returns route trees, which
+-- the Routes view of the page's Hierarchy draws. No file is opened here.
+--
+-- ## What is recognized: the Next.js conventions, both routers
+--
+-- **App Router.** A directory named `app` is a route root when a file named
+-- `page` or `route` (`.js`, `.jsx`, `.ts`, `.tsx`) lies in or below it. Of
+-- several nested `app` directories the topmost is the root. Below it:
+--
+--   * a route exists where a `page` (a page) or a `route` (a request handler)
+--     is; `layout`, `template`, `loading`, `error`, `global-error`,
+--     `not-found`, `default`, `forbidden` and `unauthorized` are noted on
+--     their segment; every other file is a colocated helper and ignored;
+--   * `[id]` is a dynamic segment, `[...rest]` a catch-all, `[[...rest]]` an
+--     optional catch-all;
+--   * `(name)` is a route group: it organizes files and is no part of the
+--     URL, so what is below it keeps the URL it would have without it;
+--   * `@name` is a parallel-route slot and `(.)x`, `(..)x`, `(...)x`
+--     intercept another route: both are drawn with what they hold, without a
+--     URL of their own (a slot renders into the layout above it at that
+--     route's URL, an interceptor answers at the URL of the route it
+--     intercepts), so neither is counted as a route a second time;
+--   * `_name` is a private folder: it and everything below it is no route.
+--
+-- **Pages Router.** A directory named `pages` is a route root only with
+-- evidence, because many projects have a `pages` folder that routes nothing
+-- (a Vite app with a router library): it must hold `_app` or `_document`,
+-- or a file in or below it must import `next` or `next/...`. Then every
+-- JS/TS file below it is a route: `about.tsx` is `/about`, `index` is its
+-- directory, the bracket forms mean what they mean above, `api/` holds
+-- request handlers, and `_app`, `_document`, `_error` are noted on the root.
+--
+-- Of an `app` and a `pages` segment on one path the first decides, so
+-- `pages/app/x.tsx` is the route `/app/x` and not a second root.
+--
+-- ## What "framework" means here
+--
+-- `"next"` when a file in or below the root imports `next` or `next/...`
+-- (read from the nodes' `requires_external`), or, for a `pages` root, when
+-- `_app`/`_document` is there. An `app` root without such an import is still
+-- drawn, because `page`/`route` files under `app` are a narrow shape, with
+-- `framework` nil: the shape matched and nothing says whose convention it is.
+--
+-- ## What is not recognized
+--
+-- SvelteKit (`+page.svelte`), Nuxt (`pages/*.vue`) and Remix (dots in file
+-- names): their route files are `.svelte`/`.vue` files or need a table of
+-- their own, and the scan has no node for a file no language backend reads.
+-- A route tree missing every page that has no script beside it would be
+-- worse than none. Also not read: `pageExtensions` and `basePath` from
+-- `next.config.*`, `middleware`, and whether an `app` and a `pages` root
+-- claim the same URL.
+--
+-- Checked against two real trees (an App Router project of Next 14 with eight
+-- routes, a Pages Router project of Next 13 with five): the routes found are
+-- the ones the directories hold. Neither has a dynamic segment, a group or a
+-- slot; those forms are covered by the fixture only.
+
+local ROUTE_EXT = { js = true, jsx = true, ts = true, tsx = true }
+
+---What a file of the App Router is to its segment, by its name without the
+---extension.
+local APP_FILES = {
+  page = true,
+  route = true,
+  layout = true,
+  template = true,
+  loading = true,
+  error = true,
+  ["global-error"] = true,
+  ["not-found"] = true,
+  default = true,
+  forbidden = true,
+  unauthorized = true,
+}
+
+---The files of the Pages Router that are no route, noted on the root.
+local PAGES_SPECIAL = { _app = "app", _document = "document", _error = "error" }
+
+---@param path string
+---@return string[]
+local function split(path)
+  local parts = {}
+  for part in path:gmatch("[^/]+") do
+    parts[#parts + 1] = part
+  end
+  return parts
+end
+
+---What kind of segment a directory or file name is.
+---@param name string
+---@return Docmap.RouteKind
+local function segment_kind(name)
+  if name:match("^%(%.+%)") then
+    return "intercept"
+  end
+  if name:match("^%(.+%)$") then
+    return "group"
+  end
+  if name:sub(1, 1) == "@" then
+    return "slot"
+  end
+  if name:match("^%[%[%.%.%..+%]%]$") then
+    return "optional"
+  end
+  if name:match("^%[%.%.%..+%]$") then
+    return "catchall"
+  end
+  if name:match("^%[.+%]$") then
+    return "dynamic"
+  end
+  return "static"
+end
+
+---@param requires string[]?
+---@return boolean
+local function imports_next(requires)
+  for _, mod in ipairs(requires or {}) do
+    if mod == "next" or mod:sub(1, 5) == "next/" then
+      return true
+    end
+  end
+  return false
+end
+
+---One segment of a route tree.
+---@alias Docmap.RouteKind "root"|"static"|"dynamic"|"catchall"|"optional"|"group"|"slot"|"intercept"
+
+---@class Docmap.RouteNode
+---@field segment string The directory or file name as written (`[slug]`, `(shop)`); the root's own path for a root.
+---@field kind Docmap.RouteKind
+---@field dir string Path of the segment, relative to the scanned root's parent like a node path. For a file route of the Pages Router the path without the extension.
+---@field node string? Id of the map's node for that directory, when there is one: what the Hierarchy re-centers on.
+---@field url string? The URL pattern, when a page or a handler makes this segment a route.
+---@field handler boolean? True when the route is a request handler (`route.*`, or below `pages/api`), not a page.
+---@field files table<string, string> What the segment holds: role (`page`, `layout`, `route`, ...) to node id.
+---@field children Docmap.RouteNode[] Sorted: groups, static, dynamic, catch-all, optional, slots, intercepting.
+
+---One route tree: an `app` or a `pages` directory.
+---@class Docmap.RouteRoot : Docmap.RouteNode
+---@field router "app"|"pages"
+---@field framework string? `"next"` with evidence, nil when only the shape matched.
+---@field routes integer How many routes the tree has.
+
+---@class Docmap.Routes
+---@field roots Docmap.RouteRoot[] Sorted by directory.
+---@field routes integer All routes of all roots.
+
+local KIND_RANK = {
+  group = 1,
+  static = 2,
+  dynamic = 3,
+  catchall = 4,
+  optional = 5,
+  slot = 6,
+  intercept = 7,
+}
+
+---The file-based route trees of a scanned tree, or nil when it has none.
+---Reads node paths and `requires_external` only.
+---@param ir Docmap.IR
+---@return Docmap.Routes?
+function M.file_routes(ir)
+  -- Every JS/TS file the map has a node for, and every directory. A node's
+  -- file is its `source`: for a directory module that is the index file
+  -- inside it, which is exactly what makes `pages/blog/index.tsx` one node.
+  local files, dir_node = {}, {}
+  for _, id in ipairs(ir.order or {}) do
+    local node = ir.nodes[id]
+    local path = (node.path or id):gsub("^%./", "")
+    if node.kind ~= "file" then
+      dir_node[path] = id
+    end
+    local source = node.source and node.source:gsub("^%./", "")
+      or (node.kind == "file" and path or nil)
+    local stem, ext = (source or ""):match("([^/]+)%.([%w]+)$")
+    if source and stem and ROUTE_EXT[ext] then
+      files[#files + 1] = {
+        id = id,
+        parts = split(source:match("^(.*)/[^/]+$") or ""),
+        stem = stem,
+        next = imports_next(node.requires_external),
+      }
+    end
+  end
+  if #files == 0 then
+    return nil
+  end
+
+  -- Which root a file belongs to: the first `app` or `pages` on its path.
+  local candidates = {} -- root dir -> { router, files, evidence... }
+  for _, file in ipairs(files) do
+    for i, part in ipairs(file.parts) do
+      if part == "app" or part == "pages" then
+        local dir = table.concat(file.parts, "/", 1, i)
+        local root = candidates[dir]
+        if not root then
+          root = { dir = dir, router = part, depth = i, files = {} }
+          candidates[dir] = root
+        end
+        root.files[#root.files + 1] = file
+        break
+      end
+    end
+  end
+
+  local roots = {}
+  for _, cand in pairs(candidates) do
+    local uses_next, is_route_tree = false, false
+    for _, file in ipairs(cand.files) do
+      uses_next = uses_next or file.next
+      local direct = #file.parts == cand.depth
+      if cand.router == "app" then
+        is_route_tree = is_route_tree or file.stem == "page" or file.stem == "route"
+      elseif direct and (file.stem == "_app" or file.stem == "_document") then
+        is_route_tree = true
+      end
+    end
+    if cand.router == "pages" then
+      cand.framework = (is_route_tree or uses_next) and "next" or nil
+      is_route_tree = is_route_tree or uses_next
+    else
+      cand.framework = uses_next and "next" or nil
+    end
+    if is_route_tree then
+      roots[#roots + 1] = cand
+    end
+  end
+  if #roots == 0 then
+    return nil
+  end
+  table.sort(roots, function(a, b)
+    return a.dir < b.dir
+  end)
+
+  local total = 0
+  local out = {}
+  for _, cand in ipairs(roots) do
+    ---@type Docmap.RouteRoot
+    local root = {
+      segment = cand.dir,
+      kind = "root",
+      dir = cand.dir,
+      node = dir_node[cand.dir],
+      files = {},
+      children = {},
+      router = cand.router,
+      framework = cand.framework,
+      routes = 0,
+    }
+    local by_dir = { [cand.dir] = root }
+
+    ---The node of a segment path below the root, made on the way down.
+    ---@param names string[]
+    ---@return Docmap.RouteNode
+    local function reach(names)
+      local at, dir = root, cand.dir
+      for _, name in ipairs(names) do
+        dir = dir .. "/" .. name
+        local child = by_dir[dir]
+        if not child then
+          child = {
+            segment = name,
+            kind = segment_kind(name),
+            dir = dir,
+            node = dir_node[dir],
+            files = {},
+            children = {},
+          }
+          by_dir[dir] = child
+          at.children[#at.children + 1] = child
+        end
+        at = child
+      end
+      return at
+    end
+
+    for _, file in ipairs(cand.files) do
+      local names = {}
+      for i = cand.depth + 1, #file.parts do
+        names[#names + 1] = file.parts[i]
+      end
+      if cand.router == "app" then
+        local private = false
+        for _, name in ipairs(names) do
+          private = private or name:sub(1, 1) == "_"
+        end
+        if APP_FILES[file.stem] and not private then
+          reach(names).files[file.stem] = file.id
+        end
+      elseif #names == 0 and PAGES_SPECIAL[file.stem] then
+        root.files[PAGES_SPECIAL[file.stem]] = file.id
+      else
+        if file.stem ~= "index" then
+          names[#names + 1] = file.stem
+        end
+        reach(names).files.page = file.id
+      end
+    end
+
+    -- The URL of every segment that is a route, and the order of the children.
+    ---@param node Docmap.RouteNode
+    ---@param url string? nil in and below a slot or an intercepting segment
+    ---@param api boolean
+    local function finish(node, url, api)
+      if node.kind == "intercept" or node.kind == "slot" then
+        url = nil
+      elseif url and node.kind ~= "root" and node.kind ~= "group" then
+        url = (url == "/" and "" or url) .. "/" .. node.segment
+      end
+      api = api or (cand.router == "pages" and node.dir == cand.dir .. "/api")
+      if node.files.page or node.files.route then
+        node.url = url
+        if node.files.route or api then
+          node.handler = true
+        end
+        if url then
+          root.routes = root.routes + 1
+        end
+      end
+      table.sort(node.children, function(a, b)
+        if KIND_RANK[a.kind] ~= KIND_RANK[b.kind] then
+          return KIND_RANK[a.kind] < KIND_RANK[b.kind]
+        end
+        return a.segment < b.segment
+      end)
+      for _, child in ipairs(node.children) do
+        finish(child, url, api)
+      end
+    end
+    finish(root, "/", false)
+
+    total = total + root.routes
+    out[#out + 1] = root
+  end
+
+  return { roots = out, routes = total }
 end
 
 return M

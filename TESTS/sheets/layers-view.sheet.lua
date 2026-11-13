@@ -103,6 +103,10 @@ return {
     },
     { shot = "focus-light" },
     { scheme = "dark" },
+    {
+      wait = "new Promise(done => setTimeout(() => done(true), 450))",
+      note = "the colours of the other theme have faded in",
+    },
     { shot = "focus-dark" },
     { scheme = "light" },
     {

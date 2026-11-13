@@ -690,10 +690,11 @@ Ordered so each step is independently useful and nothing is a big-bang.
    field alongside `plugins`, a ninth Analysis panel, and `:DocMap
    endpoints` (mirroring `:DocMap plugins` exactly). `framework` is read
    from the file's own imports, never guessed from the call shape — Express/
-   Fastify/Koa all share the identical syntax. **File-based routing
-   (Next.js/SvelteKit/Nuxt/Remix) remains not attempted** — it belongs in a
-   Hierarchy view per the reasoning already in §3.1, a materially different
-   piece of work, not a follow-up to this one.
+   Fastify/Koa all share the identical syntax. **File-based routing done
+   for Next.js (2026-11-13)** — the Routes view of the Hierarchy draws the
+   `app` and `pages` directories as route trees (`core/endpoints.lua`,
+   `file_routes`), in a Hierarchy view per the reasoning in §3.1. SvelteKit,
+   Nuxt and Remix remain not attempted.
 
 **Then in runtime-analysis.nvim:**
 

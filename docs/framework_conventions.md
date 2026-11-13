@@ -165,6 +165,15 @@ convention — neither needs inventing.
 
 ## Recommendation
 
+> **Built since (2026-11-13), in part.** The file-based router recognizer
+> exists for Next.js, both routers, as the **Routes** view of the Hierarchy
+> (`core/endpoints.lua`, `file_routes`; `docs/tabs.md`). It is not
+> generalized by a filename table: SvelteKit, Nuxt and Remix keep their
+> routes in `.svelte`/`.vue` files or in file names with a syntax of their
+> own, and the scan has no node for a file no language backend reads, so a
+> table alone would draw route trees with pages missing. The text below is
+> the recommendation as it was written.
+
 **Not now, and sequenced behind `MULTILANG.md`'s JS/TS step**, which is
 itself not scheduled. If that step ever happens: build the **file-based
 router recognizer first**, generalized across frameworks by a

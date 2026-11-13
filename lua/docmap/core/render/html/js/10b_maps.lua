@@ -1,6 +1,6 @@
 ---@module 'docmap.core.render.html.js.10b_maps'
 --- A slice of the page's script: the maps of the Hierarchy (the tint of the Modules view and its legend, the
---- Coupling plot, the Rings and the Layers).
+--- Coupling plot, the Rings, the Layers and the Routes).
 ---
 --- Not a script of its own: the slices are joined in order inside one function (see `html/js/init.lua`), so a
 --- slice may use what an earlier one declared and may stop between two statements.
@@ -1014,6 +1014,143 @@ return [[
   }
 
   function mapNote(view){ return view === "layers" ? layerNote() : ringNote(); }
+
+  // =====================================================================
+  // Routes: file-based routing as a tree.
+  //
+  // A call-based route is a row in the Endpoints panel. A file-based one is
+  // a place in a directory tree, and the nesting is the information: which
+  // segment sits in which, which layout wraps what, where the dynamic parts
+  // are. `core/endpoints.lua` (`file_routes`) reads the Next.js `app` and
+  // `pages` conventions off the paths of the scanned nodes and ships the
+  // route trees as `IR.routes`; this view draws them with the layered layout
+  // of the Modules view, a box per segment.
+  //
+  // A box says the segment as it is written on disk (`[slug]`, `(shop)`,
+  // `@modal`), so its kind is in its name, and below it the URL when a page
+  // or a handler makes it a route, else what it is. Its tooltip lists the
+  // files it holds. A click re-centers on the segment's directory, like a
+  // click in Modules; with the center outside every route tree, all of them
+  // are drawn side by side.
+  // =====================================================================
+  var ROUTE_KINDS = {
+    root: "route root",
+    static: "segment",
+    dynamic: "dynamic segment",
+    catchall: "catch-all segment",
+    optional: "optional catch-all",
+    group: "group · not in the URL",
+    slot: "slot · not in the URL",
+    intercept: "intercepts a route"
+  };
+  var ROUTERS = { app: "App Router", pages: "Pages Router" };
+
+  // Every segment of every route tree by its key, built once: the trees do
+  // not change while the page is open.
+  var routeIndex = null;
+  function routeNodes(){
+    if(routeIndex) return routeIndex;
+    routeIndex = { byKey: {}, byNode: {}, roots: [] };
+    ((IR.routes || {}).roots || []).forEach(function(root){
+      (function walk(n, parent, top){
+        n.key = "route:" + n.dir;
+        n.parentKey = parent;
+        n.root = top;
+        routeIndex.byKey[n.key] = n;
+        // The directory first; a file of the segment finds it too, so a
+        // center on `page.tsx` shows the segment that page is.
+        if(n.node && !routeIndex.byNode[n.node]) routeIndex.byNode[n.node] = n;
+        Object.keys(n.files || {}).forEach(function(role){
+          var id = n.files[role];
+          if(!routeIndex.byNode[id]) routeIndex.byNode[id] = n;
+        });
+        (n.children || []).forEach(function(c){ walk(c, n.key, top); });
+      })(root, null, root);
+      routeIndex.roots.push(root);
+    });
+    return routeIndex;
+  }
+
+  function routeFiles(n){
+    return Object.keys(n.files || {}).sort(function(a, b){
+      var first = { page: 0, route: 1, layout: 2 };
+      var ra = first[a] === undefined ? 9 : first[a], rb = first[b] === undefined ? 9 : first[b];
+      return ra !== rb ? ra - rb : (a < b ? -1 : (a > b ? 1 : 0));
+    });
+  }
+
+  function routeBoxSpec(key){
+    var n = routeNodes().byKey[key];
+    if(!n) return null;
+    var files = routeFiles(n);
+    var line;
+    if(n.kind === "root"){
+      line = ROUTERS[n.root.router] + " · " + ringPlural(n.root.routes, "route");
+    } else if(n.url){
+      line = n.url + (n.handler ? " · handler" : "");
+    } else {
+      line = ROUTE_KINDS[n.kind] + (files.length && n.kind === "static" ? " · " + files.join(", ") : "");
+    }
+    var tip = [ n.dir ];
+    if(n.url) tip.push((n.handler ? "request handler at " : "page at ") + n.url);
+    else if(n.kind !== "root") tip.push("no route of its own: " +
+      (files.length ? "it holds " + files.join(", ") : "it only groups what is below it"));
+    if(n.kind !== "static" && n.kind !== "root") tip.push(ROUTE_KINDS[n.kind]);
+    if(n.kind === "root") tip.push(n.root.framework === "next"
+      ? "Next.js " + ROUTERS[n.root.router]
+      : "the shape of a Next.js route directory; no file in it imports next");
+    files.forEach(function(role){ tip.push(role + ": " + n.files[role]); });
+    var open = n.files.page || n.files.route || n.files[files[0] ] || n.node || null;
+    return {
+      cls: "hnode rt-" + n.kind + (n.url ? " rt-route" : "") + (n.handler ? " rt-handler" : ""),
+      title: tip.join("\n"),
+      html: '<div class="hnm">' + esc(n.segment) + '</div><div class="hline">' + esc(line) + '</div>',
+      nodeId: (open && byId[open]) ? open : null,
+      recenter: (n.node && byId[n.node]) ? n.node : ((open && byId[open]) ? open : null)
+    };
+  }
+
+  // The same shape every layout returns: layers of keys from the seeds down.
+  var routeShown = null;
+  function layoutRoutes(centerId){
+    var index = routeNodes();
+    routeShown = null;
+    if(!index.roots.length) return { layers: [], included: {}, count: 0, truncated: false, edges: [] };
+    var at = index.byNode[centerId] || null;
+    var seeds = at ? [at] : index.roots;
+    var layers = [], included = {}, count = 0, truncated = false;
+    var queue = seeds.map(function(n){ return { n: n, d: 0 }; });
+    while(queue.length){
+      var item = queue.shift();
+      if(count >= MAX_HNODES){ truncated = true; break; }
+      included[item.n.key] = item.d;
+      count++;
+      (layers[item.d] = layers[item.d] || []).push(item.n.key);
+      (item.n.children || []).forEach(function(c){ queue.push({ n: c, d: item.d + 1 }); });
+    }
+    var edges = [];
+    Object.keys(included).forEach(function(key){
+      (index.byKey[key].children || []).forEach(function(c){
+        if(included[c.key] !== undefined) edges.push({ from: key, to: c.key, cls: "hedge", marker: "tree" });
+      });
+    });
+    var total = (IR.routes || {}).routes || 0;
+    routeShown = { trees: index.roots.length, routes: total, at: at };
+    return {
+      layers: layers, included: included, count: count, truncated: truncated, edges: edges,
+      centerKey: at ? at.key : null,
+      path: at ? at.dir + " · " + (at.url ? at.url + " · " : "") + "routes"
+               : ringPlural(index.roots.length, "route tree") + " · " + ringPlural(total, "route")
+    };
+  }
+
+  function routeLegend(){
+    return [
+      '<span class="lg"><span class="bx rt-route"></span>a route: a page or a handler answers at its URL</span>',
+      '<span class="lg"><span class="bx"></span>no route of its own (a layout, a group, a slot)</span>',
+      '<span class="lg">[x] dynamic · [...x] catch-all · (x) group and @x slot are not in the URL</span>'
+    ];
+  }
 
   function mapLegend(view){
     if(view === "layers"){

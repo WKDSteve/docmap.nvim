@@ -463,6 +463,11 @@ return [[
       "require another sits below it. A require that breaks a rule is a red " +
       "arrow, which is the layer-violation finding as a picture. Needs " +
       "layers in .docmap.json.",
+    "view.routes":
+      "File-based routing as a tree: the Next.js app and pages directories, a " +
+      "box per segment, with the URL where a page or a handler makes it a " +
+      "route. Dynamic segments, route groups and slots are named as written. " +
+      "Routes registered by a call are in Analysis, under Endpoints.",
     "hier.entry":
       "The module the rings are counted from. The list holds the roots of the " +
       "require graph (modules that require something and that nothing " +
