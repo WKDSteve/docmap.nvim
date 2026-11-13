@@ -2190,11 +2190,23 @@ for good — the first parser version treated any non-bullet line as ending
 the run and silently dropped every bullet after the first wrapped one; this
 is the fix, not the original design.
 
-A `Module:` bullet whose first backtick-quoted token matches (or
-endswith-matches) a real node's own `source`/`path` makes the card's own
-name a link into the Tree tab — the same leniency `tag_links` resolution
-already extends to stale cross-references elsewhere on this page. No match,
-no link, never thrown.
+A `Module:` bullet makes the card's own name a link into the Tree tab, to
+the first file or module it names. No match, no link, never thrown.
+
+**The same bullets, read backwards.** `features.index` (`core/features.lua`,
+run by `scan_full` once the tree is complete) inverts them into
+`ir.features.refs`, keyed like `ir.docs.refs` (a node id, or
+`nodeId#fnName`): which features name this module, which name this function.
+The page shows that as one trigger in the Tree tab's detail pane, on the card
+the annotation popup already is. A file or module token that names nothing in
+the tree becomes `ir.features.unresolved` and the `feature-module-missing`
+finding; the member lists are deliberately not judged. The rules, and the
+measurement behind them, are in [`features_format.md`](features_format.md),
+"The way back".
+
+**One sub-tab per theme file.** With more than one file the tab shows one
+theme at a time, the first (`core.md`) by default, behind the toolbar pattern
+the Analysis tab uses. The theme is one axis of the link (`ftheme`).
 
 **Declared only, same posture as Tools.** `ir.features` is a static parse of
 whatever `docs/FEATURES/` contains at scan time — nothing here is probed
@@ -2321,6 +2333,7 @@ Generic checks (any annotated tree):
 | `type-vs-class` | warn | A module's own table is annotated `---@type Foo` and later has real fields assigned to it — LuaLS reports `missing-fields`/"fields cannot be injected" for this exact shape; `---@class M : Foo` is the annotation that actually means it. |
 | `doc-references-missing` | warn | A `.md` file names `mod.member` where `mod` is a real module in this tree and `member` is not one of its functions — prose describing something renamed or removed. Deliberately narrow: an unknown prefix (`vim.fn.expand`), a plugin name (`x.nvim`), a glob (`mod.*`) and a documented rename (`` `old` → `new` ``) are all excluded. See `core/docs.lua`. |
 | `binding-conflict` | warn | Two places register the same keymap (same `lhs`, same mode) or the same user command, so the later one silently wins. A *config* check, meaningless for a plugin: `:map <leader>ff` shows the winner and gives no hint there was a loser. Buffer-local registrations are excluded — shadowing is what `buffer = true` is for — as is a non-literal `lhs`, and one call declaring several modes counts once. See `core/bindings.lua` for what is extracted. |
+| `feature-module-missing` | warn | A `- **Module:** …` bullet in `docs/FEATURES` names a file or module this tree does not have — a feature description left behind by a rename. Only the file or module token is judged, never the member list in the parentheses after it, and only where it claims a place in this tree: a path of a language the map holds (`core/gone.lua`, not `relay/nav.go` in a Lua map, not a real `docs/install.json`), or a dotted name under one of its modules. See `core/features.lua` (`M.index`). |
 | `tools-spec-invalid` | warn | This repo's own `docs/install.json`/`docs/INSTALL.md` has a malformed entry — missing `bin`, empty `why`, or no `pkg` map. See `core/tools.lua`. |
 | `undocumented-param` | info | A function has more parameters than `@param` lines (text-based heuristic, can be wrong on complex signatures — never fails `--check`). |
 | `param-name-mismatch` | info | R5: at a shared position, a `@param` name and the signature's declared name differ — usually a renamed parameter whose doc line was never updated. Same heuristic caveats as `undocumented-param`. |

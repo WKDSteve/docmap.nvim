@@ -129,6 +129,33 @@ what that tab renders, for this repo.
   this file follows), [`docs/pipeline.md`](../pipeline.md) "Features tab"
   section.
 
+## Theme sub-tabs in the Features tab
+
+With more than one theme file the Features tab shows one file at a time,
+behind a strip of sub-tabs in the reader's order: `core.md` first, the
+overview second, one theme each after that. The line under the strip says
+what is on screen, the link carries the theme, and a repository with a single
+feature file gets no strip.
+
+- **Module:** `core/render/html/js/05_features_help_index.lua`
+- **Config:** none; `ftheme=<theme>` in the link.
+- **Docs:** [`docs/features_format.md`](../features_format.md) "One sub-tab
+  per theme file".
+
+## The way back from code to its features
+
+The `Module:` bullets of the feature files, read backwards: a module or a
+function that a feature names carries one trigger in the Tree tab's detail
+pane, which lists those features and opens them. A bullet that names a file
+or module the tree no longer has is a drift finding.
+
+- **Module:** `core/features.lua` (`M.index`), `core/check.lua`
+  (`check_feature_modules`), `core/render/html/js/05_features_help_index.lua`
+- **Config:** none; `checks = { ["feature-module-missing"] = false }` turns
+  the finding off.
+- **Docs:** [`docs/features_format.md`](../features_format.md) "The way
+  back".
+
 ## Promoted feature tabs
 
 A `- **Tab:** true` bullet promotes one feature out of the Features catalog

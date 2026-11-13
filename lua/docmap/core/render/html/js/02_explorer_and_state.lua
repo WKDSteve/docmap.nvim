@@ -613,9 +613,11 @@ return [[
       // Notes.
       void 0;
     } else if(s.tab === "features"){
-      // Same reasoning as Quicks/Notes: one flat catalog over the whole
-      // repo's docs/FEATURES/, no center/sort/filter axis of its own yet.
-      void 0;
+      // One axis: which theme file is showing. Left out when it is the
+      // first one, so the common case stays a bare `#tab=features` link.
+      if(s.ftheme && s.ftheme === featureTheme(s) && s.ftheme !== featureTheme(null)){
+        parts.push("ftheme=" + encodeURIComponent(s.ftheme));
+      }
     } else if(s.tab === "compare"){
       if(s.cview !== "matrix") parts.push("cview=" + encodeURIComponent(s.cview));
     } else if(s.tab && s.tab.indexOf("feature-") === 0){
@@ -703,6 +705,9 @@ return [[
       else if(k === "tint") s.tint = (v === "doc" || v === "test" || v === "fix" || v === "debt") ? v : null;
       else if(k === "ext") s.ext = (v === "1" || v === "true");
       else if(k === "iview") s.iview = (v === "modules") ? "modules" : "functions";
+      // Checked where it is used (`featureTheme`): a theme that no longer
+      // exists opens the first one.
+      else if(k === "ftheme") s.ftheme = v;
       else if(k === "atool") s.atool = (v === "doc" || v === "deps" || v === "complexity" ||
         v === "duplicates" || v === "plugins" || v === "lazy" || v === "tools" || v === "hooks" ||
         v === "decorators" || v === "rust" ||

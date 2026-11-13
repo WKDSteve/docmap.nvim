@@ -828,6 +828,9 @@ return [[
     var html;
     if(el.dataset.doc){
       html = docRefsHTML(el.dataset.doc);
+    } else if(el.dataset.feat){
+      // A third trigger on the same card: which features describe this.
+      html = featRefsHTML(el.dataset.feat);
     } else {
       var entry = fnByKey[el.dataset.sig];
       // A key with no entry is a bug in whatever rendered the trigger, not
@@ -863,7 +866,7 @@ return [[
   // travel into the card to scroll it or select text. Click pins, which is
   // what makes the card usable at all for a long `@example` block.
   document.addEventListener("mouseover", function(ev){
-    var el = ev.target.closest && ev.target.closest("[data-sig],[data-doc]");
+    var el = ev.target.closest && ev.target.closest("[data-sig],[data-doc],[data-feat]");
     if(el){
       if(sigTimer){ clearTimeout(sigTimer); sigTimer = null; }
       if(el !== sigAnchor) sigOpen(el);
@@ -886,7 +889,7 @@ return [[
       navigate({ tab: "tree", id: id });
       return;
     }
-    var el = ev.target.closest && ev.target.closest("[data-sig],[data-doc]");
+    var el = ev.target.closest && ev.target.closest("[data-sig],[data-doc],[data-feat]");
     if(el){
       ev.preventDefault();
       if(sigPinned && sigAnchor === el){ sigClose(); return; }
@@ -962,7 +965,7 @@ return [[
     if(ev.key === "Escape" && sigAnchor){ sigClose(); return; }
     if(ev.key !== "Enter" && ev.key !== " ") return;
     var el = document.activeElement;
-    if(!el || !el.dataset || !(el.dataset.sig || el.dataset.doc)) return;
+    if(!el || !el.dataset || !(el.dataset.sig || el.dataset.doc || el.dataset.feat)) return;
     ev.preventDefault();
     if(sigPinned && sigAnchor === el){ sigClose(); return; }
     sigOpen(el);

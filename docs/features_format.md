@@ -93,6 +93,23 @@ not alphabetical order:
 Alphabetical order alone put `ARCHITECTURE.md` above `CORE.md`, which is the
 reverse of how anybody reads them.
 
+### One sub-tab per theme file
+
+With more than one theme file, the Features tab shows one file at a time and
+a strip of sub-tabs above it, one per file, in the order above. So the three
+positions mean something: `core.md` is what a reader sees first, `FEATURES.md`
+the overview next to it, and every other theme is opened when it is wanted.
+The line under the strip says what is on screen (`UI: 4 of 31 features across
+6 files`), and the link carries the theme (`#tab=features&ftheme=UI`) unless
+it is the first. A repository with a single feature file gets no strip.
+
+There is nothing to configure and nothing to write: the strip is how the
+catalogue is navigated. It is not a second way to highlight a feature. That
+stays `- **Tab:** true` (below), which answers a different question: "this one
+feature needs a page of its own", where a theme file says "these features
+belong together". A promoted feature is listed in the second-level strip of
+the tab, not in a theme, and is counted in none.
+
 ---
 
 ## Inside a theme file
@@ -149,10 +166,56 @@ tab treats them specially when present:
 
 | Key | What the tab does with it |
 |---|---|
-| `Module` | If the value contains (or is) a path this repo's own scan recognizes, the row links straight to that node in the Tree tab — the same resolution `:DocMap why`'s module-name matching already does, not a new one. |
+| `Module` | Read in both directions. **Forwards:** the card's name links to the first file or module the value names. **Backwards:** every file, module and function it names lists this feature (the &#9670; trigger in the Tree tab's detail pane, see "The way back" below). A value that names something this tree does not have is reported (`feature-module-missing`). |
 | `Keymaps` / `Usercmds` / `Autocmds` | Rendered as-is; not cross-resolved against `docs/BINDINGS.md`'s own rows (which have no per-row anchors to resolve *to* — see "What this deliberately does not do" below). Write these as a normal Markdown link to `../BINDINGS.md#keymaps`/`#user-commands`/`#autocommands` yourself if you want a click-through; the tab only renders the link, it does not invent one. |
 | `Config` | Rendered as-is. No cross-check against `config/DEFAULTS.lua` — that would mean parsing Lua defaults generically across every consuming plugin's own shape, a real feature and not this one. |
 | `Tab` | `- **Tab:** true` promotes the feature to its own top-level tab instead of a card in the Features catalog — see "Promoting a feature to its own tab" below. Any other value is ignored (the feature stays an ordinary card); this is the one key consumed rather than displayed, so it never shows up as a "Tab: true" row either way. |
+
+---
+
+## The way back: from a module or a function to its features
+
+A `Module:` bullet is written once and read twice. In the Tree tab, the detail
+of a module shows a &#9670; trigger beside its path when a feature names it,
+and each function a feature names shows one beside its prose references. The
+trigger opens a card listing those features by name, with theme and summary;
+a name leads to the feature itself (its card in the right theme, or its own
+tab when it is promoted), the last line to the Features tab. The trigger is
+rendered only where a feature names the thing, so seeing it is already the
+answer to "is this described anywhere".
+
+How a value is read:
+
+```markdown
+- **Module:** `core/annotate.lua` (`M.candidates`, `M.plan`), `bindings/usrcmds/annotate.lua`
+- **Module:** `lib.nvim.bindings.usercmd` (`create`)
+- **Module:** [`adapter/oil.lua`](../../lua/filetree/adapter/oil.lua) — `filetypes = {"oil"}`
+```
+
+- A backticked token **outside parentheses** names a file or a module: a
+  path, matched from the end at a `/` (`core/check.lua` is
+  `lua/docmap/core/check.lua`, and is not `precheck.lua`), or a module name,
+  declared (`@module`) or simply its path with dots. A value may name several.
+- The backticked tokens **in the parentheses after it** name members of that
+  file: `M.plan`, `plan` and `plan()` all mean the function `plan`. For a
+  directory module the files below it are searched too.
+- `module.member` written as one dotted name (`sandbox.resolve_engine_name`)
+  names both.
+- Everything else is passed over: prose, a link target, a token that is not a
+  path or a module name.
+
+**What is reported, and what is not.** Only a file or module token, and only
+when it claims a place in this tree: a path of a language the map holds
+(`core/gone.lua`; not `relay/nav.go` in a map of Lua files, and not a real
+file that is no module such as `docs/install.json`), or a dotted name under
+one of the map's modules. A member that is not found is never reported, it is
+just not indexed: measured over fourteen repositories, the parentheses hold
+options, constants, literals and methods of instances about as often as
+functions, and a check that cried at each of them would be switched off.
+
+No new key was added. `Commit:` and `Keywords:` were considered as further
+sources for the match and are not read: the existing `Module:` bullets already
+reach the files of every repository they were measured on.
 
 ---
 
@@ -234,10 +297,7 @@ is a documentation-discipline problem for the repo, not a parser error.
   `Keymaps:` bullet can link to the whole section; resolving to one row
   would need `docs/BINDINGS.md` to grow per-row ids, a change to a
   different, already-stable generator this feature does not touch.
-- **No hover-icon "which feature uses this function" affordance.** The
-  roadmap item this format ships for names this explicitly as a
-  **separate, speculative follow-up**, gated on a position-to-feature
-  index that does not exist yet ("beim Hovern über eine Funktion/Table [...]
-  ein Icon zeigen, welche Feature(s) diesen Code-Teil gerade einsetzen").
-  Building it here would have answered a question nobody asked yet at the
-  cost of the question that was: an index that exists at all.
+- **No match by commit or by keyword.** The way back from code to features
+  (above) is built from the `Module:` bullets alone. A feature that names no
+  module is found from no module: there is no `Commit:` or `Keywords:` key
+  that would reach it, and no check that every feature names one.

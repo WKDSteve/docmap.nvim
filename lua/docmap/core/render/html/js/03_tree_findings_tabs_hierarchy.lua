@@ -117,7 +117,7 @@ return [[
     // here to carry the mark control along — it is rendered on its own. Marks
     // are not a function-only idea: "how do these three modules differ" is the
     // same question one scale up.
-    h.push('<div class="mp">'+esc(n.module || n.path)+docTrigger(n.id)+markTrigger(n.id)+'</div>');
+    h.push('<div class="mp">'+esc(n.module || n.path)+docTrigger(n.id)+featTrigger(n.id)+markTrigger(n.id)+'</div>');
 
     var links = [];
     if(n.readme) links.push('<a href="'+esc(rel(n.readme))+'">README</a>');
@@ -264,7 +264,7 @@ return [[
         h.push(fnAnnotationHTML(fn));
         // Prose references for this function, where the reader is already
         // looking at everything else known about it.
-        var dref = docTrigger(key);
+        var dref = docTrigger(key) + featTrigger(key);
         if(dref) h.push('<div class="fn-desc fn-see">' + dref + '</div>');
 
         // The per-function entry into the Calls view. Counts are shown up

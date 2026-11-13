@@ -512,6 +512,35 @@ local function check_doc_references(ir, findings)
   end
 end
 
+--- A feature description that names a module the tree no longer has.
+---
+--- The fourth reference shape, after links, code identifiers and sibling
+--- paths: a `- **Module:** …` bullet in `docs/FEATURES`. The page reads those
+--- bullets in both directions (a feature card links to its node, a node lists
+--- its features), and a bullet whose file was renamed or deleted drops out of
+--- both without a word.
+---
+--- Reads `ir.features.unresolved`, which `features.index` fills during
+--- `scan_full`. Narrow on purpose, see that function: only the file or module
+--- token is judged, never the member list after it, and only where the token
+--- claims a place in this tree (a path of a language the map holds, or a
+--- dotted name under one of its modules).
+---
+--- `warn`, matching `doc-references-missing`.
+---@param ir Docmap.IR
+---@param findings Docmap.Finding[]
+local function check_feature_modules(ir, findings)
+  for _, u in ipairs((ir.features or {}).unresolved or {}) do
+    add(
+      findings,
+      "warn",
+      "feature-module-missing",
+      nil,
+      { file = u.file, line = u.line, text = u.text, feature = u.feature }
+    )
+  end
+end
+
 --- References to a *sibling repository's* files, checked against the checkouts
 --- `opts.external_repos` declares.
 ---
@@ -2350,6 +2379,7 @@ function M.run(ir, opts)
   check_doc_references(ir, findings)
   check_sibling_references(ir, findings, opts)
   check_tools_spec(ir, findings)
+  check_feature_modules(ir, findings)
   check_orphans(ir, findings, opts)
   check_tag_requires(ir, findings)
   check_orphaned_types(ir, findings, opts)

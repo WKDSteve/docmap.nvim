@@ -368,4 +368,329 @@ function M.resolve(root, dirs)
   return { folder = folder, intro = intro, files = files }
 end
 
+-- ---------------------------------------------------------------- the way back
+--
+-- A `- **Module:** …` bullet names where a feature lives. Read forwards it
+-- links a feature card to a node; `M.index` reads the same bullets backwards,
+-- so a module or a function can say which features describe it. No new
+-- metadata: the values below are what authors already write.
+--
+--   `core/annotate.lua` (`M.candidates`, `M.plan`), `bindings/usrcmds/annotate.lua`
+--   `lib.nvim.bindings.usercmd` (`create`)
+--   [`adapter/oil.lua`](../../lua/filetree/adapter/oil.lua) — `filetypes = {"oil"}`
+--
+-- A backticked token outside parentheses names a file or a module; the
+-- backticked tokens in the parentheses after it name members of that file.
+-- Anything that is neither (the `filetypes = …` above, prose, a link target)
+-- is passed over: this reads a convention, it does not police a sentence.
+
+---The backticked tokens of a `Module:` value, each with the parenthesis depth
+---it sits at. A link target `](…)` is skipped whole, so the parentheses of a
+---Markdown link do not read as a member list.
+---@param value string
+---@return { text: string, depth: integer }[]
+local function module_tokens(value)
+  local out = {}
+  local depth = 0
+  local i, n = 1, #value
+  while i <= n do
+    local c = value:sub(i, i)
+    if c == "`" then
+      local close = value:find("`", i + 1, true)
+      if not close then
+        break
+      end
+      out[#out + 1] = { text = value:sub(i + 1, close - 1), depth = depth }
+      i = close + 1
+    elseif c == "]" and value:sub(i + 1, i + 1) == "(" then
+      local close = value:find(")", i + 2, true)
+      i = (close or n) + 1
+    else
+      if c == "(" then
+        depth = depth + 1
+      elseif c == ")" and depth > 0 then
+        depth = depth - 1
+      end
+      i = i + 1
+    end
+  end
+  return out
+end
+
+---What a token would have to look like to be a claim about this tree: a path
+---with a file extension. `filetypes = {"oil"}` and `:Cmd sub` are neither.
+---@param token string
+---@return boolean
+local function looks_like_path(token)
+  return token:match("^[%w_%-./]+%.%a%w*$") ~= nil and token:find("/", 1, true) ~= nil
+end
+
+---@param name string
+---@return string|nil bare The last segment of `M.plan`, `mod:method`, `fn()`; nil when the token is not an identifier at all.
+local function bare_member(name)
+  local bare = name:gsub("%s*%(.*%)$", ""):match("([^.:]+)$")
+  if bare and bare:match("^[%a_][%w_]*$") then
+    return bare
+  end
+  return nil
+end
+
+---Lookup tables over the scanned tree, built once per `M.index`.
+---@param ir Docmap.IR
+---@return { by_path: table<string, string>, by_module: table<string, string>, paths: { path: string, id: string }[], modules: { module: string, id: string }[], exts: table<string, true> }
+local function node_lookup(ir)
+  local by_path, by_module, paths, modules, exts = {}, {}, {}, {}, {}
+  for _, id in ipairs(ir.order or {}) do
+    local node = ir.nodes[id]
+    if node then
+      for _, p in ipairs({ node.source or false, node.path or false }) do
+        if type(p) == "string" and p ~= "" then
+          p = p:gsub("\\", "/")
+          if not by_path[p] then
+            by_path[p] = id
+            paths[#paths + 1] = { path = p, id = id }
+            local ext = p:match("%.(%a%w*)$")
+            if ext then
+              exts[ext:lower()] = true
+            end
+          end
+        end
+      end
+      if type(node.module) == "string" and node.module ~= "" and not by_module[node.module] then
+        by_module[node.module] = id
+        modules[#modules + 1] = { module = node.module, id = id }
+      end
+    end
+  end
+  return { by_path = by_path, by_module = by_module, paths = paths, modules = modules, exts = exts }
+end
+
+---The node a file or module token names: the exact path or module name, else
+---the first node (in tree order) whose path ends in `/token` or whose module
+---name ends in `.token`. A suffix is how these bullets are written
+---(`core/check.lua` for `lua/docmap/core/check.lua`); the boundary keeps
+---`check.lua` from matching `precheck.lua`.
+---@param lookup table
+---@param token string
+---@return string|nil node_id
+local function resolve_node(lookup, token)
+  token = token:gsub("\\", "/")
+  if lookup.by_path[token] then
+    return lookup.by_path[token]
+  end
+  if lookup.by_module[token] then
+    return lookup.by_module[token]
+  end
+  local tail = "/" .. token
+  for _, p in ipairs(lookup.paths) do
+    if #p.path > #tail and p.path:sub(-#tail) == tail then
+      return p.id
+    end
+  end
+  if token:match("^[%a_][%w_.]*$") then
+    tail = "." .. token
+    for _, m in ipairs(lookup.modules) do
+      if #m.module > #tail and m.module:sub(-#tail) == tail then
+        return m.id
+      end
+    end
+    -- A module name is also a path: `lib.nvim.cross.uv` is the directory
+    -- `lua/lib/nvim/cross/uv`, whether or not anything in it carries an
+    -- `@module` tag saying so.
+    tail = "/" .. token:gsub("%.", "/")
+    for _, p in ipairs(lookup.paths) do
+      local stem = p.path:gsub("%.%a%w*$", ""):gsub("/init$", "")
+      if #stem >= #tail and ("/" .. stem):sub(-#tail) == tail then
+        return p.id
+      end
+    end
+  end
+  return nil
+end
+
+---Whether a dotted token that resolved to nothing still claims to be inside
+---this tree: some proper prefix of it is a module of the map. That is the rule
+---`docs.missing_member` uses, and it keeps `vim.fn.expand` or another
+---repository's `lib.nvim.git.refs` from being reported.
+---@param lookup table
+---@param token string
+---@return boolean
+local function claims_this_tree(lookup, token)
+  if not token:match("^[%a_][%w_]*%.[%w_.]+$") then
+    return false
+  end
+  local prefix = token
+  while true do
+    prefix = prefix:match("^(.*)%.[^.]+$")
+    if not prefix then
+      return false
+    end
+    if lookup.by_module[prefix] then
+      return true
+    end
+  end
+end
+
+---Every function called `bare` in `node_id` or, when the node has none, in
+---the files below it. A bullet often names a directory module
+---(`lib.nvim.window` (`make_scratch`)) whose functions live one file down.
+---@param ir Docmap.IR
+---@param node_id string
+---@param bare string
+---@return string[] keys `nodeId#fnName`, in tree order.
+local function member_keys(ir, node_id, bare)
+  local keys = {}
+  local queue = { node_id }
+  local head = 1
+  while head <= #queue do
+    local id = queue[head]
+    head = head + 1
+    local node = ir.nodes[id]
+    if node then
+      for _, fn in ipairs(node.functions or {}) do
+        if bare_member(fn.name) == bare then
+          keys[#keys + 1] = id .. "#" .. fn.name
+        end
+      end
+      -- The node's own functions win: only a miss goes on to the subtree.
+      if #keys > 0 and id == node_id then
+        break
+      end
+      for _, child in ipairs(node.children or {}) do
+        queue[#queue + 1] = child
+      end
+    end
+  end
+  return keys
+end
+
+---The reverse index of the `Module:` bullets.
+---
+---Sets two fields on `result` (and returns it): `refs`, keyed like
+---`ir.docs.refs` (a node id for a module, `nodeId#fnName` for a function),
+---each listing the features that name it; and `unresolved`, the file and
+---module tokens that claim a place in this tree and name nothing in it. Both
+---are left off when empty, so a tree without `Module:` bullets carries the
+---artifact it always did.
+---
+---**Only the file or module token is ever reported.** Measured over
+---fourteen repositories (2026-11-13): the member lists in the parentheses
+---produced 70 misses in seven of them, nearly all not functions at all
+---(`opts.env`, `false`, a method of an instance, a function of the page's
+---script). A member that is not found is therefore not indexed, and that is
+---all. The file and module tokens of the same fourteen resolve without a
+---single miss once the three rules below are in: a real file that is no
+---module, a path of a language the map does not hold, and `module.member`
+---written as one dotted name.
+---
+---A function a bullet names is also filed under its module: "which features
+---touch this file" is the module question, and it should not depend on
+---whether the author went on to list members.
+---@param result Docmap.Features.Result|nil
+---@param ir Docmap.IR
+---@param root string|nil Repo root. With it, a path token that names a real file which is no module (`docs/install.json`) is not reported.
+---@return Docmap.Features.Result|nil
+function M.index(result, ir, root)
+  if not result then
+    return nil
+  end
+  local lookup = node_lookup(ir)
+  local normalized = root and (root:gsub("\\", "/"):gsub("/+$", "")) or nil
+  local function is_real_file(token)
+    return normalized ~= nil and safe_fs.stat(normalized, normalized .. "/" .. token) ~= nil
+  end
+  -- A path is only a claim about this map when the map holds files of that
+  -- kind at all: `relay/nav.go` in a tree scanned for Lua is a real file the
+  -- map never looked at, not a stale name.
+  local function stale_path(token)
+    local ext = token:match("%.(%a%w*)$")
+    return looks_like_path(token) and ext ~= nil and lookup.exts[ext:lower()] == true
+  end
+  ---@return string|nil owner
+  ---@return string|nil member
+  local function member_of_module(token)
+    local prefix, member = token:match("^([%a_][%w_.]*)%.([%a_][%w_]*)$")
+    if not prefix then
+      return nil, nil
+    end
+    local owner = resolve_node(lookup, prefix)
+    if owner and #member_keys(ir, owner, member) > 0 then
+      return owner, member
+    end
+    return nil, nil
+  end
+  ---@type table<string, Docmap.Features.Ref[]>
+  local refs = {}
+  ---@type table<string, true>
+  local seen = {}
+  ---@type Docmap.Features.Unresolved[]
+  local unresolved = {}
+
+  local function file_ref(key, file, entry)
+    local mark = key .. "\0" .. file.path .. "\0" .. entry.line
+    if seen[mark] then
+      return
+    end
+    seen[mark] = true
+    refs[key] = refs[key] or {}
+    table.insert(refs[key], { file = file.path, line = entry.line })
+  end
+
+  for _, file in ipairs(result.files) do
+    for _, entry in ipairs(file.entries) do
+      for _, meta in ipairs(entry.meta) do
+        if meta.key:lower() == "module" then
+          ---@type string|nil
+          local current = nil
+          for _, token in ipairs(module_tokens(meta.value)) do
+            if token.depth == 0 then
+              current = resolve_node(lookup, token.text)
+              if current then
+                file_ref(current, file, entry)
+                -- The first node a feature names is where its card links
+                -- to. Resolved here so both directions agree: the page's
+                -- own matching knows paths only, not module names.
+                entry.node = entry.node or current
+              elseif member_of_module(token.text) then
+                -- `sandbox.resolve_engine_name`: a module and one member,
+                -- written as one dotted name.
+                local owner, member = member_of_module(token.text)
+                file_ref(owner, file, entry)
+                entry.node = entry.node or owner
+                for _, key in ipairs(member_keys(ir, owner, member)) do
+                  file_ref(key, file, entry)
+                end
+                current = owner
+              elseif
+                (stale_path(token.text) and not is_real_file(token.text))
+                or claims_this_tree(lookup, token.text)
+              then
+                unresolved[#unresolved + 1] = {
+                  file = file.path,
+                  line = entry.line,
+                  feature = entry.name,
+                  text = token.text,
+                }
+              end
+            elseif current then
+              local bare = bare_member(token.text)
+              if bare then
+                for _, key in ipairs(member_keys(ir, current, bare)) do
+                  file_ref(key, file, entry)
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+
+  -- Files and entries are walked in their fixed order, so every list is
+  -- already sorted by (file order, line): the artifact is byte-compared.
+  result.refs = next(refs) and refs or nil
+  result.unresolved = #unresolved > 0 and unresolved or nil
+  return result
+end
+
 return M

@@ -66,6 +66,7 @@ M.CATALOG = {
   ["doc-references-missing"] = "{doc}:{line} references '{text}', but {module} has no '{missing}'",
   ["sibling-reference-missing"] = "{file} references '{target}', which does not exist in the {repo} checkout",
   ["tools-spec-invalid"] = "{source}: entry #{index} is invalid — {reason}",
+  ["feature-module-missing"] = "{file}:{line} names '{text}' as the module of '{feature}', but this tree has no such file or module",
   ["tag-require-missing"] = "{module} is required by {who} but {prefix}'s own map does not declare it — either that require is broken, or that map predates a rename",
   ["tag-file-unavailable"] = "tag_files['{prefix}'] points at {dir}, which has no readable module_map.json — requires under '{prefix}' were not checked",
   ["unreferenced-module"] = "{module} is required by no other file in the tree",

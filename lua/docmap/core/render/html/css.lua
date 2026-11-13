@@ -325,10 +325,15 @@ li:hover>.sigi,tr:hover .sigi{opacity:.8}
 /* The prose-reference affordance. Rendered only where references exist, so
    unlike `.sigi` it carries information by being present at all — hence a
    accent-tinted resting state rather than `.sigi`'s near-invisible one. */
-.doci{display:inline-block;margin-left:6px;padding:0 5px;border-radius:4px;cursor:help;
+.doci,.feati{display:inline-block;margin-left:6px;padding:0 5px;border-radius:4px;cursor:help;
   font-size:10.5px;line-height:15px;color:var(--accent);border:1px solid var(--line);
   background:var(--accent-soft);opacity:.75;transition:opacity .12s;user-select:none}
-.doci:hover,.doci:focus,.doci.on{opacity:1;border-color:var(--accent);outline:none}
+.doci:hover,.doci:focus,.doci.on,.feati:hover,.feati:focus,.feati.on{opacity:1;
+  border-color:var(--accent);outline:none}
+/* The feature card in the popup: the name is the link, the theme a badge. */
+.featref .docref-where{font-family:inherit;font-size:12.5px;font-weight:600}
+.featref .docref-where a{color:var(--accent);text-decoration:none}
+.featref .docref-where a:hover,.featref .docref-where a:focus{text-decoration:underline}
 .docn{margin-left:4px;font-weight:600}
 .docref{margin:7px 0;padding-left:9px;border-left:2px solid var(--line)}
 .docref-where{font-family:var(--mono);font-size:11.5px;color:var(--accent)}
@@ -484,6 +489,12 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
   overflow-x:auto}
 .feat-tab-body pre code{background:none;padding:0}
 .feat-tab-body a{color:var(--accent)}
+/* One sub-tab per theme file: the Analysis toolbar, allowed to wrap because
+   the number of buttons is the repository's, not this page's. */
+.feat-themes{flex-wrap:wrap;width:fit-content;max-width:100%;margin-bottom:12px}
+.feat-themes .ncount{margin-left:6px}
+.feat-group[hidden]{display:none}
+.feat-card.feat-flash{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 #hist-list{padding:12px 8px 60px 16px;border-right:1px solid var(--line);
   max-height:calc(100vh - 132px);overflow:auto}
 @media (max-width:860px){#hist-list{max-height:none;border-right:0;

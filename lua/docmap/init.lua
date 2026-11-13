@@ -167,7 +167,11 @@ function M.scan_full(opts)
   -- simply leaves ir.features nil. See core/features.lua and
   -- docs/features_format.md.
   ir.features = timing.measure(t, "features", function()
-    return require("docmap.core.features").resolve(opts.root, opts.features_dir)
+    local features = require("docmap.core.features")
+    -- `index` reads the `Module:` bullets backwards (which features name this
+    -- module or function); it needs the finished tree, which is why it runs
+    -- here and not inside `resolve`.
+    return features.index(features.resolve(opts.root, opts.features_dir), ir, opts.root)
   end)
 
   -- The hand-verified ledger, same posture as `features`/`tools` above: a

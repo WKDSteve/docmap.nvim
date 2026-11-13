@@ -99,7 +99,11 @@ one — one card per `## Feature` section, its summary and whatever
 or anything else; there is no fixed vocabulary). An index over hand-written
 prose, not a Markdown viewer — a `Module:` bullet that resolves to a real
 node links straight into the Tree tab, the rest of the file stays exactly
-where the author put it. A `- **Tab:** true` bullet promotes the rare,
+where the author put it. With several theme files the tab shows one at a
+time, behind a strip of sub-tabs (`core.md` first). The same `Module:`
+bullets lead back: in the Tree tab, a module or function a feature names
+carries a &#9670; trigger that lists those features and opens them. A
+`- **Tab:** true` bullet promotes the rare,
 especially-important feature out of the card list entirely and into its own
 top-level tab, with everything after its metadata rendered through a small
 Markdown subset instead of just linked out to. See

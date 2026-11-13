@@ -65,6 +65,7 @@ return function(H)
     actual = "width",
     repo = "other.nvim",
     modules = "a, b",
+    feature = "A feature",
   }
 
   -- ---------------------------------------------------------------------

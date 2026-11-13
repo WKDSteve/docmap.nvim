@@ -944,6 +944,11 @@ Generic checks, run against any annotated Lua tree:
                                  surface cannot be enumerated by reading.
                                  Reads `opts.tests_dir`, in sorted file
                                  order.
+    feature-module-missing
+                          warn   A `Module:` bullet in docs/FEATURES names a
+                                 file or module this tree does not have.
+                                 Only the file or module token is judged,
+                                 never the member list after it.
     tools-spec-invalid    warn   This repo's own docs/install.json or
                                  docs/INSTALL.md (lib.nvim.deps) has a
                                  malformed entry — missing bin, empty why, or

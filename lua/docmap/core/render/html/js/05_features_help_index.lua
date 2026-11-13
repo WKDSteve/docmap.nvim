@@ -27,6 +27,10 @@ return [[
   // `tag_links` resolution already extends to stale cross-references
   // elsewhere on this page. `null` when nothing in `meta` names a `Module`
   // bullet, or nothing in the tree matches it; never thrown.
+  //
+  // The fallback only: `core/features.lua` resolves the same bullet while it
+  // builds the reverse index and leaves the answer on the entry (`node`),
+  // module names included. This runs for an entry that has none.
   function resolveModuleNode(meta){
     var mod = null;
     meta.forEach(function(m){
@@ -55,9 +59,92 @@ return [[
     return spaced.replace(/\b\w/g, function(c){ return c.toUpperCase(); });
   }
 
+  // ---------------------------------------------------------------------
+  // One sub-tab per theme file. The reader's order is the parser's
+  // (`core.md` first, `FEATURES.md` second, the rest by name), so the first
+  // file is the default: what the plugin exists for, before the overview.
+  // A repository with one feature file gets no strip at all.
+  //
+  // The strip is the Analysis tab's toolbar (`.hview-toggle` holding
+  // `.anview-btn`), the pattern this page already has for "several panels,
+  // one tab". It is not the second-level tab strip: that one lists the
+  // features promoted to a tab of their own (`Tab: true`), which is a
+  // different question. See docs/features_format.md.
+  // ---------------------------------------------------------------------
+
+  // The theme a state shows: the one it names when that file exists, else
+  // the first. A link to a theme that was renamed opens the default rather
+  // than an empty tab.
+  function featureTheme(s){
+    var files = (IR.features && IR.features.files) || [];
+    if(!files.length) return null;
+    var want = s && s.ftheme;
+    for(var i = 0; i < files.length; i++){
+      if(files[i].theme === want) return want;
+    }
+    return files[0].theme;
+  }
+
+  function visibleFeatureCount(f){
+    var n = 0;
+    f.entries.forEach(function(e){ if(!e.tab) n++; });
+    return n;
+  }
+
+  // What the line above the catalogue says. With one theme on screen the
+  // total alone would describe cards the reader cannot see.
+  function featureCountLine(feats, theme){
+    var total = 0, shown = 0;
+    feats.files.forEach(function(f){
+      var n = visibleFeatureCount(f);
+      total += n;
+      if(f.theme === theme) shown = n;
+    });
+    var where = ' in <code>' + esc(feats.folder) + '</code>.';
+    if(feats.files.length < 2){
+      return total + ' feature' + (total === 1 ? '' : 's') + ' across 1 file' + where;
+    }
+    return esc(themeTitle(theme)) + ': ' + shown + ' of ' + total + ' feature' +
+      (total === 1 ? '' : 's') + ' across ' + feats.files.length + ' files' + where;
+  }
+
+  // A card to scroll to once the tab is drawn: set by the feature popup,
+  // which knows the card and not whether the tab exists yet.
+  var pendingFeatureCard;
+
+  // Show one theme, light its button, say what is shown. Runs on every
+  // navigation; `drawFeatures` builds the DOM once and this only toggles it.
+  function syncFeatureTheme(s){
+    var host = document.getElementById("view-features");
+    var feats = IR.features;
+    if(!feats || !feats.files.length) return;
+    var theme = featureTheme(s);
+    host.querySelectorAll(".feat-group").forEach(function(g){
+      g.hidden = g.dataset.ftheme !== theme;
+    });
+    host.querySelectorAll("#feattoggle .anview-btn").forEach(function(b){
+      var on = b.dataset.ftheme === theme;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    var line = host.querySelector(".feat-count");
+    if(line) line.innerHTML = featureCountLine(feats, theme);
+
+    if(pendingFeatureCard){
+      var card = host.querySelector('.feat-card[data-feat-card="' +
+        CSS.escape(pendingFeatureCard) + '"]');
+      pendingFeatureCard = null;
+      if(card){
+        card.scrollIntoView({ block: "center" });
+        card.classList.add("feat-flash");
+        setTimeout(function(){ card.classList.remove("feat-flash"); }, 1600);
+      }
+    }
+  }
+
   var featuresDrawn = false;
   function drawFeatures(){
-    if(featuresDrawn) return; // static over one IR; nothing invalidates it
+    if(featuresDrawn){ syncFeatureTheme(state); return; } // static over one IR
     featuresDrawn = true;
 
     var host = document.getElementById("view-features");
@@ -71,6 +158,19 @@ return [[
       parts.push("</div>");
       host.innerHTML = parts.join("");
       return;
+    }
+
+    // The strip first: it is the navigation of this tab, and a folder intro
+    // of a screen's length would otherwise push it out of sight.
+    if(feats.files.length > 1){
+      parts.push('<div class="hview-toggle feat-themes" id="feattoggle" role="tablist" ' +
+        'aria-label="Feature themes">');
+      feats.files.forEach(function(f){
+        parts.push('<button class="anview-btn" role="tab" data-ftheme="' + esc(f.theme) +
+          '" data-explain="feat.theme">' + esc(themeTitle(f.theme)) +
+          '<span class="ncount">' + visibleFeatureCount(f) + '</span></button>');
+      });
+      parts.push('</div>');
     }
 
     if(feats.intro){
@@ -89,16 +189,11 @@ return [[
     // and a tab of its own would be the same feature listed twice for no
     // reason, and the whole point of promoting one is that it no longer
     // needs the card.
-    var totalFeatures = 0;
-    feats.files.forEach(function(f){
-      f.entries.forEach(function(e){ if(!e.tab) totalFeatures++; });
-    });
-    parts.push('<p class="nsub">' + totalFeatures + ' feature' +
-      (totalFeatures === 1 ? '' : 's') + ' across ' + feats.files.length + ' file' +
-      (feats.files.length === 1 ? '' : 's') + ' in <code>' + esc(feats.folder) + '</code>.</p>');
+    parts.push('<p class="nsub feat-count"></p>');
 
     feats.files.forEach(function(f){
       var visible = f.entries.filter(function(e){ return !e.tab; });
+      parts.push('<section class="feat-group" data-ftheme="' + esc(f.theme) + '">');
       parts.push('<h3 class="nhead">' + esc(themeTitle(f.theme)) +
         '<span class="ncount">' + visible.length + '</span></h3>');
       if(f.intro){
@@ -108,16 +203,18 @@ return [[
       }
       if(f.entries.length === 0){
         parts.push('<p class="ntext none">No <code>##</code> sections in this file.</p>');
+        parts.push('</section>');
         return;
       }
       if(visible.length === 0){
         parts.push('<p class="ntext none">Every feature in this file is promoted to its ' +
           'own tab — see the tab bar.</p>');
+        parts.push('</section>');
         return;
       }
       visible.forEach(function(e){
-        var nodeId = resolveModuleNode(e.meta);
-        parts.push('<div class="feat-card">');
+        var nodeId = e.node || resolveModuleNode(e.meta);
+        parts.push('<div class="feat-card" data-feat-card="' + esc(featureKey(f.path, e.line)) + '">');
         parts.push('<div class="feat-name"' +
           (nodeId ? ' data-node="' + esc(nodeId) + '" tabindex="0" role="button"' : '') +
           '>' + esc(e.name) + '</div>');
@@ -136,11 +233,17 @@ return [[
           esc(f.path) + ':' + e.line + '</a></div>');
         parts.push("</div>");
       });
+      parts.push('</section>');
     });
 
     parts.push("</div>");
     host.innerHTML = parts.join("");
 
+    host.querySelectorAll("#feattoggle .anview-btn").forEach(function(b){
+      b.addEventListener("click", function(){
+        navigate({ tab: "features", ftheme: b.dataset.ftheme });
+      });
+    });
     host.querySelectorAll(".feat-name[data-node]").forEach(function(el){
       el.addEventListener("click", function(){
         navigate({ tab: "tree", id: el.dataset.node });
@@ -153,7 +256,102 @@ return [[
         window.open(u || rel(a.dataset.src), u ? "_blank" : "_self");
       });
     });
+    syncFeatureTheme(state);
   }
+
+  // =====================================================================
+  // The way back: from a module or a function to the features that name it.
+  //
+  // `IR.features.refs` is the `Module:` bullets read backwards (built by
+  // `core/features.lua`, keyed like the prose references: a node id, or
+  // `nodeId#fnName`). One trigger, in one place: beside the module path and
+  // beside each function in the Tree tab's detail pane, next to the prose
+  // reference trigger it mirrors. Rendered only where a feature names the
+  // thing, so its presence is the information.
+  //
+  // The card is the annotation popup (`sigOpen` in the popups slice): one
+  // floating thing on the page, one set of rules for closing it.
+  // =====================================================================
+
+  function featureKey(path, line){ return path + ":" + line; }
+
+  // `path:line` -> { entry, file }, built on first use. No initializer: this
+  // slice's body runs after the boot sequence has already drawn a detail
+  // pane, and an assignment here would throw the table away again.
+  var featureByKey;
+  function featureAt(path, line){
+    if(!featureByKey){
+      featureByKey = {};
+      ((IR.features && IR.features.files) || []).forEach(function(f){
+        f.entries.forEach(function(e){
+          featureByKey[featureKey(f.path, e.line)] = { entry: e, file: f };
+        });
+      });
+    }
+    var key = featureKey(path, line);
+    return Object.prototype.hasOwnProperty.call(featureByKey, key) ? featureByKey[key] : null;
+  }
+
+  function featureRefs(key){
+    var refs = IR.features && IR.features.refs;
+    if(!refs || !Object.prototype.hasOwnProperty.call(refs, key)) return [];
+    return refs[key].filter(function(r){ return featureAt(r.file, r.line); });
+  }
+
+  function featTrigger(key){
+    var n = featureRefs(key).length;
+    if(!n) return "";
+    return '<span class="feati" tabindex="0" role="button" data-feat="' + esc(key) +
+      '" aria-label="Described by ' + n + ' feature' + (n === 1 ? '' : 's') +
+      '" title="Features that describe this">&#9670;' +
+      (n > 1 ? '<span class="docn">' + n + '</span>' : '') + '</span>';
+  }
+
+  function featRefsHTML(key){
+    var refs = featureRefs(key);
+    var h = ['<div class="fn-sig">Described by<span class="fn-badges">' +
+      '<span class="bd">' + refs.length + ' feature' + (refs.length === 1 ? '' : 's') +
+      '</span></span></div>'];
+    refs.forEach(function(r){
+      var hit = featureAt(r.file, r.line);
+      h.push('<div class="docref featref">' +
+        '<div class="docref-where"><a href="#" data-feat-goto="' +
+        esc(featureKey(r.file, r.line)) + '">' + esc(hit.entry.name) + '</a>' +
+        '<span class="bd">' + esc(themeTitle(hit.file.theme)) + '</span></div>' +
+        (hit.entry.summary
+          ? '<div class="docref-ctx">' + prose(hit.entry.summary) + '</div>' : '') +
+        '</div>');
+    });
+    h.push('<div class="fn-desc fn-see"><a href="#" data-feat-goto="">' +
+      'All features ↳</a></div>');
+    return h.join("");
+  }
+
+  // To the feature itself: its own tab when it is promoted, else its card in
+  // the catalogue, with the right theme showing. An empty key is the plain
+  // "open the Features tab" link at the foot of the card.
+  function gotoFeature(key){
+    if(!key){ navigate({ tab: "features" }); return; }
+    var cut = key.lastIndexOf(":");
+    var hit = featureAt(key.slice(0, cut), key.slice(cut + 1));
+    if(!hit) return;
+    if(hit.entry.tab){
+      var promoted = collectPromotedFeatures().filter(function(p){
+        return p.entry === hit.entry;
+      })[0];
+      if(promoted){ navigate({ tab: promoted.slug }); return; }
+    }
+    pendingFeatureCard = key;
+    navigate({ tab: "features", ftheme: hit.file.theme });
+  }
+
+  document.addEventListener("click", function(ev){
+    var a = ev.target.closest && ev.target.closest("[data-feat-goto]");
+    if(!a) return;
+    ev.preventDefault();
+    sigClose();
+    gotoFeature(a.dataset.featGoto);
+  });
 
   // =====================================================================
   // Promoted features: a `- **Tab:** true` bullet gets a feature its own
@@ -424,6 +622,9 @@ return [[
     "sub.modules":
       "Every module and namespace, alphabetically. The same set the tree " +
       "shows, without the nesting.",
+    "feat.theme":
+      "One feature file of this repository. The first is what the project " +
+      "exists for, the second the overview, the rest one theme each.",
     "sub.features.all":
       "The index of every feature file, above the ones promoted to a tab of " +
       "their own.",
@@ -752,7 +953,7 @@ return [[
     drawnFeatureTabs[slug] = true;
 
     var e = promoted.entry, f = promoted.file;
-    var nodeId = resolveModuleNode(e.meta);
+    var nodeId = e.node || resolveModuleNode(e.meta);
     var parts = ['<div class="feat-tab-wrap">'];
     parts.push('<div class="feat-tab-theme">' + esc(themeTitle(f.theme)) + '</div>');
     parts.push('<h2 class="feat-tab-name"' +

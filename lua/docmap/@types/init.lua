@@ -775,6 +775,7 @@
 ---@field line integer 1-based line of the `## ` heading, in its own file.
 ---@field summary string? The leading run of prose before the first metadata bullet. Absent when a feature is metadata-only or intro-only — see the format doc for why that is a valid state, not a parse failure.
 ---@field meta Docmap.Features.Meta[] In writing order; empty when the feature has none. Never includes a `Tab` bullet — that one is a control directive, consumed into `tab` below, not descriptive metadata to display.
+---@field node string? Id of the first node its `Module:` bullets name, where the card links to. Absent when they name none. Set by `features.index`.
 ---@field tab boolean True when the feature carries a `- **Tab:** true` bullet — promoted to its own top-level tab instead of a card in the Features list. See `docs/features_format.md` "Promoting a feature to its own tab".
 ---@field body string? Raw Markdown of everything after the metadata block, up to the next `## ` (or end of file) — only captured when `tab` is true, since a card never renders it. `nil` when nothing follows the metadata block (a promoted feature can be title+summary+metadata only, same as an ordinary card).
 
@@ -785,12 +786,29 @@
 ---@field intro string? Prose before the first `## `, skipping a leading `# Title` line if present.
 ---@field entries Docmap.Features.Entry[]
 
+--- One feature that names a module or a function in a `Module:` bullet:
+--- the theme file and the line of the feature's `## ` heading, which together
+--- identify the entry in `files`.
+---@class Docmap.Features.Ref
+---@field file string `Docmap.Features.File.path` of the theme file.
+---@field line integer `Docmap.Features.Entry.line` of the feature.
+
+--- A file or module token of a `Module:` bullet that names nothing in the
+--- tree. Raised as `feature-module-missing`.
+---@class Docmap.Features.Unresolved
+---@field file string Theme file of the feature.
+---@field line integer Line of the feature's `## ` heading.
+---@field feature string Name of the feature.
+---@field text string The token as written, without its backticks.
+
 --- `ir.features` — this repo's own `docs/FEATURES/` (or `docs/features/`)
 --- folder. See `core/features.lua` and `docs/features_format.md`.
 ---@class Docmap.Features.Result
 ---@field folder string Which candidate resolved, e.g. "docs/FEATURES".
 ---@field intro string? The folder's own `README.md`/`readme.md`, when present — never itself a theme file.
 ---@field files Docmap.Features.File[] Sorted by filename.
+---@field refs table<string, Docmap.Features.Ref[]>? The `Module:` bullets read backwards, keyed like `Docmap.Docs.Result.refs`: a node id for a module, `nodeId#fnName` for a function. Absent when no bullet resolves. Set by `features.index`.
+---@field unresolved Docmap.Features.Unresolved[]? Absent when there are none. Set by `features.index`.
 
 ---- One `<!-- @tag value -->` comment on a checklist item whose tag is
 ---- neither `@ref` nor `@verified`. Kept rather than dropped — a hand-written
