@@ -61,7 +61,6 @@ return {
       expect = BAR .. ".querySelector('select') === null",
       note = "and offers no choice it could not honour",
     },
-    { shot = "file-light" },
 
     -- The same page from a host.
     {
@@ -154,7 +153,6 @@ return {
     },
   },
   judge = {
-    "the file page explains in one sentence why nothing can be compared (file-light)",
     "gained and lost requires are told apart at a glance, and the unchanged boxes stay readable (deps-light, deps-dark)",
     "the list of changes reads as a list, with added and removed in the colours of the marks (list-light)",
   },

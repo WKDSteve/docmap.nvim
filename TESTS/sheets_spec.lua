@@ -83,22 +83,34 @@ local function start_shape_host()
   return stop
 end
 
----What a sheet needs running while it is checked, by sheet id.
----@type table<string, fun(): fun()>
-local HOSTS = { ["shape-diff"] = start_shape_host, ["shape-diff-nodes"] = start_shape_host }
+---The sheets that need the shape host, by id. It is started for the first of them and stopped after the last:
+---starting it is a scan and a render, and each sheet has ten seconds for everything.
+local HOSTED = { ["shape-diff"] = true, ["shape-diff-nodes"] = true }
+local hosted_left, stop_host = 0, nil
 
 describe("test sheets", function()
   for _, path in ipairs(sheet.files(root .. "/TESTS/sheets")) do
     local s, err = sheet.load(path)
+    local hosted = s ~= nil and HOSTED[s.id] == true
+    if hosted then
+      hosted_left = hosted_left + 1
+    end
     it(s and sheet.spec_name(s) or path, function()
       assert(s, err)
       if s.engine == "browser" then
         render_pages()
       end
-      local stop = HOSTS[s.id] and HOSTS[s.id]() or nil
+      if hosted then
+        stop_host = stop_host or start_shape_host()
+      end
       local ran, why = pcall(sheet.check, s, { root = root })
-      if stop then
-        stop()
+      if hosted then
+        hosted_left = hosted_left - 1
+        -- A run that selects only some of the hosted sheets never gets here; the host then ends on its own.
+        if hosted_left == 0 and stop_host then
+          stop_host()
+          stop_host = nil
+        end
       end
       if not ran then
         error(why, 0)

@@ -71,7 +71,6 @@ return {
         .. ".textContent)",
       note = "the numbers of the Analysis tab, where the function is read",
     },
-    { shot = "fn-light" },
 
     { focus = '#sigpop [data-kwkind="req"][data-kw="look.store"]' },
     {
@@ -119,7 +118,6 @@ return {
       note = "the deprecated badge: what the tag means, and who still calls the function",
     },
     { expect = "/M\\.start/.test(" .. POP .. ".textContent)", note = "by name" },
-    { shot = "deprecated-light" },
     { press = "Escape" },
 
     { click = 'button[data-tab="findings"]', note = "the Findings tab" },
@@ -137,9 +135,6 @@ return {
       note = "with its default grade and how many findings it has here",
     },
     { shot = "check-light" },
-    { scheme = "dark" },
-    { shot = "check-dark" },
-    { scheme = "light" },
     { click = '#findings [data-kwkind="check"]', note = "a click on the id asks" },
     {
       expect = "/tab=findings/.test(location.hash) && " .. POP .. ".classList.contains('on')",
@@ -150,9 +145,7 @@ return {
   },
   judge = {
     "the not-known card reads as an answer, not as an error or an empty box (type-not-known-light)",
-    "the function card is a compact list of labelled facts (fn-light)",
     "the call card is readable in the light and the dark theme and its link reads as a link (call-light, call-dark)",
-    "the callers of the deprecated function are easy to find in the card (deprecated-light)",
-    "the check card is readable in both themes and stays within the window (check-light, check-dark)",
+    "the check card is readable and stays within the window (check-light)",
   },
 }

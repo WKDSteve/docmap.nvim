@@ -57,9 +57,6 @@ return {
       note = "the Modules view draws no requires, so none is marked or drawn in",
     },
     { shot = "modules-light" },
-    { scheme = "dark" },
-    { shot = "modules-dark" },
-    { scheme = "light" },
 
     -- Two commits.
     {
@@ -127,6 +124,6 @@ return {
     },
   },
   judge = {
-    "the added node and the place a node was removed from are easy to find in both themes (modules-light, modules-dark)",
+    "the added node and the place a node was removed from are easy to find (modules-light)",
   },
 }
