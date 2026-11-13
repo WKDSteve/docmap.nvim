@@ -87,3 +87,22 @@ the question you arrived with. The four to reach for first:
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+<!-- connections:begin (written by the app-icons tool of the workshop; change integrations.json there, not this block) -->
+## Connections
+
+![docmap.nvim: what it uses and what uses it](assets/graphs/docmap.nvim.png)
+
+**Uses**
+
+- [hover.nvim](https://github.com/WKDSteve/hover.nvim): docmap.nvim registers a preview with hover.nvim (`hover.registry`). ([picture](assets/graphs/pair/docmap.nvim--hover.nvim.png))
+- [mdview.nvim](https://github.com/WKDSteve/mdview.nvim): docmap.nvim publishes its overview as Markdown to a running preview of mdview.nvim (`mdview.adapter.ws_client`). ([picture](assets/graphs/pair/docmap.nvim--mdview.nvim.png))
+- [ui.nvim](https://github.com/WKDSteve/ui.nvim): The map browser of docmap.nvim uses the context menu and the kit of ui.nvim (`ui.contextmenu`, `ui.kit`). ([picture](assets/graphs/pair/docmap.nvim--ui.nvim.png))
+- [lib.nvim](https://github.com/WKDSteve/lib.nvim): the shared base of the plugins.
+
+**Used by**
+
+- [docmap-desktop](https://github.com/WKDSteve/docmap-desktop): The engine of docmap-desktop is docmap.nvim, pinned in `engine.lock`: the map is the same one, browsed in a window of its own. ([picture](assets/graphs/pair/docmap-desktop--docmap.nvim.png))
+- [lsp.nvim](https://github.com/WKDSteve/lsp.nvim): The call hierarchy of lsp.nvim uses docmap.nvim and loads it on demand, also from a lazy.nvim spec. ([picture](assets/graphs/pair/lsp.nvim--docmap.nvim.png))
+- [testing.nvim](https://github.com/WKDSteve/testing.nvim): testing.nvim asks docmap.nvim which specs a change reaches (`docmap.testing`), unless a provider is given. ([picture](assets/graphs/pair/testing.nvim--docmap.nvim.png))
+<!-- connections:end -->
