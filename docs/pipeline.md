@@ -2194,9 +2194,11 @@ a registration and a trigger, never a new popup.
 
 **Nothing new is scanned for any of the IR kinds.** A call is matched by the
 line of its edge and the callee's name, so the same name in a comment or on
-another line is left alone; without a line match the name has to be
-unambiguous among the function's callees. The snippet's container carries the
-function once (`data-fnkey`), not every word.
+another line is left alone: it is a method of some object, a local, or a call
+the scan could not resolve, and a real function's card on it would be wrong.
+Only edges that carry no line at all (a map older than the field) are matched
+by the name alone, and then only when it leads to one function. The snippet's
+container carries the function once (`data-fnkey`), not every word.
 
 **Density on demand.** No trigger adds a row, a column or an icon; a word is
 underlined and nothing else. The card opens on a dwell (never while the

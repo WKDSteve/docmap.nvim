@@ -434,7 +434,7 @@ return [[
   // name, the external modules of its file and the paths it requires. Those
   // need no glossary, so a language without one gets them too; what it loses
   // is the skipping of strings and comments, and the call match is by line
-  // and name, which a comment does not satisfy by accident.
+  // and name, which a comment rarely satisfies by accident.
   function snipBodyHTML(src, path, ctx){
     var gl = glossaryForPath(path);
     var self = (ctx && ctx.fnKey && own(fnByKey, ctx.fnKey)) ? fnByKey[ctx.fnKey] : null;
@@ -475,11 +475,22 @@ return [[
         '" tabindex="0">' + esc(label) + '</span>';
     }
     // Which callee a call written `name(` on this line is. The edge's own
-    // line decides; without a line match the name has to be unambiguous.
+    // line decides. An edge says where its call is, so the same name on a
+    // line no edge names is some other `name`: a method of an object, a local
+    // of that name, a call the scan could not resolve. Marking it would put a
+    // real function's card on text that is not a call to it.
+    //
+    // Only a map whose edges of that name carry no line at all (an artifact
+    // older than the field) falls back to the name, and then only when every
+    // such edge leads to the same function.
     function calleeAt(name, pos){
       if(!own(callees, name)) return null;
-      var list = callees[name], line = self.fn.line + lineAt(pos), k;
-      for(k = 0; k < list.length; k++){ if(list[k].line === line) return list[k].key; }
+      var list = callees[name], line = self.fn.line + lineAt(pos), k, lined = false;
+      for(k = 0; k < list.length; k++){
+        if(list[k].line === line) return list[k].key;
+        if(typeof list[k].line === "number") lined = true;
+      }
+      if(lined) return null;
       for(k = 1; k < list.length; k++){ if(list[k].key !== list[0].key) return null; }
       return list[0].key;
     }

@@ -137,6 +137,8 @@ return function(H)
     "  '  local b = require(\"b\")',",
     "  '  local g = require(\"gone.mod\")',",
     "  '  return dkjson.encode(v), table.concat(g)',",
+    "  '  -- a method of the same name on a line no edge names',",
+    "  '  local w = other:help(x) + old.legacy(x)',",
     "  'end'].join('\\n');",
     "var IR = { tags: [ { name: 'deprecated', summary: 'Marks it old.', origin: 'luals', url: 'https://x/#d' },",
     "                   { name: 'internal', summary: 'Not API.', origin: 'project' } ],",
@@ -158,7 +160,8 @@ return function(H)
     "   { id: 'lua/b.lua', path: 'lua/b.lua', source: 'lua/b.lua', module: 'b', language: 'lua', summary: 'Module `B`.',",
     "     functions: [ { name: 'M.help', line: 3, signature: 'M.help(s)', summary: 'Helps `well`.',",
     "                    deprecated: 'use other', complexity: 1, tested: false },",
-    "                  { name: 'M.quiet', line: 9, signature: 'M.quiet()', internal: true } ],",
+    "                  { name: 'M.quiet', line: 9, signature: 'M.quiet()', internal: true },",
+    "                  { name: 'M.legacy', line: 12, signature: 'M.legacy(x)' } ],",
     "     types_detail: [ { name: 'B.Opts', kind: 'class', desc: 'What B takes.', file: 'lua/b.lua',",
     "                       extends: ['B.Base'], fields: FIELDS },",
     "                     { name: 'B.Empty', kind: 'class', desc: '', file: 'lua/b.lua', extends: [], fields: [] } ] },",
@@ -168,6 +171,7 @@ return function(H)
     "  edges: [ { kind: 'call', from: 'lua/a.lua', from_fn: 'M.run', to: 'lua/b.lua', to_fn: 'M.help', line: 11 },",
     "           { kind: 'call', from: 'lua/a.lua', from_fn: 'M.run', to: 'lua/b.lua', to_fn: 'M.help', line: 99 },",
     "           { kind: 'call', from: 'lua/a.lua', from_fn: 'M.run', to: 'lua/b.lua', to_fn: 'M.quiet', line: 12 },",
+    "           { kind: 'call', from: 'lua/a.lua', from_fn: 'M.run', to: 'lua/b.lua', to_fn: 'M.legacy' },",
     "           { kind: 'require', from: 'lua/a.lua', to: 'lua/b.lua', to_module: 'b', line: 14 } ] };",
     "var FIND = [ { check: 'layer-violation', severity: 'warn', node: 'lua/a.lua', message: 'm' },",
     "             { check: 'repo-own', severity: 'info', message: 'x' } ];",
@@ -267,8 +271,12 @@ return function(H)
   )
   eq(
     count(got.snip, 'data-kwkind="call"'),
-    2,
-    "snippet: the same name in a comment is not a call, and nothing else is one"
+    3,
+    "snippet: the same name in a comment is not a call, and neither is it on a line no edge names"
+  )
+  ok(
+    got.snip:find(span("lua/b.lua#M.legacy", "call", "old.legacy") .. "(x)", 1, true),
+    "snippet: an edge without a line (an older map) is matched by its name alone"
   )
   ok(
     got.snip:find(span("lua/b.lua#M.quiet", "call", "M2.quiet") .. "()", 1, true),
@@ -335,7 +343,7 @@ return function(H)
   eq(line(got.fn, "Complexity"), "4 (cyclomatic)", "fn: complexity")
   eq(
     line(got.fn, "Calls"),
-    "2 functions of this tree",
+    "3 functions of this tree",
     "fn: fan-out counts functions, not call sites"
   )
   eq(line(got.fn, "Called by"), "0 functions of this tree", "fn: fan-in")
