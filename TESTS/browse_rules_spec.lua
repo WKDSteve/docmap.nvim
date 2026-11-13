@@ -6,8 +6,8 @@
 -- runs unconditionally against a hand-built fake `rules` module; the real
 -- end-to-end path (a genuine `rules.nvim` checkout, a real ruleset, a real
 -- `run_gate_json` call) only runs when one is reachable on the rtp
--- (`RULES_DIR`, wired the same way `RUNTIME_ANALYSIS_DIR` is in
--- `TESTS/run.lua`).
+-- (`$RULES_NVIM_DIR`, `.deps/rules.nvim` or a sibling checkout, put there
+-- by `TESTS/minimal_init.lua`); without one that block prints an n/a line.
 
 return function(H)
   local eq, ok = H.eq, H.ok
@@ -50,12 +50,15 @@ return function(H)
   do
     local previous = package.loaded["rules"]
     package.loaded["rules"] = nil
-    -- Force soft_require to actually try requiring "rules" rather than
-    -- reusing a real one some earlier block in this run already loaded.
-    package.preload["rules"] = nil
+    -- Make the require fail even when a real rules.nvim is on the rtp
+    -- (TESTS/minimal_init.lua puts one there when it finds it).
+    package.preload["rules"] = function()
+      error("synthetic: rules.nvim not installed", 0)
+    end
     local results = rules_join.load("review", "/fake")
-    eq(results, nil, "load: nil when rules.nvim is absent")
+    package.preload["rules"] = nil
     package.loaded["rules"] = previous
+    eq(results, nil, "load: nil when rules.nvim is absent")
   end
 
   -- rules_join.load: the fake module's results pass through unchanged --
@@ -85,9 +88,12 @@ return function(H)
   do
     local previous = package.loaded["rules"]
     package.loaded["rules"] = nil
-    package.preload["rules"] = nil
+    package.preload["rules"] = function()
+      error("synthetic: rules.nvim not installed", 0)
+    end
     local ir = fake_ir()
     local entries = view.entries(ir, { mode = "rules", opts = { rules_gate = "review" } })
+    package.preload["rules"] = nil
     package.loaded["rules"] = previous
     eq(#entries, 1, "rules mode: one message entry when rules.nvim is absent")
     eq(entries[1].kind, "message", "rules mode: ... never a fabricated per-rule list")
@@ -159,50 +165,66 @@ return function(H)
   -- The real end-to-end path: only when a real rules.nvim checkout is
   -- reachable. Degrading correctly when it is not is already covered above.
   local ok_rules = pcall(require, "rules")
-  if ok_rules then
-    local rules = require("rules")
+  if not ok_rules then
+    print("n/a  rules.nvim not on the runtimepath (set RULES_NVIM_DIR or clone .deps/rules.nvim)")
+  else
+    -- rules.setup() below defines :Rules / :RulesVault and points rules.nvim at the fixture
+    -- ruleset. The specs share one editor (isolated = "none"): H.with_restore deletes the
+    -- commands, and rules.nvim is unloaded afterwards so that a later spec (rules_api_spec)
+    -- loads it fresh with its own configuration.
+    local ran, err = pcall(H.with_restore, { groups = { "Rules" } }, function()
+      local rules = require("rules")
 
-    local ruleset_dir = vim.fn.tempname()
-    vim.fn.mkdir(ruleset_dir, "p")
-    local checked_root = vim.fn.tempname()
-    vim.fn.mkdir(checked_root, "p")
-    vim.fn.writefile({ "local x = vim.loop.new_timer()" }, checked_root .. "/bad.lua")
+      local ruleset_dir = vim.fn.tempname()
+      vim.fn.mkdir(ruleset_dir, "p")
+      local checked_root = vim.fn.tempname()
+      vim.fn.mkdir(checked_root, "p")
+      vim.fn.writefile({ "local x = vim.loop.new_timer()" }, checked_root .. "/bad.lua")
 
-    vim.fn.writefile({
-      "# Fixture",
-      "",
-      "## Deprecated loop API",
-      "",
-      "```rule",
-      'id = "FIX-01",',
-      'severity = "critical",',
-      'check = { type = "grep", pattern = "vim%.loop%." },',
-      "```",
-      "",
-      "Do not use `vim.loop` directly.",
-      "",
-    }, ruleset_dir .. "/fixture.md")
+      vim.fn.writefile({
+        "# Fixture",
+        "",
+        "## Deprecated loop API",
+        "",
+        "```rule",
+        'id = "FIX-01",',
+        'severity = "critical",',
+        'check = { type = "grep", pattern = "vim%.loop%." },',
+        "```",
+        "",
+        "Do not use `vim.loop` directly.",
+        "",
+      }, ruleset_dir .. "/fixture.md")
 
-    rules.setup({
-      rulesets = { ruleset_dir },
-      gates = { fixture_gate = { "FIX" } },
-    })
+      rules.setup({
+        rulesets = { ruleset_dir },
+        gates = { fixture_gate = { "FIX" } },
+      })
 
-    local results = rules_join.load("fixture_gate", checked_root)
-    ok(results ~= nil, "load (real): a genuine rules.nvim call returns results")
-    if results then
-      eq(#results, 1, "load (real): the one fixture rule")
-      eq(results[1].status, "fail", "load (real): the fixture file trips the pattern")
-      eq(#results[1].findings, 1, "load (real): one finding")
+      local results = rules_join.load("fixture_gate", checked_root)
+      ok(results ~= nil, "load (real): a genuine rules.nvim call returns results")
+      if results then
+        eq(#results, 1, "load (real): the one fixture rule")
+        eq(results[1].status, "fail", "load (real): the fixture file trips the pattern")
+        eq(#results[1].findings, 1, "load (real): one finding")
+      end
+
+      local ir = fake_ir()
+      local entries = view.entries(
+        ir,
+        { mode = "rules", opts = { rules_gate = "fixture_gate", root = checked_root } }
+      )
+      eq(#entries, 1, "rules mode (real): one entry for the one fixture rule")
+      eq(entries[1].rules_row.status, "fail", "rules mode (real): fail status carried through")
+      eq(entries[1].source, "bad.lua", "rules mode (real): finding path stripped root-relative")
+    end)
+    for name in pairs(package.loaded) do
+      if name == "rules" or name:sub(1, 6) == "rules." then
+        package.loaded[name] = nil
+      end
     end
-
-    local ir = fake_ir()
-    local entries = view.entries(
-      ir,
-      { mode = "rules", opts = { rules_gate = "fixture_gate", root = checked_root } }
-    )
-    eq(#entries, 1, "rules mode (real): one entry for the one fixture rule")
-    eq(entries[1].rules_row.status, "fail", "rules mode (real): fail status carried through")
-    eq(entries[1].source, "bad.lua", "rules mode (real): finding path stripped root-relative")
+    if not ran then
+      error(err, 0)
+    end
   end
 end

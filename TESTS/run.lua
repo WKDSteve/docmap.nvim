@@ -107,23 +107,28 @@ if vim.env.RUNTIME_ANALYSIS_DIR and vim.fn.isdirectory(vim.env.RUNTIME_ANALYSIS_
   vim.opt.rtp:append(vim.env.RUNTIME_ANALYSIS_DIR)
 end
 
--- Same shape again: `browse_rules_spec.lua`'s Rules-mode tests already have
--- a real, tested skip path for the ordinary case of `rules.nvim` not being
--- installed -- this only lets a real checkout upgrade the fixture-gate
--- assertions from "the soft dependency degrades correctly" to "the soft
--- dependency actually runs a real gate end to end."
-if vim.env.RULES_DIR and vim.fn.isdirectory(vim.env.RULES_DIR) == 1 then
-  vim.opt.rtp:append(vim.env.RULES_DIR)
-end
-
--- Same shape again: `browse_traffic_spec.lua`'s Traffic-mode tests already
--- have a real, tested skip path for the ordinary case of
--- `github_stats.nvim` not being installed -- this only lets a real checkout
--- upgrade its one real-plugin block from "the soft dependency degrades
--- correctly" to "the real plugin's own path/stem helpers agree with what
--- traffic_join assumes."
-if vim.env.GITHUB_STATS_DIR and vim.fn.isdirectory(vim.env.GITHUB_STATS_DIR) == 1 then
-  vim.opt.rtp:append(vim.env.GITHUB_STATS_DIR)
+-- rules.nvim and github_stats.nvim: soft dependencies of the browse modes.
+-- `browse_rules_spec.lua` / `browse_traffic_spec.lua` test the degraded path
+-- against fakes and run their one real-plugin block only when the plugin
+-- loads (an n/a line otherwise). testing.nvim does not run this file (it only
+-- reads the `specs` order below); `TESTS/minimal_init.lua` does the same
+-- lookup for it: $<NAME>_DIR, then .deps/<name>, then a sibling checkout.
+for _, soft in ipairs({
+  { name = "rules.nvim", env = "RULES_NVIM_DIR", marker = "lua/rules" },
+  { name = "github_stats.nvim", env = "GITHUB_STATS_NVIM_DIR", marker = "lua/github_stats" },
+}) do
+  local override = vim.env[soft.env]
+  local places = (override ~= nil and override ~= "") and { override }
+    or {
+      vim.fn.getcwd() .. "/.deps/" .. soft.name,
+      vim.fs.dirname(vim.fn.getcwd()) .. "/" .. soft.name,
+    }
+  for _, d in ipairs(places) do
+    if vim.fn.isdirectory(d .. "/" .. soft.marker) == 1 then
+      vim.opt.rtp:append(d)
+      break
+    end
+  end
 end
 
 local dir = debug.getinfo(1, "S").source:sub(2):match("(.*[/\\])") or "./"

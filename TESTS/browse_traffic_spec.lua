@@ -4,8 +4,9 @@
 -- Same shape `browse_rules_spec.lua` already established for a soft
 -- dependency: the pure logic (repo resolution, disk read, entry shaping)
 -- runs unconditionally against a hand-fabricated fake `github_stats.digest`
--- module; a real checkout (`GITHUB_STATS_DIR`, wired the same way `RULES_DIR`
--- is in `TESTS/run.lua`) only upgrades a couple of assertions from "the
+-- module; a real checkout (`$GITHUB_STATS_NVIM_DIR`, `.deps/github_stats.nvim`
+-- or a sibling, put on the rtp by `TESTS/minimal_init.lua`; without one that
+-- block prints an n/a line) only upgrades a couple of assertions from "the
 -- soft dependency degrades correctly" to "the real plugin's own path/stem
 -- helpers agree with what this module assumes".
 --
@@ -117,11 +118,15 @@ return function(H)
   do
     local previous = package.loaded["github_stats.digest"]
     package.loaded["github_stats.digest"] = nil
-    -- Force soft_require to actually try requiring the module rather than
-    -- reusing a real one some earlier block in this run already loaded.
+    -- Make the require fail even when a real github_stats.nvim is on the rtp
+    -- (TESTS/minimal_init.lua puts one there when it finds it).
+    package.preload["github_stats.digest"] = function()
+      error("synthetic: github_stats.nvim not installed", 0)
+    end
+    local loaded = traffic_join.load("me/demo", {})
     package.preload["github_stats.digest"] = nil
-    eq(traffic_join.load("me/demo", {}), nil, "load: nil when github_stats.nvim is absent")
     package.loaded["github_stats.digest"] = previous
+    eq(loaded, nil, "load: nil when github_stats.nvim is absent")
   end
 
   -- traffic_join.load: the fixture, read back whole, through the default
@@ -207,10 +212,13 @@ return function(H)
   do
     local previous = package.loaded["github_stats.digest"]
     package.loaded["github_stats.digest"] = nil
-    package.preload["github_stats.digest"] = nil
+    package.preload["github_stats.digest"] = function()
+      error("synthetic: github_stats.nvim not installed", 0)
+    end
     local ir = fake_ir()
     local entries =
       view.entries(ir, { mode = "traffic", opts = { traffic = { repo = "me/demo" } } })
+    package.preload["github_stats.digest"] = nil
     package.loaded["github_stats.digest"] = previous
     eq(#entries, 1, "traffic mode: one message entry when github_stats.nvim is absent")
     eq(entries[1].kind, "message", "traffic mode: ... never a fabricated digest")
@@ -265,7 +273,11 @@ return function(H)
   -- needing a full fetch/history pipeline (already covered by that
   -- plugin's own TESTS/digest_spec.lua).
   local ok_digest = pcall(require, "github_stats.digest")
-  if ok_digest then
+  if not ok_digest then
+    print(
+      "n/a  github_stats.nvim not on the runtimepath (set GITHUB_STATS_NVIM_DIR or clone .deps/github_stats.nvim)"
+    )
+  else
     local digest_mod = require("github_stats.digest")
 
     ok(type(digest_mod.digest_dir()) == "string", "digest_dir (real): answers before setup()")

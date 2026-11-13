@@ -91,4 +91,26 @@ if parsers and parsers ~= "" and vim.fn.isdirectory(parsers) == 1 then
   vim.opt.rtp:append(parsers)
 end
 
+-- Optional, carried over from the old TESTS/run.lua: rules.nvim and github_stats.nvim are soft
+-- dependencies of the browse modes. browse_rules_spec.lua and browse_traffic_spec.lua test the
+-- degraded path against fakes and run one real-plugin block only when the plugin loads; that block
+-- prints an n/a line otherwise. Looked up like scripts/ci.lua finds rules.nvim: $<NAME>_DIR, then
+-- .deps/<name> (what CI checks out), then a sibling checkout. Not in DEPS: a local run without them
+-- is fine (rules_api_spec.lua, which needs rules.nvim under CI, finds it on its own).
+for _, soft in ipairs({
+  { name = "rules.nvim", marker = "lua/rules" },
+  { name = "github_stats.nvim", marker = "lua/github_stats" },
+}) do
+  local override = vim.env[env_name(soft.name)]
+  -- as for DEPS above: an override that is set decides alone
+  local places = (override ~= nil and override ~= "") and { override }
+    or { root .. "/.deps/" .. soft.name, vim.fs.dirname(root) .. "/" .. soft.name }
+  for _, dir in ipairs(places) do
+    if valid(dir, soft.marker) then
+      vim.opt.rtp:append(dir)
+      break
+    end
+  end
+end
+
 return { root = root, deps = found }
