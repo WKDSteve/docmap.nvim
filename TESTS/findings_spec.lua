@@ -96,6 +96,67 @@ return function(H)
     )
   end
 
+  -- ---------------------------------------------------------------------
+  -- Every check explains itself: what it compares, how severe a hit is and
+  -- why it exists (`findings.CHECKS`, the catalogue the page's check card
+  -- shows). Tied to the templates in both directions, to the policy's list
+  -- of codes, and to the grade `core/check.lua` really raises, so none of
+  -- the four can drift from the others.
+  -- ---------------------------------------------------------------------
+  local explained = {}
+  for _, key in ipairs(keys) do
+    local name = findings.check_of(key)
+    local info = findings.CHECKS[name]
+    ok(
+      info ~= nil,
+      ("findings[%s]: the check has a template and therefore needs an explanation in CHECKS"):format(
+        key
+      )
+    )
+    explained[name] = true
+  end
+  eq(
+    findings.check_of("dead-function.internal"),
+    "dead-function",
+    "findings: a variant is its check"
+  )
+  eq(findings.check_of("missing-summary"), "missing-summary", "findings: a plain key is its check")
+
+  local check_src = assert(H.slurp("lua/docmap/core/check.lua"), "check.lua must be readable")
+  local raised = {}
+  for severity, name in check_src:gmatch('"(%a+)",%s*"([%l%-]+)"') do
+    if severity == "error" or severity == "warn" or severity == "info" then
+      raised[name] = raised[name] or {}
+      raised[name][severity] = true
+    end
+  end
+  local names = vim.tbl_keys(findings.CHECKS)
+  table.sort(names)
+  for _, name in ipairs(names) do
+    local info = findings.CHECKS[name]
+    ok(
+      explained[name],
+      ("checks[%s]: an explanation without a template explains nothing"):format(name)
+    )
+    ok(
+      require("docmap.core.check_policy").CODES[name],
+      ("checks[%s]: is a code the policy knows"):format(name)
+    )
+    for _, field in ipairs({ "compares", "why" }) do
+      ok(
+        type(info[field]) == "string" and #info[field] > 20 and info[field]:sub(-1) == ".",
+        ("checks[%s]: %s is a sentence"):format(name, field)
+      )
+    end
+    ok(
+      raised[name] ~= nil and raised[name][info.severity],
+      ("checks[%s]: the stated grade %s is the one check.lua raises"):format(name, info.severity)
+    )
+  end
+  for name in pairs(require("docmap.core.check_policy").CODES) do
+    ok(findings.CHECKS[name] ~= nil, ("checks: the policy code %s is explained"):format(name))
+  end
+
   -- `variant` selects the sentence and is never itself printed.
   eq(
     findings.key({ check = "dead-function", params = { variant = "internal" } }),
