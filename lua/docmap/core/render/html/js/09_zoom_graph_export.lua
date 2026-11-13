@@ -573,8 +573,16 @@ return [[
       if(el.classList.contains("leaving")) return;
       var x = parseFloat(el.style.left), y = parseFloat(el.style.top);
       var st = getComputedStyle(el);
-      parts.push('<rect x="'+x+'" y="'+y+'" width="'+BOX_W+'" height="'+BOX_H+'" rx="7" '+
+      // The marks of a map comparison (`paintShape`, slice 11): an added node's frame is a box-shadow on
+      // screen, which no SVG reader draws, so it becomes a wider stroke; an unchanged box is dimmed, and the
+      // opacity is written as the class says rather than read off the screen, where a transition may not have
+      // settled. The `−N` badge of a place nodes were removed from follows the box.
+      var added = el.classList.contains("sd-added");
+      var dimmed = el.classList.contains("sd-same");
+      parts.push((dimmed ? '<g opacity=".5">' : '')+
+        '<rect x="'+x+'" y="'+y+'" width="'+BOX_W+'" height="'+BOX_H+'" rx="7" '+
         'fill="'+st.backgroundColor+'" stroke="'+st.borderTopColor+'"'+
+        (added ? ' stroke-width="3"' : '')+
         ((el.dataset.tint === "na" || st.borderTopStyle === "dashed") ? ' stroke-dasharray="3 3"' : '')+'/>');
       // The tint as a second rectangle over the box (colour plus opacity, which every SVG reader
       // understands) and the value as text, so the file says what the screen said.
@@ -597,6 +605,15 @@ return [[
         parts.push('<text x="'+(x+9)+'" y="'+(y+35)+'" font-size="9.5" '+
           'fill="'+getComputedStyle(sub).color+'">'+esc(clip(sub.textContent, 26))+'</text>');
       }
+      var badge = el.querySelector(".sd-badge");
+      if(badge){
+        var bs = getComputedStyle(badge);
+        parts.push('<rect class="sd-badge" x="'+(x+BOX_W-26)+'" y="'+(y-9)+'" width="32" height="16" rx="8" '+
+          'fill="'+bs.backgroundColor+'"/>'+
+          '<text x="'+(x+BOX_W-10)+'" y="'+(y+3)+'" font-size="10.5" text-anchor="middle" '+
+          'fill="'+bs.color+'">'+esc(badge.textContent)+'</text>');
+      }
+      if(dimmed) parts.push('</g>');
     });
 
     // The edges a view draws over its boxes (a broken layer rule) come last

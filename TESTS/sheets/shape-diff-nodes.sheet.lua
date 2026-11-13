@@ -57,6 +57,21 @@ return {
       note = "the Modules view draws no requires, so none is marked or drawn in",
     },
     { shot = "modules-light" },
+    {
+      expect = "(() => { const cap = []; const make = URL.createObjectURL;"
+        .. " URL.createObjectURL = b => (cap.push(b), make.call(URL, b));"
+        .. " const click = HTMLAnchorElement.prototype.click;"
+        .. " HTMLAnchorElement.prototype.click = function(){ if(!this.download) click.call(this); };"
+        .. " document.getElementById('hexport').click();"
+        .. " URL.createObjectURL = make; HTMLAnchorElement.prototype.click = click;"
+        .. " return cap[0].text().then(t => (window.__svg = t, true)); })()",
+      note = "the diagram as an SVG file, the way the export button writes it",
+    },
+    {
+      expect = "['stroke-width=\"3\"', '<g opacity=\".5\">', 'class=\"sd-badge\"', '>−1</text>',"
+        .. " 'stroke-dasharray=\"3 3\"'].every(s => window.__svg.indexOf(s) !== -1)",
+      note = "the file keeps the marks: the added frame, the dimming, the dashed place and its count",
+    },
 
     -- Two commits.
     {

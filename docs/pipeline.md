@@ -1491,8 +1491,10 @@ element:
 
 A removed node is in no map the page can draw, which is why its mark sits on
 the place it was removed from. A lost require to a removed node has no second
-box and is in the list only. The SVG export keeps the marks: frames and
-strokes are read off the live DOM like every other colour.
+box and is in the list only. The SVG export keeps the marks: edges and
+borders are read off the live DOM like every other colour; the added frame
+(a box-shadow on screen) becomes a wider stroke, the dimming a group opacity,
+and the `−N` count is drawn beside its box.
 
 **The map on screen is always this page's own.** Comparing two commits marks
 their difference on it, and the bar says so; a change that names a node this
