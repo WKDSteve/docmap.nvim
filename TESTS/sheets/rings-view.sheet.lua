@@ -8,7 +8,7 @@ local function box(id)
   return BOX:format(id)
 end
 local LABELS = "[...document.querySelectorAll('#hsvg .hring-label')].map(e => e.textContent)"
-local SHOWN_EDGES = "[...document.querySelectorAll('#hsvg .hedge-ring')]"
+local SHOWN_EDGES = "[...document.querySelectorAll('#hsvg .hedge-quiet')]"
   .. ".filter(p => getComputedStyle(p).opacity !== '0').map(p => p.dataset.from + '>' + p.dataset.to).sort().join(' ')"
 
 return {
@@ -126,7 +126,7 @@ return {
     {
       wait = "window.__svg && window.__svg.text().then(t => (t.match(/<ellipse /g) || []).length === 3"
         .. " && t.indexOf('not reachable from app · 1 module · 1 unreferenced-module') !== -1"
-        .. " && t.indexOf('stroke-dasharray=\"3 3\"') !== -1 && (t.match(/<path /g) || []).length === 5"
+        .. " && t.indexOf('stroke-dasharray=\"3 3\"') !== -1 && (t.match(/<path /g) || []).length === 6"
         .. " && (t.match(/<rect x=/g) || []).length === 7)",
       note = "the SVG file carries the rings, their names and the seven boxes, the unreachable one dashed, and no"
         .. " arrow the screen does not show",

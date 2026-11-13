@@ -76,6 +76,31 @@ SVG export (rings, their names, and the chain when a box is pinned) work as
 they do there. A ring too long for one row takes several; past 400 modules the
 unreachable ring and the deepest rings are cut first, and the page says so.
 
+**Layers** draws the tree in the bands its layering rules imply and answers
+"does this tree have the shape I claim it has?". It needs `layers` in
+`.docmap.json` (or `opts.layers`); without them the view says so and shows how
+a rule looks. A rule is one forbidden direction ("modules under `from` may not
+require modules under `to`"), not an ordered list, so the bands are derived:
+every prefix a rule names is a layer, a module belongs to the layer with the
+longest prefix it sits under, and a layer that may not reach another sits
+*below* it, because the forbidden direction is up. The band of a layer is the
+longest chain of such steps below it; the base is at the bottom. Rules need
+not form an order: layers that forbid each other in a circle (two halves that
+must not know each other) share one band, side by side, and the line under the
+diagram names them. The prefix of a sibling rule is one layer, marked
+*siblings*; modules of an `allow` list are tagged as shared targets, and the
+modules no rule names sit in a dashed stripe below the bands. A require that
+breaks a rule is a red arrow drawn over the boxes, always visible, heavier
+than any other edge; the module it leaves says "breaks a rule" in words and
+its tooltip gives the rule and its reason. That arrow is the `layer-violation`
+finding as a line (the view and the check ask the same function), and the note
+under the diagram counts them and leads to the Findings tab. Every other
+require is shown for the box under the pointer or the pin only. A second click
+on a box opens it in the Tree tab: the view shows the whole tree and has no
+center to move. Zoom, pan, dimming, the right-click menu and the SVG export
+work as in the box views. Past 600 modules a layer shows its first ones, those
+in a broken rule first, and the page says so.
+
 **Coupling** is the one view that is not a tree or a graph but a scatter plot:
 every module at or below the center that has a require edge is a dot, placed
 by how many modules it requires (fan-out, across) and how many require it

@@ -315,6 +315,24 @@ carries.
 - **Config:** none; `view=rings` and `center=<entry>` in the link.
 - **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
 
+## Layers view (the bands of the layering rules)
+
+The tree drawn in the bands its `layers` rules imply, among the Hierarchy
+views: a frame per layer, a layer that may not require another below it, and
+every require that breaks a rule as a red arrow over the boxes. It turns
+`layer-violation` from a finding you read into a picture you point at. Rules
+are pairs, so the order is derived (the longest chain of "may not reach"
+steps); layers that forbid each other in a circle share a band and are named
+as having no order. The check and the view use one crossing test
+(`core/layers.lua`).
+
+- **Module:** `core/layers.lua` (`crossing`, `map`),
+  `core/render/html/js/10b_maps.lua` (`layoutLayers`, `layerNote`)
+- **Config:** `layers` in `.docmap.json` / `opts.layers`; `view=layers` in the
+  link. The page payload carries `layers` (layers, bands, broken requires);
+  `module_map.json` does not.
+- **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
+
 ## Coupling view (fan-in against fan-out)
 
 A scatter plot among the Hierarchy views: each module a dot, by how many

@@ -358,7 +358,7 @@ return [[
     // The Deps view labels boxes by module path rather than directory name:
     // a require graph is read in module terms, and half this tree's
     // directories are called `init`-shaped things that are ambiguous alone.
-    var label = (view === "deps" || view === "modulecalls" || view === "rings") ? (n.module || n.name) : n.name;
+    var label = (view === "deps" || view === "modulecalls" || isMapView(view)) ? (n.module || n.name) : n.name;
     return {
       cls: "hnode k-" + n.kind,
       title: n.summary || n.name,
@@ -449,7 +449,7 @@ return [[
   // from CSS so the dark-mode palette applies to them too.
   function buildDefs(svgNS){
     var defs = document.createElementNS(svgNS, "defs");
-    ["tree", "type", "ext", "dep", "call"].forEach(function(name){
+    ["tree", "type", "ext", "dep", "call", "viol"].forEach(function(name){
       var m = document.createElementNS(svgNS, "marker");
       m.id = "m-" + name;
       m.setAttribute("viewBox", "0 0 8 8");
@@ -520,6 +520,11 @@ return [[
     if(view === "modulecalls"){
       return '<p class="hmsg">' + esc(center.name) + ' has no resolved call edges to or from another module — either it doesn’t call across module boundaries, or nothing else calls into it.</p>';
     }
+    if(view === "layers"){
+      return '<p class="hmsg">No layers are declared for this map. A rule in <code>.docmap.json</code> such as ' +
+        '<code>"layers": [{ "from": "app.core", "to": "app.ui" }]</code> (the core may not require the UI) ' +
+        'gives the tree bands, and this view draws them with every require that breaks a rule.</p>';
+    }
     if(view === "rings"){
       return '<p class="hmsg">This map has no module to start from, so there is no distance to measure.</p>';
     }
@@ -539,7 +544,7 @@ return [[
   }
 
   var VIEWS = { modules: 1, types: 1, inheritance: 1, deps: 1, calls: 1, modulecalls: 1, tree: 1, treemap: 1,
-                rings: 1, coupling: 1 };
+                rings: 1, layers: 1, coupling: 1 };
 
   // =====================================================================
   // Notes tab: Doxygen's Deprecated / Todo / Bug / Test lists.

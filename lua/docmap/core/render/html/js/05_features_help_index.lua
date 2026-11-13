@@ -458,6 +458,11 @@ return [[
       "how deep the tree is and what is reachable at all. What the entry does " +
       "not reach sits in a last, dashed ring, where the unreferenced-module " +
       "findings are marked. Point at a box to see its chain.",
+    "view.layers":
+      "The tree in the bands its layering rules imply: a layer that may not " +
+      "require another sits below it. A require that breaks a rule is a red " +
+      "arrow, which is the layer-violation finding as a picture. Needs " +
+      "layers in .docmap.json.",
     "hier.entry":
       "The module the rings are counted from. The list holds the roots of the " +
       "require graph (modules that require something and that nothing " +

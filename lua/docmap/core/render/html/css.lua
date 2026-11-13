@@ -751,9 +751,28 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .hring.hring-out{stroke:var(--warn);stroke-dasharray:6 5}
 .hring-label{fill:var(--muted);font-size:11.5px;font-family:var(--mono);paint-order:stroke;stroke:var(--panel);stroke-width:5px;stroke-linejoin:round}
 .hring-label.hring-out{fill:var(--warn)}
-#hsvg .hedge.hedge-ring{opacity:0}
-#hgraph.focusing .hedge.hedge-ring{opacity:0}
-#hgraph.focusing .hedge.hedge-ring.near{opacity:1}
+#hsvg .hedge.hedge-quiet{opacity:0}
+#hgraph.focusing .hedge.hedge-quiet{opacity:0}
+#hgraph.focusing .hedge.hedge-quiet.near{opacity:1}
+/* The Layers view. A band is a stripe, a layer a frame in it; what no rule
+   names sits in a dashed stripe below. A require that breaks a rule is the
+   one arrow always drawn, over the boxes (#hsvg2), heavier than any other
+   edge, and the module it leaves says so in words and has a heavier border:
+   the red comes on top of that. */
+#hsvg2{position:absolute;top:0;left:0;pointer-events:none;z-index:3}
+.hband{fill:color-mix(in srgb,var(--accent) 5%,transparent);stroke:var(--line);stroke-width:1}
+.hband.hband-loose{fill:none;stroke-dasharray:6 5}
+.hunit{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.hmap-label{fill:var(--muted);font-size:11.5px;font-family:var(--mono);paint-order:stroke;stroke:var(--panel);
+  stroke-width:4px;stroke-linejoin:round}
+.hmap-label.hunit-name{fill:var(--ink);font-weight:600}
+.hedge-viol{stroke:var(--error);stroke-width:2.5;opacity:.95}
+#hgraph.focusing .hedge.hedge-viol.near{stroke-width:3.5}
+#m-viol path{fill:var(--error)}
+.hlegend .sw.viol{border-top-color:var(--error);border-top-width:3px}
+.hnode.lv-from,.hlegend .bx.lv-from{border-color:var(--error);border-width:2px}
+.hnode.lv-from .hkind{color:var(--error)}
+.hmap-note button{padding:2px 8px;font-size:12px;margin-left:4px}
 .hnode.ring-out,.hlegend .bx.ring-out{border-style:dashed}
 .hnode.ring-out .hnm{color:var(--muted)}
 .hnode.ring-unref,.hlegend .bx.ring-unref{border-color:var(--warn);border-width:2px}
@@ -959,8 +978,8 @@ li:hover>.marki,tr:hover .marki{opacity:.8}
   opacity .22s ease,border-color .15s ease}
 .hnode.entering{opacity:0;transform:scale(.94)}
 .hnode.leaving{opacity:0;pointer-events:none}
-#hsvg{transition:opacity .18s ease}
-#hsvg.settling{opacity:0}
+#hsvg,#hsvg2{transition:opacity .18s ease}
+#hsvg.settling,#hsvg2.settling{opacity:0}
 .hnode.pulse{animation:hpulse .7s ease-out}
 @keyframes hpulse{
   0%{box-shadow:0 0 0 0 var(--accent)}
@@ -983,7 +1002,7 @@ li:hover>.marki,tr:hover .marki{opacity:.8}
 #hgraph.focusing .hnode.hidden.near{opacity:.08}
 .hedge{transition:opacity .15s ease}
 @media (prefers-reduced-motion:reduce){
-  .hnode,#hsvg,.hedge{transition:none}
+  .hnode,#hsvg,#hsvg2,.hedge{transition:none}
   .hnode.pulse{animation:none}
 }
 

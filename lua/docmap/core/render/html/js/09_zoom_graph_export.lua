@@ -280,6 +280,9 @@ return [[
   // *second* click does — root the graph here, or open the module in Tree.
   function actOn(box){
     if(classicClicks){ leaveForTree(box); return; }
+    // The Layers show the whole tree: there is no center to move, so the
+    // second click opens the module.
+    if(state.view === "layers"){ leaveForTree(box); return; }
     // An external box has nothing in this map to recentre on, so it keeps
     // its old meaning under either setting rather than becoming inert.
     if(box._spec.externalHtml || !box._spec.recenter){ leaveForTree(box); return; }
@@ -325,8 +328,7 @@ return [[
       hboxes[k].classList.toggle("near", k === key || !!near[k]);
       hboxes[k].classList.toggle("pinned", k === pinnedKey);
     });
-    var svg = document.getElementById("hsvg");
-    if(svg) svg.querySelectorAll(".hedge").forEach(function(p){
+    hstage.querySelectorAll("svg .hedge").forEach(function(p){
       p.classList.toggle("near", hgraphEdgeNear ? hgraphEdgeNear(key, p.dataset.from, p.dataset.to)
         : (p.dataset.from === key || p.dataset.to === key));
     });
@@ -517,7 +519,7 @@ return [[
 
     // Markers first: the paths below reference them by id.
     parts.push('<defs>');
-    ["tree","type","ext","dep","call"].forEach(function(name){
+    ["tree","type","ext","dep","call","viol"].forEach(function(name){
       var probe = document.querySelector("#m-" + name + " path");
       var fill = probe ? getComputedStyle(probe).fill : cs.color;
       parts.push('<marker id="x-'+name+'" viewBox="0 0 8 8" refX="7" refY="4" '+
@@ -526,7 +528,15 @@ return [[
     });
     parts.push('</defs>');
 
-    // What a view drew below its boxes (the rings and their names).
+    // What a view drew below its boxes: the bands and the frames of the
+    // layers, the rings, and the names of each.
+    svg.querySelectorAll(".hband, .hunit").forEach(function(el){
+      var st = getComputedStyle(el);
+      parts.push('<rect x="'+el.getAttribute("x")+'" y="'+el.getAttribute("y")+'" width="'+
+        el.getAttribute("width")+'" height="'+el.getAttribute("height")+'" rx="'+el.getAttribute("rx")+
+        '" fill="'+st.fill+'" stroke="'+st.stroke+'" stroke-width="'+st.strokeWidth+'" stroke-dasharray="'+
+        (st.strokeDasharray === "none" ? "" : st.strokeDasharray)+'"/>');
+    });
     svg.querySelectorAll(".hring").forEach(function(el){
       var st = getComputedStyle(el);
       parts.push('<ellipse cx="'+el.getAttribute("cx")+'" cy="'+el.getAttribute("cy")+'" rx="'+
@@ -534,25 +544,28 @@ return [[
         'stroke-width="'+st.strokeWidth+'" stroke-dasharray="'+
         (st.strokeDasharray === "none" ? "" : st.strokeDasharray)+'"/>');
     });
-    svg.querySelectorAll(".hring-label").forEach(function(el){
-      parts.push('<text x="'+el.getAttribute("x")+'" y="'+el.getAttribute("y")+'" text-anchor="middle" '+
-        'font-size="11" fill="'+getComputedStyle(el).fill+'">'+esc(el.textContent)+'</text>');
+    svg.querySelectorAll(".hring-label, .hmap-label").forEach(function(el){
+      var ls = getComputedStyle(el);
+      parts.push('<text x="'+el.getAttribute("x")+'" y="'+el.getAttribute("y")+'" text-anchor="'+
+        (el.getAttribute("text-anchor") || "start")+'" font-size="11" font-weight="'+ls.fontWeight+
+        '" fill="'+ls.fill+'">'+esc(el.textContent)+'</text>');
     });
 
-    svg.querySelectorAll(".hedge").forEach(function(p){
+    function edgeOut(p){
       var st = getComputedStyle(p);
       // An edge the screen does not show (the Rings draw the chain of the
       // focused box only) is not in the file either. Asked of the state, not
       // of the computed opacity: that one is still fading when the pointer
       // has just left the box for the export button.
-      var ringEdge = p.classList.contains("hedge-ring");
+      var ringEdge = p.classList.contains("hedge-quiet");
       if(ringEdge && !(hgraph.classList.contains("focusing") && p.classList.contains("near"))) return;
       var marker = (p.getAttribute("marker-end") || "").replace("url(#m-", "").replace(")", "");
       parts.push('<path d="'+esc(p.getAttribute("d"))+'" fill="none" stroke="'+st.stroke+'" '+
         'stroke-width="'+st.strokeWidth+'" stroke-dasharray="'+
         (st.strokeDasharray === "none" ? "" : st.strokeDasharray)+'" opacity="'+(ringEdge ? "1" : st.opacity)+'" '+
         'marker-end="url(#x-'+marker+')"/>');
-    });
+    }
+    svg.querySelectorAll(".hedge").forEach(edgeOut);
 
     Object.keys(hboxes).forEach(function(key){
       var el = hboxes[key];
@@ -584,6 +597,11 @@ return [[
           'fill="'+getComputedStyle(sub).color+'">'+esc(clip(sub.textContent, 26))+'</text>');
       }
     });
+
+    // The edges a view draws over its boxes (a broken layer rule) come last
+    // here too.
+    var svgTop = document.getElementById("hsvg2");
+    if(svgTop) svgTop.querySelectorAll(".hedge").forEach(edgeOut);
 
     if(tintLine){
       parts.push('<text x="8" y="'+(parseFloat(graphH)+17)+'" font-size="10" fill="'+cs.color+'">'+

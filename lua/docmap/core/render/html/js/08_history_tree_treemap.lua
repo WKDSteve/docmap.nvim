@@ -626,6 +626,7 @@ return [[
     else if(view === "calls") built = layoutCalls(hcenter, wantFn, state.dir || "out", depth);
     else if(view === "modulecalls") built = layoutModuleCalls(hcenter, state.dir || "out", depth, !!state.ext);
     else if(view === "rings") built = layoutRings(hcenter);
+    else if(view === "layers") built = layoutLayers();
     else if(hidingRoot) built = layoutModulesRooted(state.hideroot);
     else built = layoutModules(hcenter);
 
@@ -671,6 +672,8 @@ return [[
         (center.module || center.path) + suffix +
         (isGraphView(view) ? "  ·  " + (state.dir || "out") + ", depth " + (depth === 0 ? "∞" : depth) : "");
     }
+    // A view of the whole tree has no center to name.
+    if(built.path) hpathEl.textContent = built.path;
 
     // The empty branch above writes its explanation straight into #hgraph;
     // nothing else removes it, because reconcile() only ever adds and removes
@@ -715,6 +718,11 @@ return [[
     var svgNS = "http://www.w3.org/2000/svg";
     var old = document.getElementById("hsvg");
     if(old) old.remove();
+    var oldTop = document.getElementById("hsvg2");
+    if(oldTop) oldTop.remove();
+    // A second layer over the boxes, for the edges a view must not let a box
+    // hide (a require that breaks a layer rule). Made on demand.
+    var svgTop = null;
     var svg = document.createElementNS(svgNS, "svg");
     svg.id = "hsvg";
     svg.setAttribute("width", totalW);
@@ -758,7 +766,15 @@ return [[
         title.textContent = e.label;
         p.appendChild(title);
       }
-      svg.appendChild(p);
+      if(e.top){
+        if(!svgTop){
+          svgTop = document.createElementNS(svgNS, "svg");
+          svgTop.id = "hsvg2";
+          svgTop.setAttribute("width", totalW);
+          svgTop.setAttribute("height", totalH);
+        }
+        svgTop.appendChild(p);
+      } else svg.appendChild(p);
       // The hover companion, added after its own edge so it sits on top and
       // wins the pointer. Only where there is something to read: an
       // unweighted tree edge has no count to show, and giving every edge a
@@ -780,12 +796,17 @@ return [[
     hstage.style.width = totalW + "px";
     hstage.style.height = totalH + "px";
     hstage.insertBefore(svg, hstage.firstChild);
+    if(svgTop) hstage.appendChild(svgTop);
     stageExtent = { w: totalW, h: totalH };
     applyZoom();
 
     if(moved){
       svg.classList.add("settling");
-      setTimeout(function(){ svg.classList.remove("settling"); }, ANIM_MS);
+      if(svgTop) svgTop.classList.add("settling");
+      setTimeout(function(){
+        svg.classList.remove("settling");
+        if(svgTop) svgTop.classList.remove("settling");
+      }, ANIM_MS);
     }
 
     hgraphNeighbours = built.neighbours || neighbours;
@@ -827,8 +848,8 @@ return [[
       hgraphWrap.parentNode.insertBefore(auto, hgraphWrap.nextSibling);
     }
 
-    var mapNote = isMapView(view) ? ringNote() : null;
-    if(mapNote) hgraphWrap.parentNode.insertBefore(mapNote, hgraphWrap.nextSibling);
+    var noteEl = isMapView(view) ? mapNote(view) : null;
+    if(noteEl) hgraphWrap.parentNode.insertBefore(noteEl, hgraphWrap.nextSibling);
 
     if(built.truncated){
       var note = document.createElement("div");

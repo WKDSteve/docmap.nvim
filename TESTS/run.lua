@@ -216,6 +216,7 @@ local specs = {
   "hierarchy_tint_spec.lua",
   "coupling_view_spec.lua",
   "rings_view_spec.lua",
+  "layers_view_spec.lua",
   "explain_spec.lua",
   "analysis_tools_spec.lua",
   "plugin_wrappers_spec.lua",

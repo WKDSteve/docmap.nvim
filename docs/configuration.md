@@ -107,6 +107,11 @@ A `.docmap.json` at the repository root is read by every one of them:
 }
 ```
 
+`layers` feeds two things: the `layer-violation` check, and the **Layers**
+view of the page's Hierarchy, which draws the tree in the bands the rules
+imply and every require that breaks one as a red arrow (see
+[`tabs.md`](tabs.md)).
+
 Precedence, loosest first: the defaults, what `config.build` derives from the
 root, **this file**, the host's explicit `opts` table, then CLI flags. So a
 Neovim spec still wins over the file, and `--exclude=` still wins over both.

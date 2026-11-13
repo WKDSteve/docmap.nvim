@@ -169,6 +169,12 @@ function M.render(ir, findings, opts)
     -- Tool data, like `glossaries` above, so it rides on the page and not
     -- in the byte-deterministic artifact.
     marker_kinds = require("docmap.core.markers").KEYWORDS,
+    -- The tree in the bands its `layers` rules imply, for the Layers view: the layers, their band, the
+    -- modules in each and every require that breaks a rule (`core/layers.lua`, the function the
+    -- `layer-violation` check uses). Derived from the rules of this run and the edges, so it rides on the
+    -- page like `glossaries` and is not in `module_map.json`. Absent when no rule is declared, which the
+    -- view says in words.
+    layers = require("docmap.core.layers").map(ir, opts.layers),
   })
   -- `</script>` inside JSON would terminate the block early.
   payload = payload:gsub("</", "<\\/")
@@ -398,6 +404,7 @@ function M.render(ir, findings, opts)
     '<button class="hview-btn" data-view="tree" data-explain="view.tree">Tree</button>',
     '<button class="hview-btn" data-view="treemap" data-explain="view.treemap">Treemap</button>',
     '<button class="hview-btn" data-view="rings" data-explain="view.rings">Rings</button>',
+    '<button class="hview-btn" data-view="layers" data-explain="view.layers">Layers</button>',
     '<button class="hview-btn" data-view="coupling" data-explain="view.coupling">Coupling</button>',
     "</div>",
     -- Direction and depth belong to the directed views only; `syncGraphControls`

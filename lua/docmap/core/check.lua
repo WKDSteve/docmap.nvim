@@ -1807,79 +1807,10 @@ local function check_layers(ir, findings, opts)
     return
   end
 
-  ---Prefix match on module-path segments, not raw string prefix: `lib.vim`
-  ---must match `lib.vim.buffer` and never `lib.vimx`.
-  ---@param module string
-  ---@param prefix string
-  ---@return boolean
-  local function under(module, prefix)
-    return module == prefix or module:sub(1, #prefix + 1) == prefix .. "."
-  end
-
-  ---The direct child of `prefix` that `module` sits in (`prefix.x` for
-  ---`prefix.x.y`), or nil when `module` is not strictly below `prefix`.
-  ---@param module string
-  ---@param prefix string
-  ---@return string?
-  local function child_of(module, prefix)
-    if module == prefix or not under(module, prefix) then
-      return nil
-    end
-    local seg = module:sub(#prefix + 2):match("^[^.]+")
-    return seg and (prefix .. "." .. seg) or nil
-  end
-
-  ---Whether `module` is one of the rule's explicitly shared targets.
-  ---@param module string
-  ---@param rule Docmap.LayerRule
-  ---@return boolean
-  local function allowed(module, rule)
-    for _, prefix in ipairs(rule.allow or {}) do
-      if under(module, prefix) then
-        return true
-      end
-    end
-    return false
-  end
-
-  ---Which two layers an edge crosses under `rule`, or nil when it does not
-  ---break the rule. Two forms share one finding: the pair form (`from`/`to`,
-  ---one prefix may not reach another) and the sibling form (`siblings`: no
-  ---direct child of the prefix may reach another direct child). The sibling
-  ---form exists because "no backend requires another" over 23 backends would
-  ---otherwise be 23 x 22 hand-written pairs that go stale with every backend.
-  ---@param src string
-  ---@param dst string
-  ---@param rule Docmap.LayerRule
-  ---@return string? from_layer
-  ---@return string? to_layer
-  local function crossing(src, dst, rule)
-    if allowed(dst, rule) then
-      return nil
-    end
-    if rule.siblings then
-      local a, b = child_of(src, rule.siblings), child_of(dst, rule.siblings)
-      if a and b and a ~= b then
-        return a, b
-      end
-      return nil
-    end
-    if not (rule.from and rule.to) then
-      return nil
-    end
-    -- `from` must be outside `rule.to`'s own scope, not just inside
-    -- `rule.from`'s — otherwise a rule like `{from="docmap.core",
-    -- to="docmap.core.lang"}` also fires on `core.lang.js`
-    -- requiring `core.lang.ecma`: both modules sit trivially "under"
-    -- `docmap.core` by prefix, so without this exclusion every
-    -- intra-`core.lang` require would be misread as the very
-    -- core-into-lang boundary crossing the rule exists to catch, not
-    -- an edge that stays inside `core.lang` the whole way.
-    if under(src, rule.from) and not under(src, rule.to) and under(dst, rule.to) then
-      return rule.from, rule.to
-    end
-    return nil
-  end
+  -- What "breaks a rule" means lives in `core/layers.lua`, which also lays the
+  -- tree out in bands for the Layers view of the page: one function decides
+  -- for both, so the picture cannot mark an edge this check does not report.
+  local crossing = require("docmap.core.layers").crossing
 
   for _, edge in ipairs(ir.edges or {}) do
     if edge.kind == "require" then

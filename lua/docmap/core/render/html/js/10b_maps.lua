@@ -1,6 +1,6 @@
 ---@module 'docmap.core.render.html.js.10b_maps'
 --- A slice of the page's script: the maps of the Hierarchy (the tint of the Modules view and its legend, the
---- Coupling plot).
+--- Coupling plot, the Rings and the Layers).
 ---
 --- Not a script of its own: the slices are joined in order inside one function (see `html/js/init.lua`), so a
 --- slice may use what an earlier one declared and may stop between two statements.
@@ -433,7 +433,7 @@ return [[
   var RING_GAP = 1.3;                // between two rings
   var RING_MAX = 400;
 
-  function isMapView(v){ return v === "rings"; }
+  function isMapView(v){ return v === "rings" || v === "layers"; }
 
   function ringModule(id){
     var n = byId[id];
@@ -443,6 +443,19 @@ return [[
   function ringName(id){
     var n = byId[id] || {};
     return n.module || n.name || id;
+  }
+
+  // A module path without the prefix its surroundings already state (the
+  // layer a box sits in, the root module of the map): on a box 168 pixels
+  // wide, forty modules that all begin `app.bindings.` read as one name.
+  function mapShortName(id, prefix){
+    var name = ringName(id);
+    if(!prefix || name === prefix) return name;
+    return name.indexOf(prefix + ".") === 0 ? name.slice(prefix.length + 1) : name;
+  }
+  function mapRename(el, id, prefix){
+    var nm = el.querySelector(".hnm");
+    if(nm) nm.textContent = mapShortName(id, prefix);
   }
 
   // Breadth first along the requires: the distance of every module `entry`
@@ -619,7 +632,7 @@ return [[
     Object.keys(walk.via).forEach(function(id){
       var e = walk.via[id];
       if(positions[id] === undefined || positions[e.from] === undefined) return;
-      edges.push({ from: e.from, to: id, cls: "hedge hedge-dep hedge-ring" + (e.deferred ? " deferred" : ""),
+      edges.push({ from: e.from, to: id, cls: "hedge hedge-dep hedge-quiet" + (e.deferred ? " deferred" : ""),
                    marker: "dep",
                    label: (e.deferred ? "lazy require " : "require ") + e.to_module + ":" + e.line });
     });
@@ -695,6 +708,7 @@ return [[
           var el = hboxes[id];
           if(!el) return;
           var d = walk.dist[id];
+          mapRename(el, id, (byId[IR.root] || {}).module);
           el.dataset.ring = d === undefined ? "out" : String(d);
           var tag = id === entry ? "entry" : (d === undefined ? (unref[id] ? "unreferenced-module" : "not reachable") : "");
           if(d === undefined) el.classList.add("ring-out");
@@ -762,8 +776,253 @@ return [[
     return box;
   }
 
+  // =====================================================================
+  // Layers: the tree in the bands its layering rules imply.
+  //
+  // "Does this tree have the shape I claim it has?" The rules of `layers`
+  // (in `.docmap.json`) each forbid one direction: modules under `from` may
+  // not require modules under `to`. `core/layers.lua` turns them into a
+  // picture and ships it as `IR.layers`: every prefix a rule names is a
+  // layer, a module belongs to the layer with the longest prefix it sits
+  // under, and a layer that may not reach another sits below it, because the
+  // forbidden direction is up. Layers that forbid each other in a circle
+  // have no order; they share a band and the note says so.
+  //
+  // What is drawn: a frame per layer with its modules, the frames in bands
+  // (the base at the bottom), and below them the modules no rule names. A
+  // require that breaks a rule is a red arrow, drawn over the boxes, always
+  // visible; it is the `layer-violation` finding as a line you can point at.
+  // Every other require is shown for the box under the pointer or the pin
+  // only. Which edge breaks a rule is decided in Lua by the function the
+  // check uses, not here.
+  //
+  // It draws in the zooming stage, like the Rings, with positions of its own.
+  // =====================================================================
+  var LAYER_CELL_W = 184, LAYER_CELL_H = 74;   // a box and the gap after it
+  var LAYER_PAD = 14, LAYER_HEAD = 30;          // inside a layer's frame
+  var LAYER_GAP = 28, LAYER_BAND_PAD = 18, LAYER_BAND_HEAD = 22, LAYER_BAND_GAP = 26;
+  var LAYER_MAX = 600;
+
+  // How many boxes a layer puts in a row: about twice as wide as high.
+  function layerCols(n){ return Math.max(1, Math.min(10, Math.ceil(Math.sqrt(0.72 * n)))); }
+
+  function layerViolationText(L, v){
+    var rule = (L.rules || [])[v.rule - 1] || {};
+    return ringName(v.from) + " requires " + ringName(v.to) + ", but " + v.from_layer +
+      " must not reach into " + v.to_layer + (rule.why ? " (" + rule.why + ")" : "");
+  }
+
+  var layerShown = null;
+  function layoutLayers(){
+    var L = IR.layers;
+    layerShown = null;
+    var none = { layers: [], included: {}, count: 0, truncated: false, edges: [] };
+    if(!L || !(L.units || []).length) return none;
+
+    // The rows of the picture, from the top: the bands, highest first, then
+    // what no rule names.
+    var rows = [];
+    for(var b = L.bands - 1; b >= 0; b--){
+      rows.push({ band: b, units: L.units.filter(function(u){ return u.band === b; }) });
+    }
+    var loose = (L.unassigned || []).filter(function(id){ return !!byId[id]; });
+    if(loose.length) rows.push({ band: null, units: [{ id: null, modules: loose }] });
+
+    // A module in a broken rule is never the one the cap drops.
+    var hot = {};
+    (L.violations || []).forEach(function(v){ hot[v.from] = true; hot[v.to] = true; });
+    var total = 0, unitCount = 0;
+    rows.forEach(function(row){ row.units.forEach(function(u){
+      u.all = (u.modules || []).filter(function(id){ return !!byId[id]; });
+      total += u.all.length; unitCount++;
+    }); });
+    var per = total > LAYER_MAX ? Math.max(12, Math.floor(LAYER_MAX / unitCount)) : Infinity;
+    var truncated = false, count = 0;
+
+    var positions = {}, included = {}, unitOf = {}, frames = [], y = PAD, width = 0;
+    rows.forEach(function(row){
+      row.units.forEach(function(u){
+        u.shown = u.all;
+        if(u.all.length > per){
+          truncated = true;
+          u.shown = u.all.filter(function(id){ return hot[id]; })
+            .concat(u.all.filter(function(id){ return !hot[id]; })).slice(0, per);
+        }
+        u.cols = layerCols(u.shown.length);
+        u.lines = Math.ceil(u.shown.length / u.cols);
+        u.w = u.cols * LAYER_CELL_W - GAP_X + 2 * LAYER_PAD;
+        u.h = LAYER_HEAD + Math.max(u.lines, 1) * LAYER_CELL_H - (LAYER_CELL_H - BOX_H) + LAYER_PAD;
+      });
+      row.w = row.units.reduce(function(a, u){ return a + u.w; }, 0) + (row.units.length - 1) * LAYER_GAP;
+      row.h = row.units.reduce(function(a, u){ return Math.max(a, u.h); }, 0);
+      width = Math.max(width, row.w);
+    });
+    var W = width + 2 * LAYER_BAND_PAD + 2 * PAD;
+    rows.forEach(function(row, ri){
+      row.y = y;
+      row.bh = LAYER_BAND_HEAD + row.h + 2 * LAYER_BAND_PAD;
+      var x = PAD + LAYER_BAND_PAD + (width - row.w) / 2;
+      row.units.forEach(function(u){
+        u.x = Math.round(x);
+        u.y = y + LAYER_BAND_HEAD + LAYER_BAND_PAD;
+        u.shown.forEach(function(id, i){
+          positions[id] = { x: u.x + LAYER_PAD + (i % u.cols) * LAYER_CELL_W,
+                            y: u.y + LAYER_HEAD + Math.floor(i / u.cols) * LAYER_CELL_H };
+          included[id] = ri;
+          unitOf[id] = u.id;
+          count++;
+        });
+        frames.push(u);
+        x += u.w + LAYER_GAP;
+      });
+      y += row.bh + LAYER_BAND_GAP;
+    });
+    var H = y - LAYER_BAND_GAP + PAD;
+
+    // One arrow per pair of modules, however many rules it breaks.
+    var broken = {}, brokenList = [];
+    (L.violations || []).forEach(function(v){
+      var key = v.from + " " + v.to;
+      if(!broken[key]){ broken[key] = { from: v.from, to: v.to, texts: [] }; brokenList.push(broken[key]); }
+      broken[key].texts.push(layerViolationText(L, v));
+    });
+    var edges = [];
+    (IR.edges || []).forEach(function(e){
+      if(e.kind !== "require" || e.from === e.to) return;
+      if(positions[e.from] === undefined || positions[e.to] === undefined) return;
+      if(broken[e.from + " " + e.to]) return;
+      edges.push({ from: e.from, to: e.to,
+                   cls: "hedge hedge-dep hedge-quiet" + (e.deferred ? " deferred" : ""), marker: "dep",
+                   label: (e.deferred ? "lazy require " : "require ") + e.to_module + ":" + e.line });
+    });
+    brokenList.forEach(function(v){
+      if(positions[v.from] === undefined || positions[v.to] === undefined) return;
+      edges.push({ from: v.from, to: v.to, cls: "hedge hedge-viol", marker: "viol", top: true,
+                   label: v.texts.join("\n") });
+    });
+
+    var shared = {};
+    (L.shared || []).forEach(function(id){ shared[id] = true; });
+    var bySource = {}, byTarget = {};
+    brokenList.forEach(function(v){
+      (bySource[v.from] = bySource[v.from] || []).push(v);
+      (byTarget[v.to] = byTarget[v.to] || []).push(v);
+    });
+
+    var layered = total - loose.length;
+    layerShown = { rules: (L.rules || []).length, bands: L.bands, layers: L.units.length, layered: layered,
+                   loose: loose.length, broken: brokenList.length, loops: L.loops || [] };
+
+    function label(svg, svgNS, cls, x, yy, text){
+      var t = document.createElementNS(svgNS, "text");
+      t.setAttribute("class", "hmap-label " + cls);
+      t.setAttribute("x", x); t.setAttribute("y", yy);
+      t.textContent = text;
+      svg.appendChild(t);
+    }
+    function rect(svg, svgNS, cls, x, yy, w, h, r){
+      var el = document.createElementNS(svgNS, "rect");
+      el.setAttribute("class", cls);
+      el.setAttribute("x", x); el.setAttribute("y", yy);
+      el.setAttribute("width", w); el.setAttribute("height", h); el.setAttribute("rx", r);
+      svg.appendChild(el);
+    }
+
+    return {
+      layers: [Object.keys(positions)], included: included, count: count, truncated: truncated, edges: edges,
+      positions: positions, extent: { w: W, h: H }, edgePath: ringEdge,
+      path: ringPlural(layerShown.rules, "rule") + " · layers",
+      truncNote: "Showing " + count + " of " + total + " modules: a layer shows its first " + per +
+        ", the ones in a broken rule first.",
+      decor: function(svg, svgNS){
+        rows.forEach(function(row){
+          rect(svg, svgNS, "hband" + (row.band === null ? " hband-loose" : ""), PAD, row.y, W - 2 * PAD, row.bh, 10);
+        });
+        frames.forEach(function(u){
+          if(u.id !== null) rect(svg, svgNS, "hunit" + (u.siblings ? " hunit-sib" : ""), u.x, u.y, u.w, u.h, 8);
+        });
+      },
+      overlay: function(svg, svgNS){
+        rows.forEach(function(row){
+          label(svg, svgNS, "hband-name", PAD + 12, row.y + 16, row.band === null
+            ? "named by no rule · " + ringPlural(loose.length, "module")
+            : "band " + (row.band + 1) + " of " + L.bands +
+              (row.band === 0 ? " · the base: no rule forbids anything to require it"
+                              : " · a rule forbids a band below to require it"));
+        });
+        frames.forEach(function(u){
+          if(u.id === null) return;
+          label(svg, svgNS, "hunit-name", u.x + LAYER_PAD, u.y + 19,
+            u.id + " · " + (u.shown.length < u.all.length ? u.shown.length + " of " : "") +
+            ringPlural(u.all.length, "module") + (u.siblings ? " · siblings" : ""));
+        });
+      },
+      paint: function(){
+        Object.keys(positions).forEach(function(id){
+          var el = hboxes[id];
+          if(!el) return;
+          var out = bySource[id] || [], into = byTarget[id] || [], tips = [], tag = "";
+          mapRename(el, id, unitOf[id]);
+          el.dataset.layer = unitOf[id] || "";
+          out.forEach(function(v){ tips = tips.concat(v.texts); });
+          into.forEach(function(v){ tips.push("required against a rule by " + ringName(v.from)); });
+          if(out.length){
+            el.classList.add("lv-from");
+            tag = "breaks a rule · " + ringPlural(out.length, "require");
+          } else if(shared[id]) tag = "shared target";
+          if(into.length) el.classList.add("lv-to");
+          if(shared[id]) tips.push("a rule's allow list exempts it as a target");
+          if(tag){
+            var sm = el.querySelector(".hsm");
+            if(sm) sm.remove();
+            var k = document.createElement("div");
+            k.className = "hkind";
+            k.textContent = tag;
+            el.appendChild(k);
+          }
+          if(tips.length) el.title = (el._spec ? el._spec.title : el.title) + "\n" + tips.join("\n");
+        });
+      }
+    };
+  }
+
+  function layerNote(){
+    var s = layerShown;
+    if(!s) return null;
+    var box = document.createElement("div");
+    box.className = "htrunc hauto hmap-note";
+    var text = ringPlural(s.rules, "rule") + " put " + ringPlural(s.layered, "module") + " into " +
+      ringPlural(s.layers, "layer") + " on " + ringPlural(s.bands, "band") + ". " +
+      (s.loose ? ringPlural(s.loose, "module") + " " + (s.loose === 1 ? "is" : "are") + " named by no rule. " : "") +
+      (s.broken ? ringPlural(s.broken, "require") + " break" + (s.broken === 1 ? "s" : "") + " a rule (the red arrow" +
+                  (s.broken === 1 ? "" : "s") + ")."
+                : "No require breaks a rule.");
+    s.loops.forEach(function(group){
+      text += " No order holds among " + group.join(", ") +
+        ": they forbid each other in a circle, so they share a band.";
+    });
+    box.appendChild(document.createTextNode(text + " "));
+    if(s.broken){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.id = "hmap-findings";
+      b.textContent = "Show the findings";
+      b.addEventListener("click", function(){ navigate({ tab: "findings" }); });
+      box.appendChild(b);
+    }
+    return box;
+  }
+
+  function mapNote(view){ return view === "layers" ? layerNote() : ringNote(); }
+
   function mapLegend(view){
-    void view;
+    if(view === "layers"){
+      return '<span class="lg"><span class="sw viol"></span>a require that breaks a rule</span>' +
+        '<span class="lg"><span class="bx lv-from"></span>the module that requires against a rule</span>' +
+        '<span class="lg"><span class="sw dep"></span>any other require (shown for the box you point at)</span>' +
+        '<span class="lg">a band is above another because a rule forbids the lower one to require it</span>' +
+        '<span class="lg">wheel zooms · shift+wheel pans · click pins a box, a second click opens it in the Tree tab · right-click for more</span>';
+    }
     return '<span class="lg"><span class="bx ring-entry"></span>the entry</span>' +
       '<span class="lg"><span class="bx ring-out"></span>not reachable from the entry</span>' +
       '<span class="lg"><span class="bx ring-out ring-unref"></span>… and an unreferenced-module finding</span>' +

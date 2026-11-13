@@ -18,7 +18,7 @@ return function(H)
 
   -- ── The wiring ───────────────────────────────────────────────────────────
   has('data-view="rings" data-explain="view.rings">Rings</button>', "a Rings button")
-  has("rings: 1, coupling: 1 };", "a known view (an unknown one falls back to Modules)")
+  has("rings: 1, layers: 1, coupling: 1 };", "a known view (an unknown one falls back to Modules)")
   has('else if(view === "rings") built = layoutRings(hcenter);', "drawHierarchy hands it off")
   has(
     "var laid = built.positions ? { positions: built.positions, maxRowWidth: 0 } : layerPositions(built.layers);",
@@ -59,7 +59,7 @@ return function(H)
   )
   has('svg.querySelectorAll(".hring").forEach(function(el){', "the SVG export carries the rings")
   has(
-    'svg.querySelectorAll(".hring-label").forEach(function(el){',
+    'svg.querySelectorAll(".hring-label, .hmap-label").forEach(function(el){',
     "the SVG export carries their names"
   )
   has(
@@ -71,10 +71,10 @@ return function(H)
     "zooming past the edge does not jump to another level: there is none"
   )
   has(
-    "#hsvg .hedge.hedge-ring{opacity:0}",
+    "#hsvg .hedge.hedge-quiet{opacity:0}",
     "the arrows are hidden until a box is pointed at or pinned"
   )
-  has("#hgraph.focusing .hedge.hedge-ring.near{opacity:1}", "and shown for that box")
+  has("#hgraph.focusing .hedge.hedge-quiet.near{opacity:1}", "and shown for that box")
   has(
     'hboxes[k].classList.toggle("near", k === key || !!near[k]);',
     "a box that is not on the chain is dimmed on every hover, not on every second one"
