@@ -353,11 +353,21 @@ function M.start(cfg)
         end,
       },
       -- Everything else is a bare filename in `out_dir` (the empty one is `index.html`).
+      --
+      -- `?theme=` is the page's own way to be told its theme from outside (the script in `<head>` of
+      -- `render/html.lua`), so the route has to let it through: the server refuses every query key a route does not
+      -- declare, and `/?theme=light` was a 400. The page only reads `light` and `dark`; `system` is its third
+      -- state (follow the OS) and is accepted for that reason. Nothing else is.
       {
         pattern = "^/([^/]*)$",
         captures = {
           function(v)
             return M.safe_static_name(v) ~= nil
+          end,
+        },
+        query = {
+          theme = function(v)
+            return v == "light" or v == "dark" or v == "system"
           end,
         },
         handler = function(req)

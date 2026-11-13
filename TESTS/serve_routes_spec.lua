@@ -92,6 +92,18 @@ return function(H)
       ok(static.captures[1]("module_map.json"), "serve: a plain file name is accepted")
       ok(not static.captures[1]("a\\b"), "serve: a backslash is refused")
       ok(not static.captures[1]("a..b"), "serve: a dot-dot is refused")
+      -- `?theme=` is how the page is told its theme from outside; an undeclared key is a 400 from the server.
+      eq(
+        vim.tbl_count(static.query or {}),
+        1,
+        "serve: the static route declares exactly one query key"
+      )
+      for _, v in ipairs({ "light", "dark", "system" }) do
+        ok(static.query.theme(v), "serve: ?theme=" .. v .. " is let through")
+      end
+      for _, v in ipairs({ "", "Light", "blue", "light;x" }) do
+        ok(not static.query.theme(v), "serve: ?theme=" .. v .. " is refused")
+      end
       local icode, itype, ibody = static.handler({ params = { "" }, query = {} })
       eq(icode, 200, "serve: the index is served")
       eq(itype, "text/html; charset=utf-8", "serve: ...as html")

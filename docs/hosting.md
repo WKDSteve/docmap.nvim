@@ -223,6 +223,10 @@ well.
 It is also a feature outside any host: it is a thing a person can type into a
 browser.
 
+`:DocMap serve` lets `?theme=light`, `?theme=dark` and `?theme=system` through
+to the page and refuses any other value or key with a 400: its routes are
+whitelists, and this is the one key the page itself reads.
+
 ---
 
 ## The page talks to its host
