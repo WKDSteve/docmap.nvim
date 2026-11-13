@@ -883,6 +883,11 @@ return [[
 
   window.addEventListener("popstate", function(ev){
     applyState(ev.state || parseState(location.hash), false);
+    // Back or Forward moved to another entry, so "the last push" is no
+    // longer the entry on top: the guard in `applyState` has to compare with
+    // the entry landed on. Left as it was, going A -> B, Back, and to B
+    // again drew B and pushed nothing, and the address bar kept saying A.
+    lastPushedHash = serializeState(state);
   });
 
 ]]

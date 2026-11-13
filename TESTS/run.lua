@@ -252,6 +252,7 @@ local specs = {
   "shell_quote_spec.lua",
   "tools_spec.lua",
   "features_spec.lua",
+  "page_history_spec.lua",
   "calls_external_spec.lua",
   "call_path_spec.lua",
   "sibling_references_spec.lua",
