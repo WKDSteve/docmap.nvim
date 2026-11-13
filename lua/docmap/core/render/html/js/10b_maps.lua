@@ -400,4 +400,379 @@ return [[
     to.focus();
   });
 
+  // =====================================================================
+  // Rings: the require graph laid out by distance from an entry module.
+  //
+  // "How deep is this, and what is reachable at all?" The Deps view shows a
+  // neighbourhood; this one shows every module once, on the ring of its
+  // shortest require chain from the entry: ring 1 is what the entry requires
+  // itself, ring 2 what those require, and so on. Whatever no chain reaches
+  // sits in a last, dashed ring. That ring is `unreferenced-module` as a
+  // picture: the modules that carry the finding are marked in it, and the
+  // others in it are required only by modules that are unreachable too.
+  //
+  // The entry is the center of the Hierarchy when that is a module, so a
+  // click on a box, the search box and a link all pick it. When the center is
+  // a folder the rings start at the default entry (`ringDefaultEntry`), and
+  // the Entry select in the toolbar offers every root of the require graph:
+  // a tree with several entries, or with no `init.lua`, has no single answer.
+  //
+  // It draws into the zooming stage like the box views, with positions of its
+  // own, so zoom, pan, dimming, the context menu and the SVG export work on it
+  // unchanged. The arrows are the require that first reaches each module;
+  // they are shown for the box under the pointer or the pin only, where they
+  // read as the chain from the entry. All 300 at once would be a disc of ink.
+  // Lazy requires count like any other: reachable is reachable.
+  //
+  // A ring is an ellipse, twice as wide as high, because a box is three times
+  // as wide as high; a ring too long for one row takes several.
+  // =====================================================================
+  var RING_AX = 184, RING_AY = 80;   // one unit of the layout in pixels, across and down
+  var RING_SPACE = 1.25;             // along a row, between two boxes (units)
+  var RING_STEP = 1.15;              // between two rows of one ring
+  var RING_GAP = 1.3;                // between two rings
+  var RING_MAX = 400;
+
+  function isMapView(v){ return v === "rings"; }
+
+  function ringModule(id){
+    var n = byId[id];
+    return !!(n && n.module && n.kind !== "namespace");
+  }
+
+  function ringName(id){
+    var n = byId[id] || {};
+    return n.module || n.name || id;
+  }
+
+  // Breadth first along the requires: the distance of every module `entry`
+  // reaches, the require that reached it first, and the order they were found
+  // in (which keeps the modules one module requires next to each other).
+  function ringDistances(entry){
+    var dist = {}, via = {}, order = [entry];
+    dist[entry] = 0;
+    for(var i = 0; i < order.length; i++){
+      var id = order[i];
+      (depOut[id] || []).forEach(function(e){
+        if(dist[e.to] !== undefined || !ringModule(e.to)) return;
+        dist[e.to] = dist[id] + 1;
+        via[e.to] = e;
+        order.push(e.to);
+      });
+    }
+    return { dist: dist, via: via, order: order };
+  }
+
+  function ringByDepth(a, b){
+    var da = (byId[a].depth || 0), db = (byId[b].depth || 0);
+    if(da !== db) return da - db;
+    var na = ringName(a), nb = ringName(b);
+    return na < nb ? -1 : (na > nb ? 1 : (a < b ? -1 : (a > b ? 1 : 0)));
+  }
+
+  // The roots of the require graph: modules that require something and that
+  // nothing requires (the root of the map counts when it is a module, whoever
+  // requires it). Shallowest first.
+  function ringEntries(){
+    var out = [];
+    IR.nodes.forEach(function(n){
+      if(!ringModule(n.id) || !(depOut[n.id] || []).length) return;
+      if(n.id === IR.root || !(depIn[n.id] || []).length) out.push(n.id);
+    });
+    return out.sort(ringByDepth);
+  }
+
+  // Where the rings start when nobody chose: the root of the map when it is a
+  // module that requires something (a Lua plugin's `init.lua`). Else the
+  // module that reaches the most, looked for among the roots of the require
+  // graph and the modules of the topmost level: an entry that its own
+  // children require back (`require("app")` for the config) is no root, and
+  // it is still where the tree starts. Ties go to the shallower, then to the
+  // name, so one map always opens on the same module.
+  var ringDefault;
+  function ringDefaultEntry(){
+    if(ringDefault !== undefined) return ringDefault;
+    ringDefault = null;
+    if(ringModule(IR.root) && (depOut[IR.root] || []).length){ ringDefault = IR.root; return ringDefault; }
+    var mods = [];
+    IR.nodes.forEach(function(n){ if(ringModule(n.id)) mods.push(n.id); });
+    if(!mods.length) return null;
+    var requiring = mods.filter(function(id){ return (depOut[id] || []).length; }).sort(ringByDepth);
+    // Nothing requires anything: any module is as good, the first by depth and name.
+    if(!requiring.length){ ringDefault = mods.sort(ringByDepth)[0]; return ringDefault; }
+    var top = byId[requiring[0] ].depth || 0, pool = ringEntries(), seen = {};
+    requiring.forEach(function(id){ if((byId[id].depth || 0) === top) pool.push(id); });
+    var bestReach = -1;
+    pool.sort(ringByDepth).slice(0, 200).forEach(function(id){
+      if(seen[id]) return;
+      seen[id] = true;
+      var reach = ringDistances(id).order.length;
+      if(reach > bestReach){ ringDefault = id; bestReach = reach; }
+    });
+    return ringDefault;
+  }
+
+  function ringUnreferenced(id){
+    return (findByNode[id] || []).some(function(f){ return f.check === "unreferenced-module"; });
+  }
+
+  // Where the boxes of the rings go, in units around 0/0. `bands` is a list of
+  // id lists, innermost first. A row holds what its circumference has room
+  // for; what is left goes on the next row of the same band.
+  function ringPlace(bands){
+    var pos = {}, out = [], r = 0;
+    bands.forEach(function(ids){
+      r += RING_GAP;
+      var band = { inner: r, outer: r, rows: 0 };
+      var i = 0;
+      while(i < ids.length){
+        if(band.rows) r += RING_STEP;
+        var n = Math.min(Math.max(1, Math.floor(2 * Math.PI * r / RING_SPACE)), ids.length - i);
+        // Every second row starts half a step on, so the rows do not line up
+        // into spokes.
+        var shift = (band.rows % 2) ? Math.PI / n : 0;
+        for(var k = 0; k < n; k++){
+          var ang = -Math.PI / 2 + shift + 2 * Math.PI * k / n;
+          pos[ids[i++] ] = { ux: r * Math.cos(ang), uy: r * Math.sin(ang) };
+        }
+        band.rows++;
+      }
+      band.outer = r;
+      out.push(band);
+    });
+    return { pos: pos, bands: out, radius: r };
+  }
+
+  // A straight line between two boxes, from border to border: the boxes of a
+  // ring lie in every direction from each other, so no side is the facing one.
+  function ringEdge(a, b){
+    var ax = a.x + BOX_W / 2, ay = a.y + BOX_H / 2, bx = b.x + BOX_W / 2, by = b.y + BOX_H / 2;
+    var dx = bx - ax, dy = by - ay;
+    if(!dx && !dy) return "M" + ax + "," + ay;
+    var t = Math.min(dx ? (BOX_W / 2) / Math.abs(dx) : Infinity, dy ? (BOX_H / 2) / Math.abs(dy) : Infinity, 0.5);
+    return "M" + (ax + dx * t).toFixed(1) + "," + (ay + dy * t).toFixed(1) +
+      " L" + (bx - dx * t).toFixed(1) + "," + (by - dy * t).toFixed(1);
+  }
+
+  function ringPlural(n, one){ return n + " " + one + (n === 1 ? "" : "s"); }
+
+  // The whole view for `drawHierarchy`: the same shape every layout returns,
+  // plus positions of its own and what only this view draws.
+  var ringShown = null;
+  function layoutRings(centerId){
+    var entry = ringModule(centerId) ? centerId : ringDefaultEntry();
+    ringShown = null;
+    if(!entry) return { layers: [], included: {}, count: 0, truncated: false, edges: [] };
+    var walk = ringDistances(entry);
+
+    var rings = [];
+    walk.order.forEach(function(id){
+      var d = walk.dist[id];
+      if(d > 0) (rings[d - 1] = rings[d - 1] || []).push(id);
+    });
+    var outside = [];
+    IR.nodes.forEach(function(n){
+      if(ringModule(n.id) && walk.dist[n.id] === undefined) outside.push(n.id);
+    });
+    var unref = {};
+    outside.forEach(function(id){ if(ringUnreferenced(id)) unref[id] = true; });
+    // The findings first: they are why the others are out here.
+    outside.sort(function(a, b){
+      if(!!unref[a] !== !!unref[b]) return unref[a] ? -1 : 1;
+      return ringByDepth(a, b);
+    });
+    var total = walk.order.length + outside.length, reached = walk.order.length;
+    var unrefCount = Object.keys(unref).length, outsideCount = outside.length;
+
+    // The cap takes from the outside in: the unreachable ring first, then the
+    // deepest rings.
+    var room = RING_MAX - 1, truncated = false;
+    var bands = [], kinds = [];
+    rings.forEach(function(ids, i){
+      if(room <= 0){ truncated = true; return; }
+      if(ids.length > room){ ids = ids.slice(0, room); truncated = true; }
+      room -= ids.length;
+      bands.push(ids); kinds.push(i + 1);
+    });
+    if(outside.length){
+      if(outside.length > room){ outside = outside.slice(0, room); truncated = true; }
+      if(outside.length){ bands.push(outside); kinds.push("out"); }
+    }
+
+    var placed = ringPlace(bands);
+    var cx = PAD + placed.radius * RING_AX + BOX_W / 2;
+    var cy = PAD + placed.radius * RING_AY + BOX_H / 2;
+    var positions = {}, included = {}, count = 1;
+    positions[entry] = { x: Math.round(cx - BOX_W / 2), y: Math.round(cy - BOX_H / 2) };
+    included[entry] = 0;
+    bands.forEach(function(ids, i){
+      ids.forEach(function(id){
+        var p = placed.pos[id];
+        positions[id] = { x: Math.round(cx + p.ux * RING_AX - BOX_W / 2),
+                          y: Math.round(cy + p.uy * RING_AY - BOX_H / 2) };
+        included[id] = i + 1;
+        count++;
+      });
+    });
+
+    var edges = [];
+    Object.keys(walk.via).forEach(function(id){
+      var e = walk.via[id];
+      if(positions[id] === undefined || positions[e.from] === undefined) return;
+      edges.push({ from: e.from, to: id, cls: "hedge hedge-dep hedge-ring" + (e.deferred ? " deferred" : ""),
+                   marker: "dep",
+                   label: (e.deferred ? "lazy require " : "require ") + e.to_module + ":" + e.line });
+    });
+
+    // Pointing at a box lights its chain back to the entry and what is first
+    // reached through it.
+    var near = {};
+    Object.keys(positions).forEach(function(id){
+      var set = {};
+      for(var at = id; walk.via[at]; at = walk.via[at].from) set[walk.via[at].from] = true;
+      near[id] = set;
+    });
+    edges.forEach(function(e){ near[e.from][e.to] = true; });
+
+    function chain(id){
+      var names = [ringName(id)];
+      for(var at = id; walk.via[at]; at = walk.via[at].from) names.unshift(ringName(walk.via[at].from));
+      return names.join(" → ");
+    }
+    function why(id){
+      if(id === entry) return "the entry: the rings count the requires from here";
+      var d = walk.dist[id];
+      if(d !== undefined) return ringPlural(d, "require") + " from the entry: " + chain(id);
+      if(unref[id]) return "not reachable from " + ringName(entry) + ": nothing in this map requires it (unreferenced-module)";
+      var by = (depIn[id] || []).map(function(e){ return ringName(e.from); });
+      if(!by.length) return "not reachable from " + ringName(entry) + ": nothing in this map requires it";
+      return "not reachable from " + ringName(entry) + ": required only by " + by.slice(0, 3).join(", ") +
+        (by.length > 3 ? " and " + (by.length - 3) + " more" : "") + ", which the entry does not reach either";
+    }
+
+    ringShown = { entry: entry, picked: centerId === entry, total: total, reached: reached,
+                  depth: rings.length, outside: outsideCount, unref: unrefCount };
+
+    return {
+      layers: [ [entry] ].concat(bands), included: included, count: count, truncated: truncated, edges: edges,
+      positions: positions, extent: { w: Math.round(cx * 2), h: Math.round(cy * 2) },
+      centerKey: entry, edgePath: ringEdge, neighbours: near, tip: why,
+      edgeNear: function(key, from, to){ return to === key || !!near[key][to] && !!near[key][from] || from === key; },
+      truncNote: "Showing " + count + " of " + total + " modules: the unreachable ring and the deepest rings are cut first.",
+      // The rings themselves, drawn below the edges and the boxes.
+      decor: function(svg, svgNS){
+        placed.bands.forEach(function(band, i){
+          var out = kinds[i] === "out";
+          var rb = band.inner - RING_GAP / 2;
+          var el = document.createElementNS(svgNS, "ellipse");
+          el.setAttribute("class", "hring" + (out ? " hring-out" : ""));
+          el.setAttribute("cx", cx); el.setAttribute("cy", cy);
+          el.setAttribute("rx", (rb * RING_AX).toFixed(1)); el.setAttribute("ry", (rb * RING_AY).toFixed(1));
+          svg.appendChild(el);
+        });
+      },
+      // What each ring is, written over the edges: an arrow of the chain may
+      // cross a name, and the name has to stay readable.
+      overlay: function(svg, svgNS){
+        placed.bands.forEach(function(band, i){
+          var out = kinds[i] === "out";
+          var rb = band.inner - RING_GAP / 2;
+          var label = document.createElementNS(svgNS, "text");
+          label.setAttribute("class", "hring-label" + (out ? " hring-out" : ""));
+          label.setAttribute("x", cx); label.setAttribute("y", (cy - rb * RING_AY - 6).toFixed(1));
+          label.setAttribute("text-anchor", "middle");
+          label.textContent = out
+            ? "not reachable from " + ringName(entry) + " · " + ringPlural(outsideCount, "module") +
+              (unrefCount ? " · " + unrefCount + " unreferenced-module" : "")
+            : ringPlural(kinds[i], "require") + " away · " + ringPlural(bands[i].length, "module");
+          svg.appendChild(label);
+        });
+      },
+      // Runs after `reconcile`, which resets a box's class and markup on
+      // every draw: what a box is in this view, said on it and in its tooltip.
+      paint: function(){
+        Object.keys(positions).forEach(function(id){
+          var el = hboxes[id];
+          if(!el) return;
+          var d = walk.dist[id];
+          el.dataset.ring = d === undefined ? "out" : String(d);
+          var tag = id === entry ? "entry" : (d === undefined ? (unref[id] ? "unreferenced-module" : "not reachable") : "");
+          if(d === undefined) el.classList.add("ring-out");
+          if(unref[id]) el.classList.add("ring-unref");
+          if(tag){
+            var sm = el.querySelector(".hsm");
+            if(sm) sm.remove();
+            var k = document.createElement("div");
+            k.className = "hkind";
+            k.textContent = tag;
+            el.appendChild(k);
+          }
+          el.title = (el._spec ? el._spec.title : el.title) + "\n" + why(id);
+        });
+        ringControls();
+      }
+    };
+  }
+
+  // The Entry select: the roots of the require graph with how much each
+  // reaches, and the entry on screen when it is none of them.
+  function ringControls(){
+    var sel = document.getElementById("hentry");
+    if(!sel || !ringShown) return;
+    var ids = ringEntries().slice(0, 60);
+    var first = ringDefaultEntry();
+    [first, ringShown.entry].forEach(function(id){ if(id && ids.indexOf(id) === -1) ids.unshift(id); });
+    var all = 0;
+    IR.nodes.forEach(function(n){ if(ringModule(n.id)) all++; });
+    sel.innerHTML = ids.map(function(id){
+      return '<option value="' + esc(id) + '"' + (id === ringShown.entry ? " selected" : "") + ">" +
+        esc(ringName(id)) + " · reaches " + ringDistances(id).order.length + " of " + all + "</option>";
+    }).join("");
+  }
+
+  // What stands under the diagram: the two numbers the view is for, and the
+  // way from the unreachable ring to the finding it shows.
+  function ringNote(){
+    var s = ringShown;
+    if(!s) return null;
+    var box = document.createElement("div");
+    box.className = "htrunc hauto hring-note";
+    var text = (s.picked ? "" : "Started at " + ringName(s.entry) + ", the entry of this map (the center is a folder). ") +
+      ringName(s.entry) + " reaches " + s.reached + " of " + ringPlural(s.total, "module") + ", the farthest " +
+      ringPlural(s.depth, "require") + " away.";
+    if(s.outside){
+      text += " " + ringPlural(s.outside, "module") + " " + (s.outside === 1 ? "is" : "are") +
+        " not reachable from it";
+      if(!s.unref) text += ".";
+      else if(s.outside === 1) text += " and carries the unreferenced-module finding: nothing requires it.";
+      else if(s.unref === s.outside) text += ", and all of them carry the unreferenced-module finding: nothing requires them.";
+      else text += ": " + s.unref + " carr" + (s.unref === 1 ? "ies" : "y") +
+        " the unreferenced-module finding (nothing requires " + (s.unref === 1 ? "it" : "them") +
+        "), the others are required only by unreachable modules or are exempt from that check.";
+    }
+    box.appendChild(document.createTextNode(text + " "));
+    if(s.unref){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.id = "hring-findings";
+      b.textContent = "Show the findings";
+      b.addEventListener("click", function(){ navigate({ tab: "findings" }); });
+      box.appendChild(b);
+    }
+    return box;
+  }
+
+  function mapLegend(view){
+    void view;
+    return '<span class="lg"><span class="bx ring-entry"></span>the entry</span>' +
+      '<span class="lg"><span class="bx ring-out"></span>not reachable from the entry</span>' +
+      '<span class="lg"><span class="bx ring-out ring-unref"></span>… and an unreferenced-module finding</span>' +
+      '<span class="lg"><span class="sw dep"></span>the require that first reaches a module (shown for the box you point at)</span>' +
+      '<span class="lg">wheel zooms · shift+wheel pans · click pins a box, a second click makes it the entry · right-click for more</span>';
+  }
+
+  document.getElementById("hentry").addEventListener("change", function(ev){
+    if(byId[ev.target.value]) navigate({ center: ev.target.value, fn: null });
+  });
+
 ]]

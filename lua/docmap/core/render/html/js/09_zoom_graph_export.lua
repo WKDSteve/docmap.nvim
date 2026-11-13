@@ -111,6 +111,8 @@ return [[
   // there, and it already exists as state and as a toolbar control, so the
   // threshold binds to it instead.
   function drill(dir, clientX, clientY){
+    // A map of the whole tree has no level below or above it to jump to.
+    if(isMapView(state.view)) return;
     var now = Date.now();
     // One flick of the wheel must not fall three levels. Blocked by the
     // cooldown, the zoom is pulled back just inside the threshold so the next
@@ -202,6 +204,9 @@ return [[
   // draw would stack duplicates on exactly the boxes that survive longest.
   // =====================================================================
   var hgraphNeighbours = {};
+  // Set by a view whose focus is more than "the edges that touch this box"
+  // (the Rings light the whole chain back to the entry); null otherwise.
+  var hgraphEdgeNear = null;
 
   function boxOf(target){
     var el = target;
@@ -314,12 +319,16 @@ return [[
     var near = hgraphNeighbours[key] || {};
     hgraph.classList.add("focusing");
     Object.keys(hboxes).forEach(function(k){
-      hboxes[k].classList.toggle("near", k === key || near[k]);
+      // A real boolean: `toggle(name, undefined)` is the one-argument form and
+      // flips the class, so a box that is no neighbour was lit on every
+      // second hover.
+      hboxes[k].classList.toggle("near", k === key || !!near[k]);
       hboxes[k].classList.toggle("pinned", k === pinnedKey);
     });
     var svg = document.getElementById("hsvg");
     if(svg) svg.querySelectorAll(".hedge").forEach(function(p){
-      p.classList.toggle("near", p.dataset.from === key || p.dataset.to === key);
+      p.classList.toggle("near", hgraphEdgeNear ? hgraphEdgeNear(key, p.dataset.from, p.dataset.to)
+        : (p.dataset.from === key || p.dataset.to === key));
     });
   }
 
@@ -390,6 +399,10 @@ return [[
       var el = document.getElementById(id);
       if(el) el.style.display = diag;
     });
+    // Sideways turns layers; the Rings have none. Their own control is the
+    // entry the rings start at.
+    if(isMapView(s.view)) document.getElementById("hlr").style.display = "none";
+    document.getElementById("hentrywrap").style.display = s.view === "rings" ? "" : "none";
     document.getElementById("hdir").style.display = show;
     // The tint belongs to the Modules boxes; the select shows what the link says.
     document.getElementById("htintwrap").style.display = (s.view || "modules") === "modules" ? "" : "none";
@@ -513,12 +526,31 @@ return [[
     });
     parts.push('</defs>');
 
+    // What a view drew below its boxes (the rings and their names).
+    svg.querySelectorAll(".hring").forEach(function(el){
+      var st = getComputedStyle(el);
+      parts.push('<ellipse cx="'+el.getAttribute("cx")+'" cy="'+el.getAttribute("cy")+'" rx="'+
+        el.getAttribute("rx")+'" ry="'+el.getAttribute("ry")+'" fill="none" stroke="'+st.stroke+'" '+
+        'stroke-width="'+st.strokeWidth+'" stroke-dasharray="'+
+        (st.strokeDasharray === "none" ? "" : st.strokeDasharray)+'"/>');
+    });
+    svg.querySelectorAll(".hring-label").forEach(function(el){
+      parts.push('<text x="'+el.getAttribute("x")+'" y="'+el.getAttribute("y")+'" text-anchor="middle" '+
+        'font-size="11" fill="'+getComputedStyle(el).fill+'">'+esc(el.textContent)+'</text>');
+    });
+
     svg.querySelectorAll(".hedge").forEach(function(p){
       var st = getComputedStyle(p);
+      // An edge the screen does not show (the Rings draw the chain of the
+      // focused box only) is not in the file either. Asked of the state, not
+      // of the computed opacity: that one is still fading when the pointer
+      // has just left the box for the export button.
+      var ringEdge = p.classList.contains("hedge-ring");
+      if(ringEdge && !(hgraph.classList.contains("focusing") && p.classList.contains("near"))) return;
       var marker = (p.getAttribute("marker-end") || "").replace("url(#m-", "").replace(")", "");
       parts.push('<path d="'+esc(p.getAttribute("d"))+'" fill="none" stroke="'+st.stroke+'" '+
         'stroke-width="'+st.strokeWidth+'" stroke-dasharray="'+
-        (st.strokeDasharray === "none" ? "" : st.strokeDasharray)+'" opacity="'+st.opacity+'" '+
+        (st.strokeDasharray === "none" ? "" : st.strokeDasharray)+'" opacity="'+(ringEdge ? "1" : st.opacity)+'" '+
         'marker-end="url(#x-'+marker+')"/>');
     });
 
@@ -529,7 +561,7 @@ return [[
       var st = getComputedStyle(el);
       parts.push('<rect x="'+x+'" y="'+y+'" width="'+BOX_W+'" height="'+BOX_H+'" rx="7" '+
         'fill="'+st.backgroundColor+'" stroke="'+st.borderTopColor+'"'+
-        (el.dataset.tint === "na" ? ' stroke-dasharray="3 3"' : '')+'/>');
+        ((el.dataset.tint === "na" || st.borderTopStyle === "dashed") ? ' stroke-dasharray="3 3"' : '')+'/>');
       // The tint as a second rectangle over the box (colour plus opacity, which every SVG reader
       // understands) and the value as text, so the file says what the screen said.
       var tinted = el.dataset.tint !== undefined;

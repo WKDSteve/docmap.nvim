@@ -298,6 +298,23 @@ export keeps tint, values and legend.
 - **Config:** none; `tint=doc|test|fix|debt` in the link.
 - **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
 
+## Rings view (distance from the entry module)
+
+The require graph laid out as concentric rings among the Hierarchy views:
+the entry module in the middle, every other module on the ring of its
+shortest require chain, and a last, dashed ring for what the entry does not
+reach. It answers "how deep is this, and what is reachable at all" and makes
+`unreferenced-module` visible: the modules with the finding are marked in
+that ring. The entry is the center of the Hierarchy, or chosen from the roots
+of the require graph in the Entry select. Zoom and SVG export are the
+diagram's own. Read from the require edges and the findings the page already
+carries.
+
+- **Module:** `core/render/html/js/10b_maps.lua` (`ringDistances`,
+  `ringDefaultEntry`, `ringPlace`, `layoutRings`)
+- **Config:** none; `view=rings` and `center=<entry>` in the link.
+- **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
+
 ## Coupling view (fan-in against fan-out)
 
 A scatter plot among the Hierarchy views: each module a dot, by how many

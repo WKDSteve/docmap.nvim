@@ -53,6 +53,29 @@ lines of code, or by functions (`tm=functions`): a click zooms into a group, a
 leaf opens in the Tree tab, and ▲ Up and the path above go back. Rows and tiles
 take the same right-click menu as boxes, and dimmed nodes stay dimmed.
 
+**Rings** lays the require graph out by distance from an entry module and
+answers "how deep is this, and what is reachable at all?". The entry sits in
+the middle; ring 1 holds what it requires itself, ring 2 what those require,
+and so on, each module once, on the ring of its shortest require chain (a lazy
+require counts like any other). Whatever no chain reaches sits in a last,
+dashed ring. That ring is the `unreferenced-module` finding as a picture: the
+modules that carry the finding are marked and named as such, the others out
+there are required only by unreachable modules or are exempt from the check,
+and the line under the diagram gives the counts and leads to the Findings tab.
+The entry is the center of the Hierarchy when that is a module, so a link
+(`center=`), the search box and a second click on a box all choose it. When
+the center is a folder, the rings start at the root of the map if that is a
+module (a plugin's `init.lua`), else at the module that reaches the most; the
+**Entry** select in the toolbar lists the roots of the require graph (modules
+that require something and that nothing requires) with how many modules each
+reaches, for a tree with several entries or without an `init.lua`. Arrows are
+shown for the box under the pointer or the pin only: its chain back to the
+entry and what is first reached through it. The view draws in the same zooming
+diagram as the box views, so zoom, pan, dimming, the right-click menu and the
+SVG export (rings, their names, and the chain when a box is pinned) work as
+they do there. A ring too long for one row takes several; past 400 modules the
+unreachable ring and the deepest rings are cut first, and the page says so.
+
 **Coupling** is the one view that is not a tree or a graph but a scatter plot:
 every module at or below the center that has a require edge is a dot, placed
 by how many modules it requires (fan-out, across) and how many require it

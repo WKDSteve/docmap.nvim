@@ -358,7 +358,7 @@ return [[
     // The Deps view labels boxes by module path rather than directory name:
     // a require graph is read in module terms, and half this tree's
     // directories are called `init`-shaped things that are ambiguous alone.
-    var label = (view === "deps" || view === "modulecalls") ? (n.module || n.name) : n.name;
+    var label = (view === "deps" || view === "modulecalls" || view === "rings") ? (n.module || n.name) : n.name;
     return {
       cls: "hnode k-" + n.kind,
       title: n.summary || n.name,
@@ -482,6 +482,7 @@ return [[
   };
 
   function drawLegend(view){
+    if(isMapView(view)){ hlegendEl.innerHTML = mapLegend(view); return; }
     var entries = (LEGEND[view] || []).slice();
     if(view === "deps" && state.ext) entries = entries.concat(LEGEND.depsExt);
     var items = entries.map(function(it){
@@ -519,6 +520,9 @@ return [[
     if(view === "modulecalls"){
       return '<p class="hmsg">' + esc(center.name) + ' has no resolved call edges to or from another module — either it doesn’t call across module boundaries, or nothing else calls into it.</p>';
     }
+    if(view === "rings"){
+      return '<p class="hmsg">This map has no module to start from, so there is no distance to measure.</p>';
+    }
     return '<p class="hmsg">Nothing to draw here.</p>';
   }
 
@@ -535,7 +539,7 @@ return [[
   }
 
   var VIEWS = { modules: 1, types: 1, inheritance: 1, deps: 1, calls: 1, modulecalls: 1, tree: 1, treemap: 1,
-                coupling: 1 };
+                rings: 1, coupling: 1 };
 
   // =====================================================================
   // Notes tab: Doxygen's Deprecated / Todo / Bug / Test lists.

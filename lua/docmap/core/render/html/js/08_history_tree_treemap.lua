@@ -625,6 +625,7 @@ return [[
     else if(view === "deps") built = layoutDeps(hcenter, state.dir || "out", depth, !!state.ext);
     else if(view === "calls") built = layoutCalls(hcenter, wantFn, state.dir || "out", depth);
     else if(view === "modulecalls") built = layoutModuleCalls(hcenter, state.dir || "out", depth, !!state.ext);
+    else if(view === "rings") built = layoutRings(hcenter);
     else if(hidingRoot) built = layoutModulesRooted(state.hideroot);
     else built = layoutModules(hcenter);
 
@@ -656,7 +657,10 @@ return [[
 
     var suffix = { types: " · types", inheritance: " · inheritance",
                    deps: " · deps", calls: " · calls",
-                   modulecalls: " · module calls" }[view] || "";
+                   modulecalls: " · module calls", rings: " · rings" }[view] || "";
+    // A view that names its own middle (the entry of the Rings) is about
+    // that, not about the folder the Hierarchy happens to be centered on.
+    if(isMapView(view) && built.centerKey && byId[built.centerKey]) center = byId[built.centerKey];
     var focusFn = view === "calls" && wantFn;
     if(hidingRoot){
       hpathEl.textContent = state.hideroot + " root level" + (state.hideroot === 1 ? "" : "s") +
@@ -676,7 +680,9 @@ return [[
     var stale = hgraph.querySelector(".hmsg");
     if(stale) stale.remove();
 
-    var laid = layerPositions(built.layers);
+    // A view may bring positions of its own (the Rings); every other one is
+    // layers, and layers become positions here.
+    var laid = built.positions ? { positions: built.positions, maxRowWidth: 0 } : layerPositions(built.layers);
     var positions = laid.positions;
 
     // The key the view considers "the middle": a node id in three views, a
@@ -687,7 +693,7 @@ return [[
     if(lrBtn) lrBtn.classList.toggle("active", isLR());
   var centerKey = hcenter;
     if(view === "types") centerKey = built.layers[0] && built.layers[0][0];
-    else if(view === "inheritance") centerKey = built.centerKey;
+    else if(view === "inheritance" || isMapView(view)) centerKey = built.centerKey;
     else if(view === "calls") centerKey = wantFn || (built.layers[0] && built.layers[0][0]);
     // A forest has no single "middle" — every layer-0 box is equally a
     // root, so none of them gets the highlight ring a real center would.
@@ -695,6 +701,7 @@ return [[
 
     var moved = reconcile(positions, view, centerKey);
     applyTint();
+    if(built.paint) built.paint();
 
     // The layer axis and the spread axis swap with the orientation; the
     // canvas has to swap with them or half the graph is outside it.
@@ -703,6 +710,7 @@ return [[
       Math.max(0, depth - 1) * (isLR() ? GAP_X : GAP_Y);
     var totalW = isLR() ? alongLayers : laid.maxRowWidth + PAD * 2;
     var totalH = isLR() ? laid.maxRowWidth + PAD * 2 : alongLayers;
+    if(built.extent){ totalW = built.extent.w; totalH = built.extent.h; }
 
     var svgNS = "http://www.w3.org/2000/svg";
     var old = document.getElementById("hsvg");
@@ -712,6 +720,7 @@ return [[
     svg.setAttribute("width", totalW);
     svg.setAttribute("height", totalH);
     svg.appendChild(buildDefs(svgNS));
+    if(built.decor) built.decor(svg, svgNS);
 
     // Edge geometry cannot be interpolated the way a box position can — `d`
     // is not an animatable CSS property, and a per-frame path interpolator
@@ -731,7 +740,7 @@ return [[
       var a = positions[e.from], b = positions[e.to];
       if(!a || !b || e.from === e.to) return;
       var p = document.createElementNS(svgNS, "path");
-      p.setAttribute("d", edgePath(a, b));
+      p.setAttribute("d", built.edgePath ? built.edgePath(a, b) : edgePath(a, b));
       p.setAttribute("class", e.cls);
       p.setAttribute("marker-end", "url(#m-" + (e.marker || "tree") + ")");
       // Weighted edges (Module Calls) get a thicker stroke for more calls —
@@ -765,6 +774,9 @@ return [[
       (neighbours[e.to] = neighbours[e.to] || {})[e.from] = true;
     });
 
+    // What a view writes over its edges (the names of the rings).
+    if(built.overlay) built.overlay(svg, svgNS);
+
     hstage.style.width = totalW + "px";
     hstage.style.height = totalH + "px";
     hstage.insertBefore(svg, hstage.firstChild);
@@ -776,7 +788,8 @@ return [[
       setTimeout(function(){ svg.classList.remove("settling"); }, ANIM_MS);
     }
 
-    hgraphNeighbours = neighbours;
+    hgraphNeighbours = built.neighbours || neighbours;
+    hgraphEdgeNear = built.edgeNear || null;
 
     // Rows are centered on the widest layer, so the centered box can sit
     // thousands of pixels from the left edge on a wide map — without this,
@@ -814,10 +827,13 @@ return [[
       hgraphWrap.parentNode.insertBefore(auto, hgraphWrap.nextSibling);
     }
 
+    var mapNote = isMapView(view) ? ringNote() : null;
+    if(mapNote) hgraphWrap.parentNode.insertBefore(mapNote, hgraphWrap.nextSibling);
+
     if(built.truncated){
       var note = document.createElement("div");
       note.className = "htrunc";
-      note.textContent = "Showing the first " + MAX_HNODES + " boxes — narrow the depth, or double-click a box to re-center on a smaller neighbourhood.";
+      note.textContent = built.truncNote || "Showing the first " + MAX_HNODES + " boxes — narrow the depth, or double-click a box to re-center on a smaller neighbourhood.";
       hgraphWrap.parentNode.insertBefore(note, hgraphWrap.nextSibling);
     }
   }

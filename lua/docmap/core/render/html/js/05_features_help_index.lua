@@ -453,6 +453,16 @@ return [[
       "Everything under the center as nested areas, sized by lines of code " +
       "(or functions): where the weight of a wide level sits, at a glance. " +
       "Click to zoom in.",
+    "view.rings":
+      "Every module on the ring of its shortest require chain from the entry: " +
+      "how deep the tree is and what is reachable at all. What the entry does " +
+      "not reach sits in a last, dashed ring, where the unreferenced-module " +
+      "findings are marked. Point at a box to see its chain.",
+    "hier.entry":
+      "The module the rings are counted from. The list holds the roots of the " +
+      "require graph (modules that require something and that nothing " +
+      "requires) with how many modules each reaches. Any module can be the " +
+      "entry: click its box twice, or search for it.",
     "view.coupling":
       "Every module as a dot: how many modules it requires across, how many " +
       "require it up. The corners have names (hubs, tangles, pass-throughs, " +

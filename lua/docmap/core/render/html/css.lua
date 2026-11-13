@@ -742,6 +742,25 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .cq-dot:hover,.cq-dot:focus{stroke:var(--ink);stroke-width:2;outline:none}
 .cq-read{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink)}
 .htrunc.hauto{color:var(--muted)}
+/* The Rings view. A ring is a line and a name; the last one, for what the
+   entry does not reach, is dashed. A box out there is dashed as well and says
+   so in its second line; one that carries the unreferenced-module finding
+   names the finding there and has a heavier border. The colour of a warning
+   comes on top of that, it is never the only sign. */
+.hring{fill:none;stroke:var(--line);stroke-width:1.5}
+.hring.hring-out{stroke:var(--warn);stroke-dasharray:6 5}
+.hring-label{fill:var(--muted);font-size:11.5px;font-family:var(--mono);paint-order:stroke;stroke:var(--panel);stroke-width:5px;stroke-linejoin:round}
+.hring-label.hring-out{fill:var(--warn)}
+#hsvg .hedge.hedge-ring{opacity:0}
+#hgraph.focusing .hedge.hedge-ring{opacity:0}
+#hgraph.focusing .hedge.hedge-ring.near{opacity:1}
+.hnode.ring-out,.hlegend .bx.ring-out{border-style:dashed}
+.hnode.ring-out .hnm{color:var(--muted)}
+.hnode.ring-unref,.hlegend .bx.ring-unref{border-color:var(--warn);border-width:2px}
+.hnode.ring-unref .hkind{color:var(--warn)}
+.hlegend .bx.ring-entry{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.hring-note button{padding:2px 8px;font-size:12px;margin-left:4px}
+#hentry{max-width:260px}
 /* Sits directly before `#hdepth`'s button group. "1"/"2"/"3"/"∞" alone
    read as a slider or a zoom control — reported exactly that way after
    watching someone use the page for the first time — because every other

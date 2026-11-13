@@ -397,6 +397,7 @@ function M.render(ir, findings, opts)
     '<button class="hview-btn" data-view="inheritance" data-explain="view.inheritance">Inheritance</button>',
     '<button class="hview-btn" data-view="tree" data-explain="view.tree">Tree</button>',
     '<button class="hview-btn" data-view="treemap" data-explain="view.treemap">Treemap</button>',
+    '<button class="hview-btn" data-view="rings" data-explain="view.rings">Rings</button>',
     '<button class="hview-btn" data-view="coupling" data-explain="view.coupling">Coupling</button>',
     "</div>",
     -- Direction and depth belong to the directed views only; `syncGraphControls`
@@ -439,6 +440,10 @@ function M.render(ir, findings, opts)
     '<option value="fix">FIX markers</option>',
     '<option value="debt">TODO / HACK / PERF</option>',
     "</select></label>",
+    -- The Rings view only: which module the rings are counted from. A select, because a tree may have
+    -- several roots of its require graph and none of them has to be an `init.lua`.
+    '<label class="htint" id="hentrywrap" data-explain="hier.entry"><span class="hctl-label">Entry</span>',
+    '<select id="hentry" aria-label="The module the rings start at"></select></label>',
     '<button id="hzoomreset" title="Reset zoom to 100% (or press 0)">⌕ 100%</button>',
     '<span class="hzoom" id="hzoomlabel">100%</span>',
     '<button id="hexport" title="Download the current diagram as a standalone SVG">↓ SVG</button>',
