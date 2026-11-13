@@ -142,6 +142,17 @@ the center. The plot is one tab stop: the arrows walk the modules, the
 expensive corners first, a readout names the module under the pointer or the
 focus, and a click or Enter opens it in the Tree tab.
 
+**± Compare maps** puts a second map behind the diagram: the map of a commit against this one, or the
+maps of two commits against each other, chosen from the commit list the History tab uses. Nothing is
+laid out again. A node that was added gets a green frame, a require that was gained a green edge, a
+require that was lost is drawn dashed in red between its two boxes (Deps view), the place a node was
+removed from carries a red count, and everything that did not change is dimmed. The bar above the
+diagram counts the four kinds of change and unfolds the full list, with the same change as
+`:DocMap diff` prints it underneath. The comparison rides in the link (`cmp=<sha>` or
+`cmp=<older>..<newer>`), so it can be shared and Back leaves it. It needs a host that can read git
+(`:DocMap serve`); a page opened from a file, a published copy and a host without the route each
+say so in the bar instead of showing an empty comparison.
+
 The Modules view has one more encoding, off by default: the **Tint** switch in its toolbar colours each
 box by a measure of everything below it. *documented* and *tested* are the share of functions that
 are (`@internal` functions are left out of the documented share, as in the Documentation panel);

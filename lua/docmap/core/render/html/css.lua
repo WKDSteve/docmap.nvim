@@ -990,6 +990,48 @@ li:hover>.marki,tr:hover .marki{opacity:.8}
 .hnode .htv{position:absolute;top:6px;right:8px;font-family:var(--mono);font-size:10.5px;font-weight:600;
   color:var(--ink)}
 .htint{display:inline-flex;align-items:center;gap:6px}
+/* The shape diff. The bar is a second row of controls that exists only while a comparison is being
+   chosen or shown; the marks are frames and strokes on what is already drawn, so nothing moves. Added is
+   the green the History diff uses for added lines, removed its red: one meaning per colour on the page. */
+.hshape{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;margin:-6px 0 14px;padding:8px 10px;
+  border:1px solid var(--line);border-radius:8px;font-size:12.5px}
+.hshape[hidden]{display:none}
+.hshape button{padding:4px 9px;font-size:12.5px}
+.hshape .sd-pick{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.hshape select{font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--line);border-radius:7px;
+  background:var(--bg);color:var(--ink);max-width:min(46ch,60vw)}
+.sd-sum{display:inline-flex;gap:6px;flex-wrap:wrap}
+.sd-count{font-family:var(--mono);font-size:11.5px;padding:2px 7px;border:1px solid currentColor;border-radius:999px}
+.sd-plus{color:var(--file)} .sd-minus{color:var(--error)}
+.sd-count.sd-zero{color:var(--muted);border-color:var(--line)}
+.sd-msg{color:var(--muted)}
+.hshape .hmsg{padding:0;text-align:left;font-size:12.5px}
+.sd-note{flex-basis:100%;color:var(--warn);font-size:12px}
+.sd-body{flex-basis:100%;max-height:40vh;overflow-y:auto;border-top:1px solid var(--line);padding-top:8px}
+.sd-body[hidden]{display:none}
+.sd-sec{margin-bottom:10px}
+.sd-sec-t{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.sd-sec ul{list-style:none;margin:4px 0 0;padding:0;font-family:var(--mono);font-size:12px;line-height:1.7}
+.sd-n,.sd-under,.sd-more{color:var(--muted);font-weight:400}
+.sd-gone{color:var(--muted);text-decoration:line-through}
+.hshape .sd-chip{padding:0 5px;font:inherit;border:1px solid var(--line);border-radius:5px;background:none;
+  color:var(--accent);cursor:pointer}
+.sd-text pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;margin:6px 0 0}
+#hshapebtn.active{color:var(--accent);border-color:var(--accent);font-weight:600}
+.hnode.sd-added{border-color:var(--file);box-shadow:0 0 0 2px var(--file)}
+.hnode.sd-lost{border-color:var(--error);border-style:dashed}
+#hstage.sd-on .hnode.sd-same{opacity:.5}
+#hgraph.focusing #hstage.sd-on .hnode.sd-same.near{opacity:1}
+.sd-badge{position:absolute;top:-9px;right:-7px;padding:0 5px;border-radius:999px;font-family:var(--mono);
+  font-size:10.5px;line-height:16px;background:var(--error);color:var(--bg);cursor:help}
+.hedge.sd-add{stroke:var(--file);stroke-width:2.6;opacity:1;stroke-dasharray:none}
+.hedge.sd-moved{stroke:var(--warn);stroke-width:2.2;opacity:1}
+.hedge.sd-del{stroke:var(--error);stroke-width:2.2;opacity:.9;stroke-dasharray:7 5}
+#hstage.sd-on .hedge.sd-same{opacity:.18}
+.ht-row.sd-added,.tm-tile.sd-added,.tm-group.sd-added{outline:2px solid var(--file);outline-offset:-2px}
+.ht-row.sd-lost,.tm-tile.sd-lost,.tm-group.sd-lost{outline:2px dashed var(--error);outline-offset:-2px}
+.cq-dot.sd-added{stroke:var(--file);stroke-width:3}
+.cq-dot.sd-lost{stroke:var(--error);stroke-width:3;stroke-dasharray:3 2}
 .htint select{font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--line);border-radius:7px;
   background:var(--panel);color:var(--ink)}
 .hlegend .lg-tint b{color:var(--ink);font-weight:600}

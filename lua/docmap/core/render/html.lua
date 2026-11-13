@@ -465,6 +465,9 @@ function M.render(ir, findings, opts)
     '<button id="hzoomreset" title="Reset zoom to 100% (or press 0)">⌕ 100%</button>',
     '<span class="hzoom" id="hzoomlabel">100%</span>',
     '<button id="hexport" title="Download the current diagram as a standalone SVG">↓ SVG</button>',
+    -- The shape diff: this map against the map of a commit, or two commits against each other, marked on
+    -- the diagram. One button here; its bar (`#hshape`, below the controls) is there only while it is on.
+    '<button id="hshapebtn" aria-pressed="false" aria-controls="hshape" data-explain="hier.shape">± Compare maps</button>',
     -- Right-click a box to dim/show it — see the context menu. This pill
     -- only says how many are dimmed right now and clears all of them,
     -- mirroring #markbar's own role for Compare marks.
@@ -475,6 +478,7 @@ function M.render(ir, findings, opts)
     '<button id="hiddenbar" class="markbar" hidden></button>',
     '<span class="hpath" id="hpath"></span>',
     "</div>",
+    '<div id="hshape" class="hshape" role="group" aria-labelledby="hshape-label" hidden></div>',
     -- Outside #hgraph-wrap, not inside it: the wrap itself scrolls
     -- (overflow:auto, for a diagram bigger than the viewport), and an
     -- absolutely-positioned child of a scrolling element scrolls away with

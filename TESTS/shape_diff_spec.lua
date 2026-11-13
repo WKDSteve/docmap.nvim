@@ -2,10 +2,13 @@
 ---@diagnostic disable: need-check-nil, missing-fields
 -- TESTS/shape_diff_spec.lua — two maps compared on the Hierarchy tab.
 --
--- Two halves:
+-- Four halves:
 --   * `diff.shape` against hand-built maps: what is added, removed and moved, where a removed node is
 --     anchored, and what is said when a map is too old to compare;
---   * the route `shape/<a>[/<b>]` of `core/api.lua`: what reaches git, and every way there is nothing to show.
+--   * the route `shape/<a>[/<b>]` of `core/api.lua`: what reaches git, and every way there is nothing to show;
+--   * the page: the wiring pinned as text;
+--   * the bar and the indexes of the page's own script, run in `node` (skipped without it).
+-- The behaviour in a real window, against a real server, is TESTS/sheets/shape-diff.sheet.lua.
 
 return function(H)
   local eq, ok = H.eq, H.ok
@@ -279,4 +282,270 @@ return function(H)
       end
     end
   end
+
+  -- ── The page: wiring ─────────────────────────────────────────────────────
+  local src = H.html_source()
+  local function has(needle, msg)
+    ok(src:find(needle, 1, true) ~= nil, "shape page: " .. msg)
+  end
+  has(
+    '<button id="hshapebtn" aria-pressed="false" aria-controls="hshape" data-explain="hier.shape">',
+    "one button in the Hierarchy controls, explained like the others"
+  )
+  has(
+    '<div id="hshape" class="hshape" role="group" aria-labelledby="hshape-label" hidden></div>',
+    "its bar exists only while it is on"
+  )
+  has("cmp: null,", "the comparison is one axis of the state, off by default")
+  has('if(s.cmp) parts.push("cmp=" + encodeURIComponent(s.cmp));', "the link carries it")
+  has('else if(k === "cmp") s.cmp = shapeSpec(v);', "a link restores it, and only as commit hashes")
+  has("syncShape(s);", "it is painted after every draw")
+  has(
+    "paintShape(state.cmp ? shapeOf(state.cmp) : null);",
+    "also after the draw the search preview does on its own"
+  )
+  has(
+    'fetch("/api/shape/" + spec.replace("..", "/"))',
+    "the comparison is the host's, not the page's; the route has no `..` in it"
+  )
+  has(
+    "if(histCommits && histCommits.length){ shapeCommits = histCommits; return; }",
+    "the commits are the History tab's list"
+  )
+  has('fetch("/api/commits?n=100")', "asked the way History asks")
+  has(
+    "if(!historyAvailable()){ shapeCache[spec] = { error: shapeFileMessage() }; return; }",
+    "a page that cannot fetch says so in place"
+  )
+  has(
+    'explainFetchFailure(e, "the comparison")',
+    "a host that does not answer is explained like History's"
+  )
+  has(
+    'p.setAttribute("class", "hedge hedge-dep sd-del");',
+    "a lost require is drawn, not listed only"
+  )
+  has(
+    'p.setAttribute("d", edgePath(shapeBoxPos(a), shapeBoxPos(b)));',
+    "between the boxes where they already are"
+  )
+  has("#hstage.sd-on .hnode.sd-same{opacity:.5}", "what did not change is dimmed, not removed")
+  has(".hnode.sd-added{border-color:var(--file);", "an added node is framed")
+  has(".hedge.sd-del{stroke:var(--error);", "a lost require has the colour of removal")
+  ok(
+    not src:find("function layoutShape", 1, true) and not src:find("reconcile(shape", 1, true),
+    "shape page: the comparison lays nothing out"
+  )
+
+  -- ── The page: the bar and the indexes, in node ───────────────────────────
+  if vim.fn.executable("node") == 0 then
+    return
+  end
+  local slice = require("docmap.core.render.html.js.11_quicks_compare_init")
+  local a = assert(slice:find("  var shapeBar = document.getElementById", 1, true))
+  local b = assert(
+    slice:find(
+      "  // =====================================================================\n  // Initial load",
+      a,
+      true
+    )
+  )
+  local program = table.concat({
+    "var stub = new Proxy(function(){}, { get: function(t, k){",
+    "  if(k === Symbol.toPrimitive) return function(){ return ''; };",
+    "  return stub; }, apply: function(){ return stub; } });",
+    "var document = { getElementById: function(){ return stub; }, activeElement: null,",
+    "  createElement: function(){ return stub; }, createElementNS: function(){ return stub; } };",
+    "var location = { protocol: 'http:' };",
+    "var navigated = [];",
+    "function navigate(p){ navigated.push(JSON.stringify(p)); }",
+    "function esc(s){ return String(s == null ? '' : s).replace(/[&<>\"]/g, function(c){",
+    "  return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]; }); }",
+    "function own(o, k){ return !!o && Object.prototype.hasOwnProperty.call(o, k); }",
+    "function historyAvailable(){ return location.protocol === 'http:'; }",
+    "function explainFetchFailure(){ return { then: function(){} }; }",
+    "function edgePath(){ return ''; }",
+    "var histCommits = null, hstage = stub, hboxes = {}, fnByKey = {};",
+    "var state = { tab: 'hierarchy', view: 'deps', cmp: null };",
+    "var byId = { 'a': { id: 'a', path: 'a' }, 'a/x.lua': { id: 'a/x.lua', module: 'a.x', path: 'a/x.lua' },",
+    "             'a/new.lua': { id: 'a/new.lua', module: 'a.new', path: 'a/new.lua' } };",
+    slice:sub(a, b - 1),
+    "var out = {};",
+    "out.specs = ['abcdef0', 'ABCDEF0123', 'abcdef0..1234567', 'abcdef', 'abcdef0..', 'abcdef0...1234567',",
+    "  'HEAD', 'abcdef0..HEAD', 'abcdef0;x', '', null].map(shapeSpec);",
+    "out.sides = shapeSides('abcdef0..1234567');",
+    "out.side = shapeSides('abcdef0');",
+    "var d = shapeIndex({ available: true, deps_comparable: true, after: { current: false },",
+    "  nodes_added: ['a/new.lua', 'gone/now.lua'],",
+    "  nodes_removed: [ { id: 'a/old.lua', name: 'a.old', anchor: 'a' }, { id: 'a/old2.lua', name: 'a.old2', anchor: 'a' },",
+    "                   { id: 'z.lua', name: 'z' } ],",
+    "  deps_added: [ { from: 'a/x.lua', to: 'a/new.lua', deferred: false },",
+    "                { from: 'a/x.lua', to: 'a', deferred: false, changed: true } ],",
+    "  deps_removed: [ { from: 'a/x.lua', to: 'a/old.lua', deferred: true } ],",
+    "  cycles_added: {}, cycles_removed: {}, reasons: {}, text: ['Structural diff against abcdef0', '<b>'] });",
+    "out.added = Object.keys(d._added);",
+    "out.lostAt = d._lostAt;",
+    "out.edge = Object.keys(d._edge);",
+    "out.touched = Object.keys(d._touched).sort();",
+    "out.cycles = d.cycles_added;",
+    "shapeCommits = [ { sha: 'abcdef0123456789abcdef0123456789abcdef01', short: 'abcdef0', date: '2026-01-02',",
+    "                   subject: 'one <b> ' + new Array(80).join('x') },",
+    "                 { sha: '1234567123456712345671234567123456712345', short: '1234567', date: '2026-01-01', subject: 'two' } ];",
+    "shapeCache['abcdef0'] = d;",
+    "out.bar = shapeBarHTML({ cmp: 'abcdef0', tab: 'hierarchy' });",
+    "shapeListOpen = true;",
+    "out.barOpen = shapeBarHTML({ cmp: 'abcdef0', tab: 'hierarchy' });",
+    "shapeListOpen = false; shapeOpen = true;",
+    "out.barIdle = shapeBarHTML({ cmp: null, tab: 'hierarchy' });",
+    "shapeCache['fffffff'] = { loading: true };",
+    "out.barLoading = shapeBarHTML({ cmp: 'fffffff', tab: 'hierarchy' });",
+    "shapeCache['eeeeeee'] = shapeIndex({ available: true, deps_comparable: false, after: { current: true },",
+    "  reasons: ['Requires and cycles are not compared: the older map predates the dependency graph (schema 1).'] });",
+    "out.barOld = shapeBarHTML({ cmp: 'eeeeeee', tab: 'hierarchy' });",
+    "shapeCache['ddddddd'] = shapeIndex({ available: true, deps_comparable: true, after: { current: true } });",
+    "out.barNone = shapeBarHTML({ cmp: 'ddddddd', tab: 'hierarchy' });",
+    "var many = []; for(var i = 0; i < 45; i++) many.push('n' + i);",
+    "out.long = shapeListHTML(shapeIndex({ available: true, nodes_added: many }));",
+    "location.protocol = 'file:'; shapeCommits = null; shapeLoadCommits();",
+    "out.barFile = shapeBarHTML({ cmp: null, tab: 'hierarchy' });",
+    "shapeFetch('ccccccc'); out.fileFetch = shapeCache['ccccccc'].error;",
+    "console.log(JSON.stringify(out));",
+  }, "\n")
+  local tmp = vim.fn.tempname() .. ".js"
+  H.write(tmp, vim.split(program, "\n", { plain = true }))
+  local result = vim.system({ "node", tmp }, { text = true }):wait()
+  pcall(os.remove, tmp)
+  eq(
+    result.code,
+    0,
+    "shape page: the section runs on its own — " .. vim.trim(result.stderr or "")
+  )
+  local got = vim.json.decode(result.stdout or "{}", { luanil = { object = true, array = true } })
+
+  local function count(text, needle)
+    local n, from = 0, 1
+    while true do
+      local s, e = text:find(needle, from, true)
+      if not s then
+        return n
+      end
+      n, from = n + 1, e + 1
+    end
+  end
+
+  eq(
+    vim.inspect(got.specs),
+    vim.inspect({ "abcdef0", "abcdef0123", "abcdef0..1234567" }),
+    "spec: one or two commit hashes of at least seven digits, lower-cased; everything else is no comparison"
+  )
+  eq(got.sides.a .. " " .. got.sides.b, "abcdef0 1234567", "spec: the older side comes first")
+  eq(got.side.a .. "|" .. got.side.b, "abcdef0|", "spec: one hash is against this map")
+  eq(table.concat(got.added, ","), "a/new.lua,gone/now.lua", "index: added nodes by id")
+  eq(
+    table.concat(got.lostAt.a, ","),
+    "a.old,a.old2",
+    "index: removed nodes by the place they were removed from; one without a place is in the list only"
+  )
+  eq(
+    table.concat(got.edge, ","),
+    "a/x.lua a/new.lua,a/x.lua a",
+    "index: gained requires by the pair an edge of the diagram carries"
+  )
+  eq(
+    table.concat(got.touched, ","),
+    "a,a/new.lua,a/old.lua,a/x.lua",
+    "index: both ends of every changed require stay undimmed"
+  )
+  eq(#got.cycles, 0, "index: an empty object from the host is an empty list")
+
+  ok(
+    got.bar:find('<option value="abcdef0123456789abcdef0123456789abcdef01" selected>', 1, true)
+      and got.bar:find("abcdef0 · 2026-01-02 · one &lt;b&gt; ", 1, true)
+      and got.bar:find("…</option>", 1, true),
+    "bar: the older side is chosen from the commits, subject escaped and cut"
+  )
+  ok(
+    got.bar:find('<select id="hshape-b" aria-label="The newer map">', 1, true)
+      and got.bar:find('<option value="">this map</option>', 1, true),
+    "bar: the newer side defaults to this map"
+  )
+  ok(
+    got.bar:find('<span class="sd-count sd-plus">+2 nodes</span>', 1, true)
+      and got.bar:find('<span class="sd-count sd-minus">−3 nodes</span>', 1, true)
+      and got.bar:find('<span class="sd-count sd-plus">+2 requires</span>', 1, true)
+      and got.bar:find('<span class="sd-count sd-minus">−1 require</span>', 1, true),
+    "bar: four counts, each in the colour of its marks — " .. got.bar
+  )
+  ok(
+    got.bar:find('<button type="button" id="hshape-list" aria-expanded="false"', 1, true)
+      and got.bar:find('<div id="hshape-body" class="sd-body" hidden></div>', 1, true),
+    "bar: the list is folded until asked for, and costs nothing while it is"
+  )
+  ok(
+    got.bar:find("Marked on the map this page shows.", 1, true),
+    "bar: comparing two commits says which map the marks are on"
+  )
+  ok(got.bar:find(">End comparison</button>", 1, true), "bar: the way out is in the bar")
+  ok(
+    got.barOpen:find('aria-expanded="true"', 1, true)
+      and got.barOpen:find(
+        '<button type="button" class="sd-chip" data-sd-center="a/new.lua">a.new</button>',
+        1,
+        true
+      )
+      and got.barOpen:find('<span class="sd-gone">gone/now.lua</span>', 1, true),
+    "list: a node of this map is a way to it, one this map does not have is only named"
+  )
+  ok(
+    got.barOpen:find(
+      '<span class="sd-gone">a.old</span> <span class="sd-under">from <button type="button" class="sd-chip" data-sd-center="a">a</button></span>',
+      1,
+      true
+    ),
+    "list: a removed node says where it was removed from"
+  )
+  ok(
+    got.barOpen:find("was lazy, now at load time", 1, true)
+      and got.barOpen:find('<span class="sd-under">lazy</span>', 1, true),
+    "list: a require says when it loads, and when that is what changed"
+  )
+  ok(
+    got.barOpen:find("Structural diff against abcdef0\n&lt;b&gt;</pre>", 1, true),
+    "list: the text of `:DocMap diff` rides along, escaped"
+  )
+  ok(
+    got.barIdle:find("choose a commit…", 1, true)
+      and got.barIdle:find(">Close</button>", 1, true)
+      and not got.barIdle:find("sd-count", 1, true),
+    "bar: open without a comparison it offers the choice and nothing else"
+  )
+  ok(
+    got.barLoading:find("Comparing…", 1, true)
+      and got.barLoading:find('<option value="fffffff" selected>fffffff</option>', 1, true),
+    "bar: a commit the list does not reach is still the selected one, and waiting is said"
+  )
+  ok(
+    got.barOld:find(
+      '<div class="sd-note">Requires and cycles are not compared: the older map predates the dependency graph (schema 1).</div>',
+      1,
+      true
+    ) and count(got.barOld, "sd-count") == 2,
+    "bar: what cannot be compared is said, and its counts are not shown as zero — " .. got.barOld
+  )
+  ok(
+    got.barNone:find("No node and no require differs between the two maps.", 1, true)
+      and not got.barNone:find("hshape-list", 1, true),
+    "bar: no difference is an answer"
+  )
+  eq(count(got.long, "<li>"), 40, "list: a section is cut")
+  ok(got.long:find("… and 5 more", 1, true), "list: and says by how much")
+  ok(
+    got.barFile:find("This page was opened from a file", 1, true)
+      and not got.barFile:find("<select", 1, true),
+    "bar: opened from a file it says why there is nothing to choose from"
+  )
+  ok(
+    got.fileFetch:find("opened from a file", 1, true),
+    "a link that carries a comparison says the same on a file page"
+  )
 end

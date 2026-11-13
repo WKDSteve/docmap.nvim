@@ -596,6 +596,393 @@ return [[
   });
 
   // =====================================================================
+  // Shape diff: two maps compared on the Hierarchy tab
+  //
+  // `:DocMap diff` says in text what a branch changed about the tree. What
+  // text cannot show is *where*: which corner of the graph grew, which box
+  // lost a dependency. The diagram can, and the data is already there: every
+  // commit carries its own map.
+  //
+  // The comparison is not computed here. `/api/shape/<a>` (against this map)
+  // and `/api/shape/<a>/<b>` (two commits) are answered by `core/diff.lua`,
+  // the module `:DocMap diff` prints from, so the page and the command cannot
+  // disagree about one pair of maps. This section chooses the two sides,
+  // through the commit list the History tab asks for, and marks the answer on
+  // whatever the Hierarchy tab has drawn.
+  //
+  // Marked, never re-laid-out. The diagram the reader was looking at stays
+  // where it is: an added node gets a coloured frame, a require that was
+  // gained a coloured edge, a require that was lost is drawn dashed between
+  // its two boxes when both are on screen, and what did not change is dimmed.
+  // A removed node is in no map this page can draw, so the place it was
+  // removed from carries the count; the list in the bar has every name.
+  //
+  // The map on screen is always this page's own. Comparing two commits marks
+  // their difference on it, and a change that names a node this map does not
+  // have is in the list only, which the bar says.
+  // =====================================================================
+  var shapeBar = document.getElementById("hshape");
+  var shapeBtn = document.getElementById("hshapebtn");
+  var shapeCache = {};       // spec -> answer, { loading } or { error }
+  var shapeCommits = null;   // null: not asked. "loading", a list, or { error }
+  var shapeOpen = false;     // the bar is open and no comparison is chosen yet
+  var shapeListOpen = false; // the list of changes is unfolded
+  var SHAPE_LIST = 40;       // rows per section of the list; the rest is counted
+
+  // One commit hash, or two joined by `..`: the shape `core/api.lua` lets
+  // through to git, and nothing else. Lower-cased so one comparison has one
+  // spelling in the link and in the cache.
+  function shapeSpec(v){
+    v = String(v || "").toLowerCase();
+    return /^[0-9a-f]{7,40}(\.\.[0-9a-f]{7,40})?$/.test(v) ? v : null;
+  }
+
+  function shapeSides(spec){
+    var i = spec.indexOf("..");
+    return i < 0 ? { a: spec, b: "" } : { a: spec.slice(0, i), b: spec.slice(i + 2) };
+  }
+
+  function shapeOf(spec){ return own(shapeCache, spec) ? shapeCache[spec] : null; }
+
+  // JSON has no way to tell an empty list from an empty object, and a host
+  // may send either for "none".
+  function shapeList(v){ return Array.isArray(v) ? v : []; }
+
+  // What the painters look things up in, built once per answer.
+  function shapeIndex(d){
+    d.nodes_added = shapeList(d.nodes_added);
+    d.nodes_removed = shapeList(d.nodes_removed);
+    d.deps_added = shapeList(d.deps_added);
+    d.deps_removed = shapeList(d.deps_removed);
+    d.cycles_added = shapeList(d.cycles_added);
+    d.cycles_removed = shapeList(d.cycles_removed);
+    d.reasons = shapeList(d.reasons);
+    d.text = shapeList(d.text);
+    d._added = {}; d._lostAt = {}; d._edge = {}; d._touched = {};
+    d.nodes_added.forEach(function(id){ d._added[id] = true; });
+    d.nodes_removed.forEach(function(n){
+      if(!n.anchor) return;
+      if(!own(d._lostAt, n.anchor)) d._lostAt[n.anchor] = [];
+      d._lostAt[n.anchor].push(n.name || n.id);
+    });
+    d.deps_added.forEach(function(e){
+      d._edge[e.from + " " + e.to] = e;
+      d._touched[e.from] = true; d._touched[e.to] = true;
+    });
+    d.deps_removed.forEach(function(e){ d._touched[e.from] = true; d._touched[e.to] = true; });
+    return d;
+  }
+
+  // Ask the host for one comparison, once. Every way this can fail ends as a
+  // sentence in the bar: a file page cannot ask, a published copy has nobody
+  // to ask, a host that does not know the route says 404.
+  function shapeFetch(spec){
+    if(own(shapeCache, spec)) return;
+    if(!historyAvailable()){ shapeCache[spec] = { error: shapeFileMessage() }; return; }
+    shapeCache[spec] = { loading: true };
+    var landed = function(answer){
+      shapeCache[spec] = answer;
+      if(state.cmp === spec && state.tab === "hierarchy") syncShape(state);
+    };
+    // The link says `a..b`, the way git does; the route says `a/b`, because
+    // a server is right to refuse a path with `..` in it.
+    fetch("/api/shape/" + spec.replace("..", "/"))
+      .then(function(r){
+        if(!r.ok){
+          throw new Error("the host answered " + r.status +
+            (r.status === 404 ? ": it does not offer the shape comparison (/api/shape)" : ""));
+        }
+        return r.json();
+      })
+      .then(function(d){
+        if(!d || d.available !== true){
+          landed({ error: '<span class="sd-msg">' + esc((d && d.reason) || "the host gave no comparison") + '</span>' });
+          return;
+        }
+        landed(shapeIndex(d));
+      })
+      .catch(function(e){
+        explainFetchFailure(e, "the comparison").then(function(msg){ landed({ error: msg }); });
+      });
+  }
+
+  function shapeFileMessage(){
+    return '<span class="sd-msg">This page was opened from a file, so it cannot ask for the map of ' +
+      'another commit. Run <code>:DocMap serve</code> and open the URL it prints.</span>';
+  }
+
+  // The commit list, the one the History tab opens with. Taken from there
+  // when that tab has already asked.
+  function shapeLoadCommits(){
+    if(shapeCommits !== null) return;
+    if(histCommits && histCommits.length){ shapeCommits = histCommits; return; }
+    if(!historyAvailable()){ shapeCommits = { error: shapeFileMessage() }; return; }
+    shapeCommits = "loading";
+    fetch("/api/commits?n=100")
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        shapeCommits = (d && d.commits) || [];
+        if(state.tab === "hierarchy") syncShape(state);
+      })
+      .catch(function(e){
+        explainFetchFailure(e, "the comparison").then(function(msg){
+          shapeCommits = { error: msg };
+          if(state.tab === "hierarchy") syncShape(state);
+        });
+      });
+  }
+
+  function shapeOptions(selected, first){
+    var h = '<option value="">' + esc(first) + '</option>';
+    var seen = false;
+    (Array.isArray(shapeCommits) ? shapeCommits : []).forEach(function(c){
+      var on = !!selected && c.sha.indexOf(selected) === 0;
+      if(on) seen = true;
+      var subject = c.subject.length > 60 ? c.subject.slice(0, 59) + "…" : c.subject;
+      h += '<option value="' + esc(c.sha) + '"' + (on ? " selected" : "") + '>' +
+        esc(c.short + " · " + c.date + " · " + subject) + '</option>';
+    });
+    // A link can name a commit the list does not reach back to.
+    if(selected && !seen){
+      h += '<option value="' + esc(selected) + '" selected>' + esc(selected.slice(0, 8)) + '</option>';
+    }
+    return h;
+  }
+
+  function shapeNodeName(id){
+    var n = byId[id];
+    return n ? (n.module || n.path) : id;
+  }
+
+  // One section of the list: a title with its count, the first rows, and how
+  // many were left out.
+  function shapeSection(title, cls, rows){
+    if(!rows.length) return "";
+    var h = '<div class="sd-sec"><div class="sd-sec-t ' + cls + '">' + esc(title) +
+      ' <span class="sd-n">' + rows.length + '</span></div><ul>';
+    rows.slice(0, SHAPE_LIST).forEach(function(r){ h += '<li>' + r + '</li>'; });
+    h += '</ul>';
+    if(rows.length > SHAPE_LIST){
+      h += '<div class="sd-more">… and ' + (rows.length - SHAPE_LIST) + ' more</div>';
+    }
+    return h + '</div>';
+  }
+
+  // A node of this map is a button that centres the diagram on it; one this
+  // map does not have is its name and nothing to click.
+  function shapeNodeChip(id, name){
+    return byId[id]
+      ? '<button type="button" class="sd-chip" data-sd-center="' + esc(id) + '">' + esc(name || shapeNodeName(id)) + '</button>'
+      : '<span class="sd-gone">' + esc(name || id) + '</span>';
+  }
+
+  function shapeListHTML(d){
+    var h = "";
+    h += shapeSection("Nodes added", "sd-plus", d.nodes_added.map(function(id){ return shapeNodeChip(id); }));
+    h += shapeSection("Nodes removed", "sd-minus", d.nodes_removed.map(function(n){
+      return '<span class="sd-gone">' + esc(n.name || n.id) + '</span>' +
+        (n.anchor ? ' <span class="sd-under">from ' + shapeNodeChip(n.anchor) + '</span>' : '');
+    }));
+    var edgeRow = function(e){
+      return shapeNodeChip(e.from) + ' → ' + shapeNodeChip(e.to) +
+        (e.changed ? ' <span class="sd-under">' + (e.deferred ? "now lazy" : "was lazy, now at load time") + '</span>'
+          : (e.deferred ? ' <span class="sd-under">lazy</span>' : ''));
+    };
+    h += shapeSection("Requires gained", "sd-plus", d.deps_added.map(edgeRow));
+    h += shapeSection("Requires lost", "sd-minus", d.deps_removed.map(edgeRow));
+    h += shapeSection("Load-time cycles introduced", "sd-minus", d.cycles_added.map(function(c){ return esc(c); }));
+    h += shapeSection("Load-time cycles resolved", "sd-plus", d.cycles_removed.map(function(c){ return esc(c); }));
+    if(d.text.length){
+      h += '<details class="sd-text"><summary>The same change as text (<code>:DocMap diff</code>)</summary><pre>' +
+        esc(d.text.join("\n")) + '</pre></details>';
+    }
+    return h;
+  }
+
+  function shapeCount(n, cls, sign, one, many){
+    return '<span class="sd-count ' + cls + (n ? "" : " sd-zero") + '">' + sign + n + ' ' +
+      (n === 1 ? one : many) + '</span>';
+  }
+
+  function shapeBarHTML(s){
+    var h = '<span class="hctl-label" id="hshape-label">Compare maps</span>';
+    if(shapeCommits && shapeCommits.error){
+      return h + shapeCommits.error + '<button type="button" id="hshape-end">Close</button>';
+    }
+    var sides = s.cmp ? shapeSides(s.cmp) : { a: "", b: "" };
+    var busy = shapeCommits === "loading" || shapeCommits === null;
+    h += '<label class="sd-pick">from <select id="hshape-a" aria-label="The older map"' + (busy ? " disabled" : "") + '>' +
+      shapeOptions(sides.a, busy ? "loading commits…" : "choose a commit…") + '</select></label>';
+    h += '<label class="sd-pick">to <select id="hshape-b" aria-label="The newer map"' + (busy ? " disabled" : "") + '>' +
+      shapeOptions(sides.b, "this map") + '</select></label>';
+
+    var d = s.cmp ? shapeOf(s.cmp) : null;
+    if(d && d.loading){
+      h += '<span class="sd-msg">Comparing…</span>';
+    } else if(d && d.error){
+      h += d.error;
+    } else if(d){
+      var none = !d.nodes_added.length && !d.nodes_removed.length &&
+        !d.deps_added.length && !d.deps_removed.length;
+      h += '<span class="sd-sum" role="status">' +
+        shapeCount(d.nodes_added.length, "sd-plus", "+", "node", "nodes") +
+        shapeCount(d.nodes_removed.length, "sd-minus", "−", "node", "nodes") +
+        (d.deps_comparable
+          ? shapeCount(d.deps_added.length, "sd-plus", "+", "require", "requires") +
+            shapeCount(d.deps_removed.length, "sd-minus", "−", "require", "requires")
+          : '') +
+        '</span>';
+      if(none && d.deps_comparable) h += '<span class="sd-msg">No node and no require differs between the two maps.</span>';
+      if(!none || d.text.length){
+        h += '<button type="button" id="hshape-list" aria-expanded="' + (shapeListOpen ? "true" : "false") +
+          '" aria-controls="hshape-body">Changes</button>';
+      }
+    }
+    if(s.cmp || shapeOpen) h += '<button type="button" id="hshape-end">' + (s.cmp ? "End comparison" : "Close") + '</button>';
+    if(d && !d.loading && !d.error){
+      d.reasons.forEach(function(r){ h += '<div class="sd-note">' + esc(r) + '</div>'; });
+      if(d.after && !d.after.current){
+        h += '<div class="sd-note">Marked on the map this page shows. A change that names a node this map ' +
+          'does not have is in the list only.</div>';
+      }
+      h += '<div id="hshape-body" class="sd-body"' + (shapeListOpen ? "" : " hidden") + '>' +
+        (shapeListOpen ? shapeListHTML(d) : "") + '</div>';
+    }
+    return h;
+  }
+
+  function shapeBoxPos(el){ return { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0 }; }
+
+  // Mark the answer on whatever is drawn. Called after every draw, like the
+  // dimming and the language filter, because boxes and edges are rebuilt by
+  // each one. `d` null (or not an answer yet) takes every mark off again.
+  function paintShape(d){
+    var on = !!(d && d.available === true);
+    hstage.classList.toggle("sd-on", on);
+
+    Object.keys(hboxes).forEach(function(key){
+      var el = hboxes[key];
+      // A box is a node, or (Calls) a function of one; class and `ext:` boxes
+      // belong to no node the comparison knows.
+      var id = byId[key] ? key : (own(fnByKey, key) ? fnByKey[key].node.id : null);
+      var added = on && !!id && d._added[id] === true;
+      var lost = (on && id && byId[key] && own(d._lostAt, id)) ? d._lostAt[id] : null;
+      var touched = on && !!id && d._touched[id] === true;
+      el.classList.toggle("sd-added", added);
+      el.classList.toggle("sd-lost", !!lost);
+      el.classList.toggle("sd-same", on && !added && !lost && !touched);
+      var badge = el.querySelector(".sd-badge");
+      if(badge) badge.remove();
+      if(lost){
+        badge = document.createElement("span");
+        badge.className = "sd-badge";
+        badge.textContent = "−" + lost.length;
+        badge.title = lost.length + " node" + (lost.length === 1 ? "" : "s") + " removed from here: " +
+          lost.slice(0, 12).join(", ") + (lost.length > 12 ? ", …" : "");
+        el.appendChild(badge);
+      }
+    });
+
+    var svg = document.getElementById("hsvg");
+    if(svg){
+      svg.querySelectorAll(".sd-del").forEach(function(p){ p.remove(); });
+      svg.querySelectorAll(".hedge-dep").forEach(function(p){
+        var e = on ? d._edge[p.dataset.from + " " + p.dataset.to] : null;
+        p.classList.toggle("sd-add", !!e && !e.changed);
+        p.classList.toggle("sd-moved", !!e && !!e.changed);
+        p.classList.toggle("sd-same", on && !e);
+      });
+      // A require that is gone has no edge to recolour: drawn where it was,
+      // when both of its boxes are on screen. Only the Deps view draws
+      // requires, so only there is a missing one a statement about the graph.
+      if(on && state.view === "deps"){
+        var svgNS = "http://www.w3.org/2000/svg";
+        d.deps_removed.forEach(function(e){
+          var a = hboxes[e.from], b = hboxes[e.to];
+          if(!a || !b || a.classList.contains("leaving") || b.classList.contains("leaving")) return;
+          var p = document.createElementNS(svgNS, "path");
+          p.setAttribute("d", edgePath(shapeBoxPos(a), shapeBoxPos(b)));
+          p.setAttribute("class", "hedge hedge-dep sd-del");
+          p.setAttribute("marker-end", "url(#m-dep)");
+          p.dataset.from = e.from;
+          p.dataset.to = e.to;
+          var title = document.createElementNS(svgNS, "title");
+          title.textContent = "lost: " + shapeNodeName(e.from) + " no longer requires " + shapeNodeName(e.to);
+          p.appendChild(title);
+          svg.appendChild(p);
+        });
+      }
+    }
+
+    // Tree rows, Treemap areas and the dots of the Coupling plot carry node
+    // ids too.
+    var alt = document.getElementById("halt-body");
+    if(alt) alt.querySelectorAll(".ht-row[data-id], .tm-group[data-id], .tm-tile[data-id], .cq-dot[data-id]").forEach(function(el){
+      el.classList.toggle("sd-added", on && d._added[el.dataset.id] === true);
+      el.classList.toggle("sd-lost", on && own(d._lostAt, el.dataset.id));
+    });
+  }
+
+  // Bar and marks from the state, after every draw.
+  function syncShape(s){
+    var onHier = s.tab === "hierarchy";
+    shapeBtn.classList.toggle("active", !!s.cmp);
+    shapeBtn.setAttribute("aria-pressed", s.cmp ? "true" : "false");
+    var show = onHier && (!!s.cmp || shapeOpen);
+    if(show){
+      shapeLoadCommits();
+      if(s.cmp) shapeFetch(s.cmp);
+      // The bar is rebuilt as a whole; a control the reader is on keeps the
+      // focus across that.
+      var active = document.activeElement;
+      var keep = (active && shapeBar.contains(active)) ? active.id : null;
+      shapeBar.innerHTML = shapeBarHTML(s);
+      if(keep && document.getElementById(keep)) document.getElementById(keep).focus();
+    }
+    shapeBar.hidden = !show;
+    paintShape((onHier && s.cmp) ? shapeOf(s.cmp) : null);
+  }
+
+  shapeBtn.addEventListener("click", function(){
+    if(state.cmp){ shapeOpen = false; shapeListOpen = false; navigate({ cmp: null }); return; }
+    shapeOpen = !shapeOpen;
+    syncShape(state);
+    if(shapeOpen){
+      var first = document.getElementById("hshape-a") || document.getElementById("hshape-end");
+      if(first) first.focus();
+    }
+  });
+
+  shapeBar.addEventListener("change", function(ev){
+    if(!ev.target || (ev.target.id !== "hshape-a" && ev.target.id !== "hshape-b")) return;
+    var a = document.getElementById("hshape-a").value, b = document.getElementById("hshape-b").value;
+    // Without an older side there is nothing to compare; the newer side
+    // alone is remembered by the select until one is chosen.
+    if(!a){ if(state.cmp) navigate({ cmp: null }); return; }
+    shapeOpen = true;
+    navigate({ cmp: shapeSpec(b ? a + ".." + b : a) });
+  });
+
+  shapeBar.addEventListener("click", function(ev){
+    var t = ev.target.closest && ev.target.closest("button");
+    if(!t) return;
+    if(t.id === "hshape-end"){
+      shapeOpen = false; shapeListOpen = false;
+      if(state.cmp) navigate({ cmp: null }); else syncShape(state);
+      shapeBtn.focus();
+      return;
+    }
+    if(t.id === "hshape-list"){
+      shapeListOpen = !shapeListOpen;
+      syncShape(state);
+      return;
+    }
+    if(t.dataset.sdCenter && byId[t.dataset.sdCenter]){
+      navigate({ center: t.dataset.sdCenter, fn: null });
+    }
+  });
+
+  // =====================================================================
   // Initial load: parse whatever hash the page was opened with (a bare
   // #<id> from an old-style/shared link, a full serialized state from
   // Back/Forward, or nothing) and apply it as a *replace*, not a push — the

@@ -708,6 +708,9 @@ return [[
     // The tint of the Modules view: null (off, the default), "doc", "test",
     // "fix" or "debt" (see the Tint section of the maps slice).
     tint: null,
+    // The shape diff of the Hierarchy tab: null (off), or the two maps being
+    // compared as `<older sha>` (against this map) or `<older>..<newer>`.
+    cmp: null,
     // Analysis sort. `null` means "this panel's own default order", which is
     // deliberately not spelled as an explicit column: each panel's default is
     // an editorial choice (worst coverage first, highest fan-in first) that a
@@ -865,6 +868,8 @@ return [[
       // that link's own view does not have — the same rule `dir`/`depth`/
       // `ext`/`fn` above already follow.
       if(s.hidden && s.hidden.length) parts.push("hidden=" + encodeURIComponent(s.hidden.join(",")));
+      // The comparison belongs to this tab's diagram and to every view of it.
+      if(s.cmp) parts.push("cmp=" + encodeURIComponent(s.cmp));
     }
     // Outside the per-tab branches, unlike every other axis: marks are
     // collected while reading any tab and belong to the reader, not to a view.
@@ -908,6 +913,8 @@ return [[
       // An unknown tint is no tint: a link with a typo opens the plain view.
       else if(k === "tint") s.tint = (v === "doc" || v === "test" || v === "fix" || v === "debt") ? v : null;
       else if(k === "ext") s.ext = (v === "1" || v === "true");
+      // Anything that is not one or two commit hashes is no comparison.
+      else if(k === "cmp") s.cmp = shapeSpec(v);
       else if(k === "iview") s.iview = (v === "modules") ? "modules" : "functions";
       // Checked where it is used (`featureTheme`): a theme that no longer
       // exists opens the first one.
@@ -1019,6 +1026,7 @@ return [[
     syncMarks();
     syncHidden();
     syncLangFilter();
+    syncShape(s);
     syncGraphControls(s);
     syncSearchBox(s);
 

@@ -379,7 +379,11 @@ return [[
       // view, the same way Enter's real navigate({center}) would clear
       // hideroot — see drawHierarchy's own note on why this path needs it
       // spelled out explicitly instead of getting it for free.
-      if(match) drawHierarchy(match, state.view, true);
+      if(match){
+        drawHierarchy(match, state.view, true);
+        // drawn behind applyState's back, so the comparison is painted here
+        paintShape(state.cmp ? shapeOf(state.cmp) : null);
+      }
       return;
     }
     // Three row shapes share this list -- node rows, function rows (which

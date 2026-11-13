@@ -482,6 +482,11 @@ return [[
       "the share of functions that are documented or tested, or how many FIX " +
       "or TODO/HACK/PERF markers there are per 1,000 lines. A stronger tint means " +
       "look here first. The value is printed on each box and the legend names the steps.",
+    "hier.shape":
+      "Compares the map of a commit with this one, or the maps of two commits, " +
+      "and marks the difference on the diagram: nodes that were added, places " +
+      "nodes were removed from, requires gained and lost. Nothing moves; what " +
+      "did not change is dimmed. Needs a server that can read git.",
     "view.modules":
       "The directory hierarchy itself — every module and namespace, nested " +
       "the way the tree is. The one view with no direction, because " +

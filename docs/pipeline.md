@@ -196,6 +196,7 @@ git is asked at request time.
 GET /                      the map itself
 GET /api/commits?n=100     the commit list
 GET /api/commit/<sha>      touched functions + callers + impacted modules + diff
+GET /api/shape/<a>[/<b>]   the shape change between two committed maps (see "Comparing two maps")
 ```
 
 **Security posture**, enforced rather than documented and hoped for:
@@ -1455,6 +1456,60 @@ which this zoom is semantic.
 as plain `<rect>`/`<text>` rather than wrapped in `<foreignObject>`, which
 Inkscape and most converters do not render, and colours are read back off the
 live DOM so the export matches the theme it was taken from.
+
+### Comparing two maps (`± Compare maps`)
+
+`:DocMap diff` says in text what a branch changed about the tree. The diagram
+can show *where*, and the data is already there, because every commit carries
+its own map. The button puts a bar above the diagram; the older side is
+chosen from `/api/commits` (the History tab's list, taken from there when
+that tab has already asked), the newer side is this map unless a second
+commit is chosen.
+
+**The comparison is the host's, not the page's.** `/api/shape/<a>` compares
+the map committed at `a` with the one on disk, `/api/shape/<a>/<b>` two
+committed maps. Both are answered by `core/api.lua` from `diff.shape`
+([`core/diff.lua`](../lua/docmap/core/diff.lua)), the module `:DocMap diff`
+prints from, so the page and the command cannot disagree about one pair of
+maps; the answer carries the text of that command too. Two path segments
+rather than git's `a..b`, because a server is right to refuse a path with
+`..` in it. Each sha is checked against the same whitelist as
+`commit/<sha>` before anything reaches git. The link keeps git's spelling:
+`cmp=<a>` or `cmp=<a>..<b>`.
+
+**Marked, never laid out again.** `paintShape` runs after every draw, like
+the dimming and the language filter, and only adds classes and one kind of
+element:
+
+| Change | Mark |
+|---|---|
+| node added | a green frame on its box (in the Tree, Treemap and Coupling views an outline on its row, tile or dot) |
+| node removed | the nearest ancestor this map still has is dashed in red and carries `−N`; the names are in its tooltip and in the list |
+| require gained | its edge in green; one that only changed when it loads (lazy or not), in amber |
+| require lost | drawn dashed in red between its two boxes, in the Deps view, when both are on screen |
+| unchanged | dimmed, never removed |
+
+A removed node is in no map the page can draw, which is why its mark sits on
+the place it was removed from. A lost require to a removed node has no second
+box and is in the list only. The SVG export keeps the marks: frames and
+strokes are read off the live DOM like every other colour.
+
+**The map on screen is always this page's own.** Comparing two commits marks
+their difference on it, and the bar says so; a change that names a node this
+map does not have is in the list, struck through, and nowhere else.
+
+**What cannot be compared is said, not shown as zero.** The schema rule is
+`diff.compare`'s: a map of schema 1 has no require graph, so against one the
+edge and cycle lists stay empty, the two require counts are left out of the
+bar and a line says which side predates the graph. Nodes are compared in
+every schema. A commit without a map, a page opened from a file, a published
+copy and a host that does not know the route (`docmap-desktop` until it adopts
+it) each end as one sentence in the bar.
+
+`TESTS/shape_diff_spec.lua` holds `diff.shape`, the route and the bar;
+`TESTS/sheets/shape-diff.sheet.lua` and `shape-diff-nodes.sheet.lua` work the
+comparison in a real window against `TESTS/shape_host.lua`, the real server
+with git stood in for.
 
 ### Cross-project links (`opts.tag_files`)
 

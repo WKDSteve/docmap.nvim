@@ -173,6 +173,20 @@ known" and why.
 - **Config:** none.
 - **Docs:** [`docs/pipeline.md`](../pipeline.md) "The lookup layer".
 
+## Comparing two maps on the diagram
+
+The Hierarchy tab can put the map of a commit, or of two commits, behind the
+diagram and mark the difference where it is: added nodes, the places nodes
+were removed from, requires gained and lost. Nothing is laid out again, and
+what did not change is dimmed. The comparison itself is the one `:DocMap
+diff` prints, asked from the host.
+
+- **Module:** `core/diff.lua` (`M.shape`), `core/api.lua` (`M.shape`),
+  `core/render/html/js/11_quicks_compare_init.lua`
+- **Config:** none; `cmp=<sha>` or `cmp=<older>..<newer>` in the link. Needs
+  `:DocMap serve`.
+- **Docs:** [`docs/pipeline.md`](../pipeline.md) "Comparing two maps".
+
 ## Promoted feature tabs
 
 A `- **Tab:** true` bullet promotes one feature out of the Features catalog
