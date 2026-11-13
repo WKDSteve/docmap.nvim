@@ -171,6 +171,11 @@ return function(H)
     "  return Math.round(Math.sqrt(dx * dx + dy * dy) * 100) / 100; }",
     "out.radii = ['b', 'd', 'lazy', 'e'].map(radius).join(',');",
     "out.note = ringNote().kids[0].text;",
+    -- what the rings are called (the labels are svg text; a recorder stands in for the svg)
+    "document.createElementNS = function(ns, tag){ return { tag: tag, a: {}, setAttribute: function(k, v){ this.a[k] = v; } }; };",
+    "function names(b){ var seen = []; b.overlay({ appendChild: function(el){ seen.push(el.textContent); } }, 'ns');",
+    "  return seen.join(' | '); }",
+    "out.labels = names(built);",
     "out.noteButton = ringNote().kids.length;",
     "var picked = layoutRings('e');",
     "out.picked = picked.layers.map(function(l){ return l.join(','); }).join(' | ') + ' ' + ringShown.picked;",
@@ -209,6 +214,7 @@ return function(H)
     "out.capped = capped.count + ' ' + capped.truncated + ' ' + capped.layers[1].length + ' ' + capped.layers[2].length +",
     "  ' ' + ringShown.total + ' ' + ringShown.outside;",
     "out.cappedNote = capped.truncNote;",
+    "out.cappedLabels = names(capped);",
     "console.log(JSON.stringify(out));",
   }, "\n")
   local tmp = vim.fn.tempname() .. ".js"
@@ -272,12 +278,18 @@ return function(H)
   eq(got.radii, "1.3,2.6,3.9,5.2", "rings: one ring is one gap farther out than the one before")
   eq(
     got.note,
-    "Started at app, the entry of this map (the center is a folder). app reaches 5 of 8 modules, the farthest "
+    "Started at app, the entry of this map (the center is no module). app reaches 5 of 8 modules, the farthest "
       .. "3 requires away. 3 modules are not reachable from it: 1 carries the unreferenced-module finding "
       .. "(nothing requires it), the others are required only by unreachable modules or are exempt from that check. ",
     "rings: the note says both numbers and ties the last ring to the finding"
   )
   eq(got.noteButton, 2, "rings: with a finding in the ring, the note has a way to the findings")
+  eq(
+    got.labels,
+    "1 require away · 2 modules | 2 requires away · 1 module | 3 requires away · 1 module"
+      .. " | not reachable from app · 3 modules · 1 unreferenced-module",
+    "rings: every ring is named with its distance and its size"
+  )
   eq(
     got.picked,
     "e | f | a,b,c,d,g,lazy true",
@@ -313,6 +325,11 @@ return function(H)
     got.capped,
     "400 true 350 49 451 100",
     "rings: the cap takes from the unreachable ring first, and the numbers stay those of the whole tree"
+  )
+  eq(
+    got.cappedLabels,
+    "1 require away · 350 modules | not reachable from hub · 49 of 100 modules",
+    "rings: a ring the cap cut says how much of it is drawn"
   )
   eq(
     got.cappedNote,

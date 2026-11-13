@@ -534,7 +534,8 @@ return [[
       var st = getComputedStyle(el);
       parts.push('<rect x="'+el.getAttribute("x")+'" y="'+el.getAttribute("y")+'" width="'+
         el.getAttribute("width")+'" height="'+el.getAttribute("height")+'" rx="'+el.getAttribute("rx")+
-        '" fill="'+st.fill+'" stroke="'+st.stroke+'" stroke-width="'+st.strokeWidth+'" stroke-dasharray="'+
+        '" fill="'+st.fill+'" fill-opacity="'+st.fillOpacity+'" stroke="'+st.stroke+
+        '" stroke-width="'+st.strokeWidth+'" stroke-dasharray="'+
         (st.strokeDasharray === "none" ? "" : st.strokeDasharray)+'"/>');
     });
     svg.querySelectorAll(".hring").forEach(function(el){

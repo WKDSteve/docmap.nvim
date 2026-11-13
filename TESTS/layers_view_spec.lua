@@ -321,6 +321,22 @@ return function(H)
     "a broken require is heavier"
   )
   has("#hsvg .hedge.hedge-quiet{opacity:0}", "every other require waits for a pointed-at box")
+  has(
+    "if(!selfPos && built.positions && hlastView !== view){",
+    "entering the view starts at its top left corner; a redraw inside it keeps the scroll position"
+  )
+  has(
+    ".hband{fill:var(--accent);fill-opacity:.05;stroke:var(--line);stroke-width:1}",
+    "a band is a plain colour and an opacity, so the exported file holds no colour function"
+  )
+  has(
+    [[fill="'+st.fill+'" fill-opacity="'+st.fillOpacity+'" stroke="]],
+    "the export writes the opacity of a band beside its colour"
+  )
+  ok(
+    require("docmap.core.render.html.css"):find(".hband{[^}]*color%-mix") == nil,
+    "layers: no color-mix() in what the export copies into the file"
+  )
 
   -- ── The layout, in node ──────────────────────────────────────────────────
   if vim.fn.executable("node") == 0 then
@@ -457,7 +473,7 @@ return function(H)
   eq(
     got.overlay,
     "band 2 of 2 · a rule forbids a band below to require it"
-      .. " | band 1 of 2 · the base: no rule forbids anything to require it"
+      .. " | band 1 of 2 · the base"
       .. " | named by no rule · 1 module"
       .. " | app.io · 9 modules · siblings | app.ui · 2 modules | app.base · 3 modules",
     "layers: every band and every layer is named"

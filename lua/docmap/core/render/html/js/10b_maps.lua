@@ -600,9 +600,10 @@ return [[
     // The cap takes from the outside in: the unreachable ring first, then the
     // deepest rings.
     var room = RING_MAX - 1, truncated = false;
-    var bands = [], kinds = [];
+    var bands = [], kinds = [], sizes = [];
     rings.forEach(function(ids, i){
       if(room <= 0){ truncated = true; return; }
+      sizes.push(ids.length);
       if(ids.length > room){ ids = ids.slice(0, room); truncated = true; }
       room -= ids.length;
       bands.push(ids); kinds.push(i + 1);
@@ -694,10 +695,13 @@ return [[
           label.setAttribute("class", "hring-label" + (out ? " hring-out" : ""));
           label.setAttribute("x", cx); label.setAttribute("y", (cy - rb * RING_AY - 6).toFixed(1));
           label.setAttribute("text-anchor", "middle");
+          // A ring the cap cut says how much of it is drawn.
+          var whole = out ? outsideCount : sizes[i];
+          var cut = bands[i].length < whole ? bands[i].length + " of " : "";
           label.textContent = out
-            ? "not reachable from " + ringName(entry) + " · " + ringPlural(outsideCount, "module") +
+            ? "not reachable from " + ringName(entry) + " · " + cut + ringPlural(whole, "module") +
               (unrefCount ? " · " + unrefCount + " unreferenced-module" : "")
-            : ringPlural(kinds[i], "require") + " away · " + ringPlural(bands[i].length, "module");
+            : ringPlural(kinds[i], "require") + " away · " + cut + ringPlural(whole, "module");
           svg.appendChild(label);
         });
       },
@@ -751,7 +755,7 @@ return [[
     if(!s) return null;
     var box = document.createElement("div");
     box.className = "htrunc hauto hring-note";
-    var text = (s.picked ? "" : "Started at " + ringName(s.entry) + ", the entry of this map (the center is a folder). ") +
+    var text = (s.picked ? "" : "Started at " + ringName(s.entry) + ", the entry of this map (the center is no module). ") +
       ringName(s.entry) + " reaches " + s.reached + " of " + ringPlural(s.total, "module") + ", the farthest " +
       ringPlural(s.depth, "require") + " away.";
     if(s.outside){
@@ -947,8 +951,7 @@ return [[
           label(svg, svgNS, "hband-name", PAD + 12, row.y + 16, row.band === null
             ? "named by no rule · " + ringPlural(loose.length, "module")
             : "band " + (row.band + 1) + " of " + L.bands +
-              (row.band === 0 ? " · the base: no rule forbids anything to require it"
-                              : " · a rule forbids a band below to require it"));
+              (row.band === 0 ? " · the base" : " · a rule forbids a band below to require it"));
         });
         frames.forEach(function(u){
           if(u.id === null) return;
@@ -1050,12 +1053,13 @@ return [[
   var routeIndex = null;
   function routeNodes(){
     if(routeIndex) return routeIndex;
-    routeIndex = { byKey: {}, byNode: {}, roots: [] };
+    routeIndex = { byKey: {}, byNode: {}, rootOf: {}, roots: [] };
     ((IR.routes || {}).roots || []).forEach(function(root){
-      (function walk(n, parent, top){
+      (function walk(n, top){
         n.key = "route:" + n.dir;
-        n.parentKey = parent;
-        n.root = top;
+        // Beside the segment, not on it: a reference to its root would make
+        // the payload a cycle for anything that walks or serializes it.
+        routeIndex.rootOf[n.key] = top;
         routeIndex.byKey[n.key] = n;
         // The directory first; a file of the segment finds it too, so a
         // center on `page.tsx` shows the segment that page is.
@@ -1064,8 +1068,8 @@ return [[
           var id = n.files[role];
           if(!routeIndex.byNode[id]) routeIndex.byNode[id] = n;
         });
-        (n.children || []).forEach(function(c){ walk(c, n.key, top); });
-      })(root, null, root);
+        (n.children || []).forEach(function(c){ walk(c, top); });
+      })(root, root);
       routeIndex.roots.push(root);
     });
     return routeIndex;
@@ -1082,10 +1086,11 @@ return [[
   function routeBoxSpec(key){
     var n = routeNodes().byKey[key];
     if(!n) return null;
+    var top = routeNodes().rootOf[key];
     var files = routeFiles(n);
     var line;
     if(n.kind === "root"){
-      line = ROUTERS[n.root.router] + " · " + ringPlural(n.root.routes, "route");
+      line = ROUTERS[top.router] + " · " + ringPlural(top.routes, "route");
     } else if(n.url){
       line = n.url + (n.handler ? " · handler" : "");
     } else {
@@ -1096,8 +1101,8 @@ return [[
     else if(n.kind !== "root") tip.push("no route of its own: " +
       (files.length ? "it holds " + files.join(", ") : "it only groups what is below it"));
     if(n.kind !== "static" && n.kind !== "root") tip.push(ROUTE_KINDS[n.kind]);
-    if(n.kind === "root") tip.push(n.root.framework === "next"
-      ? "Next.js " + ROUTERS[n.root.router]
+    if(n.kind === "root") tip.push(top.framework === "next"
+      ? "Next.js " + ROUTERS[top.router]
       : "the shape of a Next.js route directory; no file in it imports next");
     files.forEach(function(role){ tip.push(role + ": " + n.files[role]); });
     var open = n.files.page || n.files.route || n.files[files[0] ] || n.node || null;
@@ -1139,6 +1144,9 @@ return [[
     return {
       layers: layers, included: included, count: count, truncated: truncated, edges: edges,
       centerKey: at ? at.key : null,
+      // A forest has no middle to highlight; the view still opens on its
+      // first tree, not on whatever corner the last diagram was scrolled to.
+      scrollKey: seeds[0].key,
       path: at ? at.dir + " · " + (at.url ? at.url + " · " : "") + "routes"
                : ringPlural(index.roots.length, "route tree") + " · " + ringPlural(total, "route")
     };

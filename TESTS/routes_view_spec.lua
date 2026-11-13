@@ -411,6 +411,8 @@ return function(H)
     "var all = layoutRoutes('src');",
     "out.layers = all.layers.map(function(l){ return l.join(' '); }).join(' | ');",
     "out.count = all.count + '/' + all.truncated + '/' + all.centerKey;",
+    "out.scrollKey = all.scrollKey;",
+    "out.acyclic = (function(){ try { JSON.stringify(IR.routes); return true; } catch(e){ return false; } })();",
     "out.path = all.path;",
     "out.edges = all.edges.map(function(e){ return e.from.slice(6) + '>' + e.to.slice(6) + ':' + e.marker; }).join(' ');",
     "function spec(n){ var s = routeBoxSpec('route:' + n.dir); return [s.cls, s.html, s.title, s.nodeId, s.recenter].join(' ## '); }",
@@ -446,6 +448,11 @@ return function(H)
     "routes: with the center outside every route tree all trees are drawn, a layer per depth"
   )
   eq(got.count, "8/false/null", "routes: a forest has no middle")
+  eq(got.scrollKey, "route:src/app", "routes: and still opens on its first tree")
+  ok(
+    got.acyclic,
+    "routes: indexing the trees leaves the payload a tree (no reference back to a root)"
+  )
   eq(got.path, "2 route trees · 5 routes", "routes: the path counts trees and routes")
   eq(
     got.edges,

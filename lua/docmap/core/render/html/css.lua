@@ -760,7 +760,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
    edge, and the module it leaves says so in words and has a heavier border:
    the red comes on top of that. */
 #hsvg2{position:absolute;top:0;left:0;pointer-events:none;z-index:3}
-.hband{fill:color-mix(in srgb,var(--accent) 5%,transparent);stroke:var(--line);stroke-width:1}
+.hband{fill:var(--accent);fill-opacity:.05;stroke:var(--line);stroke-width:1}
 .hband.hband-loose{fill:none;stroke-dasharray:6 5}
 .hunit{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
 .hmap-label{fill:var(--muted);font-size:11.5px;font-family:var(--mono);paint-order:stroke;stroke:var(--panel);

@@ -34,6 +34,10 @@ return {
       note = "a frame per layer is drawn",
     },
     {
+      expect = "(w => w.scrollLeft === 0 && w.scrollTop === 0)(document.getElementById('hgraph-wrap'))",
+      note = "the view opens at its top left corner",
+    },
+    {
       expect = "/view=layers/.test(location.hash) && document.getElementById('halt').hidden"
         .. " && document.getElementById('hexport').style.display !== 'none'"
         .. " && document.getElementById('hlr').style.display === 'none'"
@@ -117,8 +121,10 @@ return {
     {
       wait = "window.__svg && window.__svg.text().then(t => (t.match(/<rect x=/g) || []).length === 14"
         .. " && (t.match(/<path /g) || []).length === 7 && t.indexOf('app.core · 2 modules') !== -1"
-        .. " && t.indexOf('band 1 of 3') !== -1 && t.lastIndexOf('<path ') > t.lastIndexOf('<rect x='))",
-      note = "the SVG file carries bands, frames, names, the seven boxes and the broken require, drawn last",
+        .. " && t.indexOf('band 1 of 3') !== -1 && t.lastIndexOf('<path ') > t.lastIndexOf('<rect x=')"
+        .. " && t.indexOf('color(') === -1 && t.indexOf('fill-opacity=\"0.05\"') !== -1)",
+      note = "the SVG file carries bands, frames, names, the seven boxes and the broken require, drawn last; its"
+        .. " colours are plain ones every SVG reader knows",
     },
     { click = '#hstage .hnode[data-key="lua/app/ui/window.lua"]', note = "a click pins a box" },
     {

@@ -536,6 +536,8 @@ return [[
 
   function drawAltView(view){
     var center = byId[hcenter];
+    // No diagram is on screen any more: the next one is entered, not redrawn.
+    hlastView = null;
     hgraphWrap.style.display = "none";
     halt.hidden = false;
     clearGraph();
@@ -591,6 +593,10 @@ return [[
   // `implicitCenter`: the URL names no center, so the view may pick a better
   // one than the root (see busiestFor). A center somebody chose - a click, a
   // link, the search box - is always kept, empty or not.
+  // The view of the last diagram drawn, so entering a view can be told from
+  // redrawing it. Tree, Treemap and Coupling reset it (`drawAltView`): they
+  // draw elsewhere.
+  var hlastView = null;
   function drawHierarchy(centerId, view, forceCenter, implicitCenter){
     view = VIEWS[view] ? view : "modules";
     hcenter = (centerId && byId[centerId]) ? centerId : (hcenter && byId[hcenter] ? hcenter : IR.root);
@@ -821,8 +827,17 @@ return [[
     // view here would yank the diagram out from under the pointer the gesture
     // is still on. The flag is consumed once, so ordinary navigation keeps
     // its centering.
-    var selfPos = (centerKey && !suppressAutoScroll) ? positions[centerKey] : null;
+    var scrollKey = centerKey || built.scrollKey || null;
+    var selfPos = (scrollKey && !suppressAutoScroll) ? positions[scrollKey] : null;
     if(suppressAutoScroll){ suppressAutoScroll = false; }
+    // A view with positions of its own and no middle (the Layers) starts at
+    // its top left corner when it is entered. Only then: a redraw inside the
+    // view (a box dimmed, the theme) keeps the reader where they are.
+    if(!selfPos && built.positions && hlastView !== view){
+      hgraphWrap.scrollLeft = 0;
+      hgraphWrap.scrollTop = 0;
+    }
+    hlastView = view;
     if(selfPos){
       var targetLeft = Math.max(0, selfPos.x + BOX_W / 2 - hgraphWrap.clientWidth / 2);
       var targetTop = Math.max(0, selfPos.y - hgraphWrap.clientHeight / 2 + BOX_H);
@@ -832,7 +847,7 @@ return [[
         hgraphWrap.scrollLeft = targetLeft;
         hgraphWrap.scrollTop = targetTop;
       }
-      var centerEl = hboxes[centerKey];
+      var centerEl = centerKey ? hboxes[centerKey] : null;
       if(centerEl && !reducedMotion()){
         centerEl.classList.remove("pulse");
         void centerEl.offsetWidth;
