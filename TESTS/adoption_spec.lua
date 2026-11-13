@@ -179,11 +179,12 @@ return function(H)
   -- timer, the grace period on the way out, the keyboard path and the
   -- flip-when-it-would-overflow placement all already live behind it.
   ok(
-    html:find('data-kwkind="tag" tabindex=', 1, true),
+    html:find([[" data-kwkind="tag"' + (key ? ' data-kwctx="' + esc(key) + '"' : '') +]], 1, true)
+      and html:find([[' tabindex="0">' + esc(label) + '</span>';]], 1, true),
     "adoption: through one helper, keyboard-reachable"
   )
   ok(
-    html:find('el.dataset.kwkind === "tag"', 1, true),
+    html:find('lookupRegister("tag", function(key, ctx){', 1, true),
     "adoption: and the card knows the third kind"
   )
 

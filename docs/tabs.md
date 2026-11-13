@@ -199,3 +199,21 @@ Markdown subset instead of just linked out to. See
 [`docs/features_format.md`](features_format.md) for the format this
 tab reads, and this repository's own [`docs/FEATURES/`](FEATURES) for
 a real (if deliberately small) example — including one promoted feature.
+
+**Lookup cards** are the same in every tab. Wherever the page shows notation
+a reader may not know, the word carries a dotted underline, and resting the
+pointer on it, focusing it with Tab or clicking it opens one small card;
+Escape, a scroll or moving away closes it. In a function's source snippet
+(the &#9432; popup and the Compare tab) that is a language keyword, a
+standard-library name, the function's own name (complexity, callers, callees,
+whether a spec names it), a call that resolves in the tree (the callee's
+summary and module), a `require` path (in the tree, external, or unresolved)
+and an external module (what this file calls on it, and how often). In the
+annotations it is a badge such as `deprecated` (what the tag means, and who
+still calls the function) and a type name (its fields and where it is
+declared). In the Findings tab and in a module's Drift list it is the check
+(what it compares, how severe a hit is by default, why it exists). A card
+with a way on, into the map or out to a reference, follows it on Enter. A
+card never shows an empty answer: where the map does not hold the data, for
+example class details in a map generated without `--full`, it says "Not
+known" and why.

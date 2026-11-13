@@ -257,6 +257,7 @@ local specs = {
   "tools_spec.lua",
   "features_spec.lua",
   "features_index_spec.lua",
+  "lookup_layer_spec.lua",
   "page_history_spec.lua",
   "calls_external_spec.lua",
   "call_path_spec.lua",

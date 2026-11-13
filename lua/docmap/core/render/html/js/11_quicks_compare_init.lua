@@ -193,7 +193,7 @@ return [[
       // The same renderer the detail pane and the popup use. A third copy of
       // "how a function's annotations look" is exactly the drift this plugin
       // exists to detect.
-      h.push(fnAnnotationHTML(e.fn) + snippetHTML(e.fn, e.node));
+      h.push(fnAnnotationHTML(e.fn, e.key) + snippetHTML(e.fn, e.node));
     } else {
       h.push('<div class="fn-sig">' + esc(e.node.module || e.node.name) + '</div>');
       if(e.node.summary) h.push('<div class="fn-desc">' + prose(e.node.summary) + '</div>');

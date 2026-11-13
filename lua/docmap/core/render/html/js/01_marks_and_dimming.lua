@@ -423,6 +423,324 @@ return [[
     return out;
   }
 
+  // =====================================================================
+  // The lookup layer
+  //
+  // Every place the page shows notation a reader may not recognise wants
+  // the same thing: a short answer, in place, behind a deliberate gesture.
+  // `lookup(kind, key, ctx)` is the one question, a kind is registered from
+  // where its data lives (`lookupRegister`), and `lookupCardHTML` is the one
+  // card. A trigger is any element carrying `data-kw` (the key) and
+  // `data-kwkind` (the kind); the keyword card of the popups slice opens it
+  // on a dwell, on focus and on a click, and closes it the same way for all.
+  //
+  // A kind answers with a card, with `null` (the trigger has nothing behind
+  // it, which is a bug in whatever decorated it: no card at all), or with a
+  // card whose `unknown` says why the data is not here. "Not known" is an
+  // answer; an empty card is not.
+  //
+  // A card:
+  //   word     what was asked about            kind    a small label beside it
+  //   summary  prose (backticks rendered)      note    the surprising fact, verbatim
+  //   lines    labelled one-liners: { label, text }
+  //   rows     { title, items: { code, text, count }, total }, cut to LOOKUP_ROWS
+  //            with the omitted amount stated
+  //   unknown  why the data is missing         origin  where the answer comes from
+  //   link     { href, label }, leaves the page
+  //   nav      { label, to }, a state patch for navigate()
+  // =====================================================================
+  var LOOKUP = {};
+  var LOOKUP_ROWS = 8;
+  var LOOKUP_TEXT = 180;
+
+  function own(obj, key){ return !!obj && Object.prototype.hasOwnProperty.call(obj, key); }
+
+  function lookupRegister(kind, answer){ LOOKUP[kind] = answer; }
+
+  function lookup(kind, key, ctx){
+    if(!own(LOOKUP, kind)) return null;
+    return LOOKUP[kind](key, ctx || {});
+  }
+
+  function lookupClip(text){
+    text = String(text == null ? "" : text);
+    return text.length > LOOKUP_TEXT ? text.slice(0, LOOKUP_TEXT - 1) + "…" : text;
+  }
+
+  function lookupCardHTML(card){
+    var h = '<div class="kw-word">' + esc(card.word) +
+      (card.kind ? '<span class="kw-kind">' + esc(card.kind) + '</span>' : '') + '</div>';
+    if(card.summary) h += '<div class="kw-sum">' + prose(card.summary) + '</div>';
+    if(card.unknown) h += '<div class="kw-unknown">Not known: ' + prose(card.unknown) + '</div>';
+    if(card.note) h += '<div class="kw-note">' + esc(card.note) + '</div>';
+    (card.lines || []).forEach(function(l){
+      h += '<div class="kw-line"><span class="kw-label">' + esc(l.label) + '</span> ' +
+        prose(l.text) + '</div>';
+    });
+    var rows = card.rows;
+    if(rows && rows.items && rows.items.length){
+      var total = rows.total || rows.items.length;
+      var shown = rows.items.slice(0, LOOKUP_ROWS);
+      if(rows.title) h += '<div class="kw-rows-title">' + esc(rows.title) + '</div>';
+      h += '<ul class="kw-rows">';
+      shown.forEach(function(r){
+        h += '<li>' + (r.code ? '<code>' + esc(r.code) + '</code> ' : '') +
+          (r.text ? prose(lookupClip(r.text)) : '') +
+          (r.count ? ' <span class="kw-n">' + r.count + '×</span>' : '') + '</li>';
+      });
+      h += '</ul>';
+      if(total > shown.length){
+        h += '<div class="kw-more">… and ' + (total - shown.length) + ' more</div>';
+      }
+    }
+    if(card.origin) h += '<div class="kw-origin">' + esc(card.origin) + '</div>';
+    if(card.nav){
+      h += '<div class="kw-ref"><a href="#" data-kw-nav="' + esc(JSON.stringify(card.nav.to)) +
+        '">' + esc(card.nav.label) + '</a></div>';
+    }
+    if(card.link){
+      h += '<div class="kw-ref"><a href="' + esc(card.link.href) +
+        '" target="_blank" rel="noreferrer noopener">' + esc(card.link.label) + ' &#8599;</a></div>';
+    }
+    return h;
+  }
+
+  // ---------------------------------------------------------------------
+  // The kinds the IR answers. No scanner work behind any of them: the data
+  // is in the artifact already and was one navigation away.
+  // ---------------------------------------------------------------------
+
+  // Which languages of this map have call edges at all. A function of a
+  // language without them has no callers the map could know of, and "0" would
+  // be a number where "not known" is the answer.
+  var callLangs = null;
+  function hasCallEdges(node){
+    if(callLangs === null){
+      callLangs = {};
+      (IR.edges || []).forEach(function(e){
+        if(e.kind === "call" && byId[e.from] && byId[e.from].language){
+          callLangs[byId[e.from].language] = true;
+        }
+      });
+    }
+    return !!(node && node.language && callLangs[node.language]);
+  }
+
+  // The distinct functions on the other end of a function's call edges.
+  function callPeers(key, incoming){
+    var seen = {}, out = [];
+    ((incoming ? callIn : callOut)[key] || []).forEach(function(e){
+      var k = incoming ? fnKey(e.from, e.from_fn) : fnKey(e.to, e.to_fn);
+      if(seen[k]) return;
+      seen[k] = true;
+      out.push(k);
+    });
+    return out;
+  }
+
+  function lookupPlural(n, word){ return n + " " + word + (n === 1 ? "" : "s"); }
+
+  // A call in a snippet that resolves in the tree: what the callee is, where
+  // it lives, and the way there.
+  lookupRegister("call", function(key){
+    var e = own(fnByKey, key) ? fnByKey[key] : null;
+    if(!e){
+      return { word: key.replace(/^.*#/, ""), kind: "call",
+        unknown: "the map has an edge to this function and no entry for it." };
+    }
+    return {
+      word: e.fn.signature || e.fn.name, kind: "call",
+      summary: e.fn.summary || null,
+      unknown: e.fn.summary ? null : "it has no summary line.",
+      origin: e.node.module || e.node.path,
+      nav: { label: (e.node.module || e.node.path) + ":" + e.fn.line, to: { tab: "tree", id: e.node.id } }
+    };
+  });
+
+  // A function's own name in its snippet: the numbers the Analysis tab holds
+  // about it, where the reader is looking at it.
+  lookupRegister("fn", function(key){
+    var e = own(fnByKey, key) ? fnByKey[key] : null;
+    if(!e) return { word: key.replace(/^.*#/, ""), kind: "function", unknown: "the map has no such function." };
+    var edges = hasCallEdges(e.node);
+    var inN = callPeers(key, true).length, outN = callPeers(key, false).length;
+    var noEdges = "not known (the map has no call edges for " + (e.node.language || "this language") + ")";
+    return {
+      word: e.fn.name, kind: "function",
+      lines: [
+        { label: "Complexity", text: e.fn.complexity === undefined
+          ? "not known (the map predates it)" : e.fn.complexity + " (cyclomatic)" },
+        { label: "Called by", text: edges ? lookupPlural(inN, "function") + " of this tree" : noEdges },
+        { label: "Calls", text: edges ? lookupPlural(outN, "function") + " of this tree" : noEdges },
+        { label: "Tests", text: e.fn.tested === undefined
+          ? "not known (the map predates it)"
+          : (e.fn.tested ? "a spec names it" : "no spec names it") }
+      ],
+      nav: (inN || outN)
+        ? { label: "Callers and callees", to: { tab: "hierarchy", view: "calls", center: e.node.id, fn: key, dir: "both" } }
+        : null
+    };
+  });
+
+  // A type name in a rendered annotation: its fields and where it is declared.
+  // `types_detail` is there only when the map was generated with LuaLS
+  // enrichment (`--full`); a map without it says so instead of guessing.
+  var mapHasTypes = null;
+  function hasTypeDetail(){
+    if(mapHasTypes === null){
+      mapHasTypes = IR.nodes.some(function(n){ return !!(n.types_detail && n.types_detail.length); });
+    }
+    return mapHasTypes;
+  }
+
+  lookupRegister("type", function(key){
+    var c = own(classByName, key) ? classByName[key] : null;
+    if(!c){
+      return { word: key, kind: "type", unknown: hasTypeDetail()
+        ? "no `@class` or `@alias` of this name is declared in the tree."
+        : "this map carries no class details. They are read through `lua-language-server` when the map is generated with `--full`." };
+    }
+    var info = c.info, fields = info.fields || [];
+    var parents = (info.extends || []).join(", ");
+    return {
+      word: info.name, kind: info.kind + (parents ? " : " + parents : ""),
+      summary: info.desc || null,
+      note: (!fields.length && info.kind === "class") ? "No fields declared." : null,
+      rows: { title: "Fields", items: fields.map(function(f){
+        return { code: f.name, text: f.view + (f.desc ? " — " + f.desc : "") };
+      }) },
+      origin: info.file,
+      nav: { label: "Types view", to: { tab: "hierarchy", view: "types", center: c.nodeId, fn: null } }
+    };
+  });
+
+  // Module name -> node id, for a `require` path. Built on first use.
+  var nodeByModule = null;
+  function moduleNode(name){
+    if(nodeByModule === null){
+      nodeByModule = {};
+      IR.nodes.forEach(function(n){ if(n.module && !own(nodeByModule, n.module)) nodeByModule[n.module] = n.id; });
+    }
+    if(!own(nodeByModule, name)) return null;
+    var id = nodeByModule[name];
+    return byId[id] || null;
+  }
+
+  // What this file (or, without one, the whole tree) calls on an external
+  // module, most called first: the shape the `+ external` boxes of the Deps
+  // view break down into, where the name is written.
+  function externalRows(module, node){
+    var items = [];
+    if(node){
+      (node.calls_external || []).forEach(function(c){
+        if(c.module === module) items.push({ code: c.member || module, count: c.count });
+      });
+    } else {
+      var totals = getExternalCallTotals()[module] || {};
+      Object.keys(totals).forEach(function(m){ items.push({ code: m || module, count: totals[m] }); });
+    }
+    items.sort(function(a, b){ return b.count - a.count || (a.code < b.code ? -1 : 1); });
+    return items;
+  }
+
+  function externalCard(module, node, kind){
+    var items = externalRows(module, node);
+    return {
+      word: module, kind: kind,
+      note: items.length ? null
+        : "Required here, and no call into it that the map can see.",
+      rows: { title: node ? "This file calls" : "This tree calls", items: items },
+      origin: "external: outside this map"
+    };
+  }
+
+  function nodeOfCtx(ctx){
+    var e = ctx.fnKey && own(fnByKey, ctx.fnKey) ? fnByKey[ctx.fnKey] : null;
+    return e ? e.node : null;
+  }
+
+  // Is `name` under a prefix this tree owns (the first segment of one of its
+  // module names)? The scan files a require that resolves to nothing under
+  // `requires_external` whatever its name; one under the tree's own prefix
+  // is not another project's module, it is a module that is missing.
+  var treePrefixes = null;
+  function firstSegment(name){ return String(name).replace(/\..*$/, ""); }
+  function underOwnPrefix(name){
+    if(treePrefixes === null){
+      treePrefixes = {};
+      IR.nodes.forEach(function(n){ if(n.module) treePrefixes[firstSegment(n.module)] = true; });
+    }
+    return own(treePrefixes, firstSegment(name));
+  }
+
+  // Is `module` one of the external modules of this file?
+  function isExternalOf(node, module){
+    if(!node || underOwnPrefix(module)) return false;
+    if((node.requires_external || []).indexOf(module) !== -1) return true;
+    return (node.calls_external || []).some(function(c){ return c.module === module; });
+  }
+
+  // An external module written in a snippet.
+  lookupRegister("ext", function(key, ctx){
+    var node = nodeOfCtx(ctx);
+    if(node && !isExternalOf(node, key)){
+      return { word: key, kind: "external module",
+        unknown: "the map records no external require of this name for this file." };
+    }
+    return externalCard(key, node, "external module");
+  });
+
+  // A `require`/`import` path: three answers that look the same in the source.
+  lookupRegister("req", function(key, ctx){
+    var node = nodeOfCtx(ctx), target = null;
+    if(node){
+      (depOut[node.id] || []).forEach(function(d){ if(d.to_module === key && byId[d.to]) target = byId[d.to]; });
+    }
+    if(!target) target = moduleNode(key);
+    if(target){
+      return {
+        word: key, kind: "require",
+        summary: target.summary || null,
+        unknown: target.summary ? null : "the module has no summary line.",
+        origin: "in this tree: " + target.path,
+        nav: { label: target.module || target.path, to: { tab: "tree", id: target.id } }
+      };
+    }
+    if(isExternalOf(node, key)) return externalCard(key, node, "require");
+    return { word: key, kind: "require",
+      unknown: underOwnPrefix(key)
+        ? "unresolved. The name is under this tree's own prefix and no file of the tree declares it."
+        : "unresolved. It is neither a module of this tree nor an external require the map recorded for this file; the name may be built at run time." };
+  });
+
+  // A check id in a findings view: what the check compares and why it exists.
+  // The catalogue is `core/findings.lua`'s, next to the sentences themselves.
+  var checkByName = null;
+  function checkEntry(name){
+    if(checkByName === null){
+      checkByName = {};
+      (IR.checks || []).forEach(function(c){ checkByName[c.name] = c; });
+    }
+    return own(checkByName, name) ? checkByName[name] : null;
+  }
+
+  lookupRegister("check", function(key){
+    var c = checkEntry(key);
+    var n = FIND.filter(function(f){ return f.check === key; }).length;
+    if(!c){
+      return { word: key, kind: "check",
+        unknown: "this page has no explanation for the check. It is one of the project's own `extra_checks`, or the page predates the catalogue.",
+        origin: lookupPlural(n, "finding") + " here" };
+    }
+    return {
+      word: c.name, kind: "check",
+      summary: c.compares,
+      lines: [{ label: "Why", text: c.why }],
+      rows: { title: "A finding reads", items: (c.templates || []).map(function(t){ return { text: t }; }) },
+      origin: "severity " + c.severity + " by default · " + lookupPlural(n, "finding") + " here"
+    };
+  });
+
   // Markdown info strings that are not the file extension the glossaries are
   // keyed by. Only the ones that actually differ from a *declared* extension
   // (`lang_registry.glossaries()` keys on `backend.extensions`), so this

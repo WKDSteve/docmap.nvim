@@ -183,7 +183,29 @@ return [[
     return { free: free, scopes: scopes };
   }
 
-  function fnAnnotationHTML(fn){
+  // A type as written in an annotation, with the class names in it as
+  // triggers of the lookup layer (kind `type`). A name the map declares is
+  // one; so is, in a map that carries no class details at all, a name spelled
+  // like a LuaCATS class (`Docmap.Node`), where the card says that the
+  // details are not known and why. Everything else stays plain text.
+  function typeHTML(text){
+    var out = "", last = 0, m;
+    var re = /[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/g;
+    text = text || "";
+    while((m = re.exec(text)) !== null){
+      var name = m[0];
+      var known = own(classByName, name);
+      if(!known && (hasTypeDetail() || !/^[A-Z][A-Za-z0-9_]*\.[A-Za-z_]/.test(name))) continue;
+      out += esc(text.slice(last, m.index)) + '<span class="kw" data-kw="' + esc(name) +
+        '" data-kwkind="type" tabindex="0">' + esc(name) + '</span>';
+      last = m.index + name.length;
+    }
+    return out + esc(text.slice(last));
+  }
+
+  // `key` (the function's `fnKey`) is optional: with it the `deprecated` and
+  // `internal` badges can say who still calls the function.
+  function fnAnnotationHTML(fn, key){
     var h = [];
     var badges = [];
     // The badges *are* the tags, so they are the third trigger surface of
@@ -198,7 +220,8 @@ return [[
     // tag-specific implementation would be a fourth copy of them.
     function tagBadge(name, label, cls){
       return '<span class="bd' + (cls ? " " + cls : "") + '" data-kw="' + name +
-        '" data-kwkind="tag" tabindex="0">' + esc(label) + '</span>';
+        '" data-kwkind="tag"' + (key ? ' data-kwctx="' + esc(key) + '"' : '') +
+        ' tabindex="0">' + esc(label) + '</span>';
     }
     if(fn.deprecated !== undefined) badges.push(tagBadge("deprecated", "deprecated", "dep"));
     if(fn.async) badges.push(tagBadge("async", "async"));
@@ -226,7 +249,7 @@ return [[
     if(fn.params && fn.params.length){
       h.push('<ul class="fn-plist">');
       fn.params.forEach(function(p){
-        h.push('<li><code>'+esc(p.name)+(p.optional?'?':'')+'</code> '+esc(p.type)
+        h.push('<li><code>'+esc(p.name)+(p.optional?'?':'')+'</code> '+typeHTML(p.type)
           +(p.desc?' — '+esc(p.desc):'')+'</li>');
       });
       h.push('</ul>');
@@ -234,7 +257,7 @@ return [[
     if(fn.returns && fn.returns.length){
       h.push('<ul class="fn-plist">');
       fn.returns.forEach(function(r){
-        h.push('<li>→ <code>'+esc(r.type)+'</code>'+(r.name?' '+esc(r.name):'')
+        h.push('<li>→ <code>'+typeHTML(r.type)+'</code>'+(r.name?' '+esc(r.name):'')
           +(r.desc?' — '+esc(r.desc):'')+'</li>');
       });
       h.push('</ul>');
@@ -305,6 +328,93 @@ return [[
     return IR.glossaries[m[1].toLowerCase()] || null;
   }
 
+  // The first two kinds of the lookup layer: a language keyword and a
+  // standard-library name, both out of the glossary of the snippet's own
+  // language. `null` when the glossary has no such entry: that is a bug in
+  // whatever decorated the word, not something to show a card for.
+  function glossaryAnswer(tableName){
+    return function(key, ctx){
+      var gl = glossaryForPath(ctx.path);
+      var table = gl && gl[tableName];
+      if(!own(table, key)) return null;
+      var entry = table[key];
+      return {
+        word: key, summary: entry.summary, note: entry.note || null,
+        // Where the name comes from, when it is not the language itself:
+        // the reason `vim.*` entries can sit in a Lua glossary without
+        // pretending to be Lua.
+        origin: entry.origin || null,
+        // Only for entries that *are* the language, and one base URL per
+        // language rather than one per keyword. A `vim.*` name is not in the
+        // Lua manual; a link there would look right and answer nothing.
+        link: (!entry.origin && gl.reference && gl.reference.url)
+          ? { href: gl.reference.url + (entry.anchor || ""), label: gl.reference.label }
+          : null
+      };
+    };
+  }
+  lookupRegister("kw", glossaryAnswer("keywords"));
+  lookupRegister("std", glossaryAnswer("stdlib"));
+
+  // The tag catalogue as a lookup table, built once. Keyed by name without
+  // the `@`, which is how the badges and the parser both spell it.
+  var tagByName = null;
+  function tagEntry(name){
+    if(tagByName === null){
+      tagByName = {};
+      (IR.tags || []).forEach(function(t){ tagByName[t.name] = t; });
+    }
+    return own(tagByName, name) ? tagByName[name] : null;
+  }
+
+  // The third kind. Unlike keywords and stdlib names it has no per-language
+  // glossary: an annotation means the same thing wherever it is written,
+  // which is why the catalogue is one table and the glossaries are one per
+  // language.
+  //
+  // On a `deprecated` or an `internal` badge of a function the card also
+  // says what the tag means *here*: who still calls the function. That is
+  // the question either tag raises, and the call edges already answer it.
+  lookupRegister("tag", function(key, ctx){
+    var tag = tagEntry(key);
+    if(!tag) return null;
+    var card = {
+      word: "@" + tag.name, summary: tag.summary,
+      origin: tag.origin === "luals" ? "LuaCATS annotation" : "this project's own convention",
+      // Only where the origin publishes one. A LuaLS link for `@todo` would
+      // load, look authoritative and not contain the answer.
+      link: tag.url ? { href: tag.url, label: "LuaLS reference" } : null
+    };
+    var e = ctx.fnKey && own(fnByKey, ctx.fnKey) ? fnByKey[ctx.fnKey] : null;
+    if(e && (key === "deprecated" || key === "internal")){
+      if(!hasCallEdges(e.node)){
+        card.lines = [{ label: "Callers", text: "not known (the map has no call edges for " +
+          (e.node.language || "this language") + ")" }];
+      } else {
+        var callers = callPeers(ctx.fnKey, true);
+        // An internal function is meant to be called from its own module;
+        // the callers worth naming are the ones outside it.
+        if(key === "internal"){
+          callers = callers.filter(function(k){ return fnByKey[k] && fnByKey[k].node.id !== e.node.id; });
+        }
+        if(callers.length){
+          card.rows = {
+            title: key === "deprecated" ? "Still called by" : "Called from outside its module by",
+            items: callers.map(function(k){
+              var c = fnByKey[k];
+              return c ? { code: c.fn.name, text: c.node.module || c.node.path } : { code: k };
+            })
+          };
+        } else {
+          card.lines = [{ label: "Callers", text: key === "deprecated"
+            ? "nothing in this tree calls it any more"
+            : "nothing outside its own module calls it" }];
+        }
+      }
+    }
+    return card;
+  });
+
   // Which spans of a snippet are *not* code.
   //
   // A keyword decorated inside a string or a comment is a false positive:
@@ -317,12 +427,62 @@ return [[
   // interpolation, a regex literal containing comment-looking bytes) costs
   // a *missing* decoration rather than a wrong one. That is the direction
   // to fail in, and it is why this is allowed to be approximate at all.
-  function snipBodyHTML(src, path){
+  //
+  // `ctx` is optional and names the function the snippet belongs to
+  // (`{ fnKey }`). With it the tokenizer also marks what the IR knows about
+  // this function's own text: the calls that resolve in the tree, its own
+  // name, the external modules of its file and the paths it requires. Those
+  // need no glossary, so a language without one gets them too; what it loses
+  // is the skipping of strings and comments, and the call match is by line
+  // and name, which a comment does not satisfy by accident.
+  function snipBodyHTML(src, path, ctx){
     var gl = glossaryForPath(path);
-    if(!gl || !gl.keywords) return esc(src);
+    var self = (ctx && ctx.fnKey && own(fnByKey, ctx.fnKey)) ? fnByKey[ctx.fnKey] : null;
+    if((!gl || !gl.keywords) && !self) return esc(src);
+    if(!gl) gl = {};
     var sx = gl.syntax || {};
     var strs = sx.strings || [];
     var out = "", plain = "", i = 0, n = src.length;
+
+    // ---- what the IR knows about this function ----
+    function bare(name){ return String(name).replace(/^.*[.:]/, ""); }
+    var callees = {}, externals = {}, modules = {}, ownBare = null, ownDone = false;
+    if(self){
+      ownBare = bare(self.fn.name);
+      (callOut[ctx.fnKey] || []).forEach(function(e){
+        var b = bare(e.to_fn);
+        if(!own(callees, b)) callees[b] = [];
+        callees[b].push({ key: fnKey(e.to, e.to_fn), line: e.line });
+      });
+      (self.node.requires_external || []).forEach(function(m){
+        modules[m] = true;
+        if(!underOwnPrefix(m)) externals[m] = true;
+      });
+      (self.node.calls_external || []).forEach(function(c){
+        if(!underOwnPrefix(c.module)) externals[c.module] = true;
+      });
+      (depOut[self.node.id] || []).forEach(function(d){ if(d.to_module) modules[d.to_module] = true; });
+    }
+    // The source line a position of the snippet is on (the snippet starts at
+    // the function's own first line). Positions only ever grow.
+    var lnPos = 0, lnNo = 0;
+    function lineAt(pos){
+      while(lnPos < pos){ if(src.charAt(lnPos) === "\n") lnNo++; lnPos++; }
+      return lnNo;
+    }
+    function span(key, kind, label){
+      return '<span class="kw" data-kw="' + esc(key) + '" data-kwkind="' + kind +
+        '" tabindex="0">' + esc(label) + '</span>';
+    }
+    // Which callee a call written `name(` on this line is. The edge's own
+    // line decides; without a line match the name has to be unambiguous.
+    function calleeAt(name, pos){
+      if(!own(callees, name)) return null;
+      var list = callees[name], line = self.fn.line + lineAt(pos), k;
+      for(k = 0; k < list.length; k++){ if(list[k].line === line) return list[k].key; }
+      for(k = 1; k < list.length; k++){ if(list[k].key !== list[0].key) return null; }
+      return list[0].key;
+    }
 
     function flush(){ if(plain){ out += esc(plain); plain = ""; } }
     function at(tok){ return tok && src.substr(i, tok.length) === tok; }
@@ -351,6 +511,21 @@ return [[
           j++;
         }
         if(j > n) j = n;
+        // A string that is a `require`/`import` path: the fifth thing a
+        // snippet can be asked about. Either the word before it says so, or
+        // the map knows the name as a module this file requires.
+        var body = src.slice(i + str[0].length, j - str[1].length);
+        if(self && j - str[1].length >= i + str[0].length &&
+           src.substr(j - str[1].length, str[1].length) === str[1] &&
+           /^[A-Za-z0-9_@.\/:-]+$/.test(body) &&
+           (own(modules, body) ||
+            /(?:^|[^A-Za-z0-9_])(?:require|import|from)\s*\(?\s*$/.test(src.slice(Math.max(0, i - 24), i)))){
+          plain += str[0];
+          flush();
+          out += span(body, "req", body);
+          plain += str[1];
+          i = j; continue;
+        }
         plain += src.slice(i, j); i = j; continue;
       }
       var ch = src.charAt(i);
@@ -395,7 +570,7 @@ return [[
         if(sx.method_namespace && parts.length === 1 && i > 0 &&
            src.charAt(i - 1) === ":" && src.charAt(i - 2) !== ":"){
           var viaColon = sx.method_namespace + "." + run;
-          if(Object.prototype.hasOwnProperty.call(gl.stdlib || {}, viaColon)){
+          if(own(gl.stdlib, viaColon)){
             matched = viaColon; kind = "std"; label = run;
           }
         }
@@ -421,6 +596,34 @@ return [[
           out += '<span class="kw" data-kw="' + esc(matched) + '" data-kwkind="' + kind +
             '" tabindex="0">' + esc(label) + '</span>';
           plain += run.slice(label.length);
+        } else if(self){
+          // Nothing of the language itself: ask the IR. The function's own
+          // name where it is declared, then a call that resolves in the
+          // tree, then an external module of this file.
+          var lastSeg = parts[parts.length - 1], after = k, hit = null;
+          while(after < n && /[ \t]/.test(src.charAt(after))) after++;
+          if(!ownDone && lineAt(i) <= 2 && (run === self.fn.name || lastSeg === ownBare)){
+            ownDone = true;
+            hit = span(ctx.fnKey, "fn", run);
+          } else if(src.charAt(after) === "(" && calleeAt(lastSeg, i)){
+            hit = span(calleeAt(lastSeg, i), "call", run);
+          }
+          if(hit){
+            flush(); out += hit;
+          } else {
+            var extName = null;
+            for(var cut = parts.length; cut >= 1 && !extName; cut--){
+              var prefix = parts.slice(0, cut).join(".");
+              if(own(externals, prefix)) extName = prefix;
+            }
+            if(extName){
+              flush();
+              out += span(extName, "ext", extName);
+              plain += run.slice(extName.length);
+            } else {
+              plain += run;
+            }
+          }
         } else {
           plain += run;
         }
@@ -454,8 +657,9 @@ return [[
     // walks up to it, which is what `.closest` is for.
     var path = node ? (node.source || node.path || "") : "";
     return '<div class="fn-snip-label">Source' + omitted + '</div>' +
-      '<div class="fn-snip" data-path="' + esc(path) + '">' +
-      snipBodyHTML(fn.snippet, path) + '</div>';
+      '<div class="fn-snip" data-path="' + esc(path) + '"' +
+      (node ? ' data-fnkey="' + esc(fnKey(node.id, fn.name)) + '"' : '') + '>' +
+      snipBodyHTML(fn.snippet, path, node ? { fnKey: fnKey(node.id, fn.name) } : null) + '</div>';
   }
 
   // Artifact lives in out_dir; repo-relative paths need to climb back out.

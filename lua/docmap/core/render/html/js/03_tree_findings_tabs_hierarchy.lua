@@ -170,7 +170,10 @@ return [[
     var f = findByNode[n.id] || [];
     if(f.length){
       h.push('<div class="sec">Drift</div><ul class="lst">');
-      f.forEach(function(x){ h.push('<li><span class="sev '+x.severity+'">'+x.severity+'</span> '+esc(x.message)+'</li>'); });
+      // The severity badge is the trigger of the check's card (lookup kind
+      // `check`): which check said this, what it compares and why.
+      f.forEach(function(x){ h.push('<li><span class="sev '+x.severity+'" data-kw="'+esc(x.check)+
+        '" data-kwkind="check" tabindex="0">'+x.severity+'</span> '+esc(x.message)+'</li>'); });
       h.push('</ul>');
     }
 
@@ -261,7 +264,7 @@ return [[
       function pushFn(fn){
         var key = fnKey(n.id, fn.name);
         h.push('<div class="fn" data-fn="'+esc(key)+'">');
-        h.push(fnAnnotationHTML(fn));
+        h.push(fnAnnotationHTML(fn, key));
         // Prose references for this function, where the reader is already
         // looking at everything else known about it.
         var dref = docTrigger(key) + featTrigger(key);
@@ -408,7 +411,11 @@ return [[
   document.querySelectorAll("#findings tbody tr[data-node]").forEach(function(tr){
     var target = tr.dataset.node;
     if(!byId[target]) return;
-    tr.addEventListener("click", function(){ navigate({ tab: "tree", id: target }); });
+    tr.addEventListener("click", function(ev){
+      // The check id is a trigger of its own (the check's card): a click on it asks, it does not leave.
+      if(ev.target.closest && ev.target.closest("[data-kw]")) return;
+      navigate({ tab: "tree", id: target });
+    });
   });
 
   // =====================================================================

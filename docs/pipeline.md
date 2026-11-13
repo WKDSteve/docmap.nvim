@@ -1647,7 +1647,9 @@ as a real, navigable stop.
 Each row in the "Drift findings" table that names a real IR node (most of
 them — a couple of repo-specific checks report against synthetic paths that
 were never scanned nodes, and those rows just stay inert) is clickable:
-selects that node in the Tree tab.
+selects that node in the Tree tab. The check id in the row is a trigger of
+its own (see *The lookup layer*): a click on it opens the check's card and
+does not follow the row.
 
 ### Back/forward navigation
 
@@ -2114,6 +2116,61 @@ This is also the one place the page re-derives a default that
 `nil` when unstated rather than guessing, and the guess belongs where the
 question is asked.
 
+### The lookup layer: one card for what the page shows
+
+A source snippet, an annotation and a findings table all show notation the
+reader may not know. The page answers all of them the same way: a trigger is
+any element with `data-kw` (the key) and `data-kwkind` (the kind),
+`lookup(kind, key, ctx)` asks the kind registered under that name, and
+`lookupCardHTML` renders the answer into the one card `#kwpop`. A kind is
+registered with `lookupRegister` from where its data lives, so a new one is
+a registration and a trigger, never a new popup.
+
+| Kind | Trigger | Answer, and where it comes from |
+|---|---|---|
+| `kw`, `std` | a keyword or standard-library name in a snippet or a fenced block | the glossary of the snippet's own language (`IR.glossaries`, from the language backends) |
+| `tag` | an annotation badge (`deprecated`, `async`, …) | the tag catalogue (`IR.tags`, `core/tags.lua`); on `deprecated` and `internal` also the callers, from the call edges |
+| `fn` | the function's own name where its snippet declares it | `fn.complexity`, the distinct callers and callees, `fn.tested` |
+| `call` | a call in a snippet that resolves in the tree | the callee's summary and module (`ir.edges`, kind `call`), and a jump to it |
+| `req` | the string of a `require`/`import` in a snippet | in the tree (the target's summary, a jump), external (what this file calls on it), or unresolved |
+| `ext` | an external module written in a snippet | `calls_external` of the file: which members, how often |
+| `type` | a class name in a `@param` or `@return` type | `types_detail`: fields, parents, the declaring file |
+| `check` | a check id in the Findings table, the severity badge in a module's Drift list | `IR.checks`, from `findings.CHECKS`: what the check compares, its default grade, why it exists, what a finding reads like |
+
+**Nothing new is scanned for any of the IR kinds.** A call is matched by the
+line of its edge and the callee's name, so the same name in a comment or on
+another line is left alone; without a line match the name has to be
+unambiguous among the function's callees. The snippet's container carries the
+function once (`data-fnkey`), not every word.
+
+**Density on demand.** No trigger adds a row, a column or an icon; a word is
+underlined and nothing else. The card opens on a dwell (never while the
+pointer only crosses the word), on focus and on a click. It is bounded twice:
+rows are cut at eight with the omitted amount stated, and the box scrolls
+before it outgrows half the window. A kind that has nothing behind a trigger
+shows no card at all, which is a bug in whatever decorated the word; a kind
+whose data is not in this map answers with `unknown`, and the card says "Not
+known" and why (a map without class details, a language without call edges,
+a `require` that resolves to nothing, a check of the project's own
+`extra_checks`).
+
+**A require the scan could not resolve is filed under `requires_external`
+whatever its name.** The card separates the two cases the artifact lumps
+together: a name under the first segment of one of the tree's own module
+names is a module that is missing, not another project's.
+
+**Enter follows the card.** The card sits at the end of the document, so Tab
+never reaches it from the word. Enter on a focused trigger takes the card's
+jump into the map (a state patch for `navigate`, so Back returns), or else
+its reference link.
+
+Not built: the commit that last touched a line of a snippet. It needs a host
+that can run git per line, which the static page does not have.
+
+`TESTS/lookup_layer_spec.lua` runs the registry, the tokenizer and the card
+in `node` against a hand-built IR; `TESTS/sheets/lookup-hovers.sheet.lua`
+works the cards with the keyboard in a real window.
+
 ### Explaining the page's own furniture
 
 Every tab, every mode inside one, the findings disclosure, all six Hierarchy
@@ -2286,6 +2343,14 @@ authors to follow, not a limit this renderer enforces.
 
 The rendered map is the visible half; the checks are the half that catches
 bugs.
+
+Every check explains itself in `findings.CHECKS`
+([`core/findings.lua`](../lua/docmap/core/findings.lua)), beside the
+sentences its findings are rendered from: what it compares, the grade it
+raises by default, and why it exists. The page shows that as a card on every
+check id. `TESTS/findings_spec.lua` ties the explanations to the templates in
+both directions, to the policy's list of codes and to the grade
+`core/check.lua` raises, so a check added without one fails the suite.
 
 **Two of them are gated on what the language can express**, and the gate is
 the backend's own answer rather than a list kept here, declared once in

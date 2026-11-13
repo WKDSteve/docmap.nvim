@@ -674,79 +674,34 @@ return [[
       : Math.max(8, a.top - r.height - 6)) + "px";
   }
 
-  // The tag catalogue as a lookup table, built once. Keyed by name without
-  // the `@`, which is how the badges and the parser both spell it.
-  var tagByName = null;
-  function tagEntry(name){
-    if(tagByName === null){
-      tagByName = {};
-      (IR.tags || []).forEach(function(t){ tagByName[t.name] = t; });
-    }
-    return Object.prototype.hasOwnProperty.call(tagByName, name) ? tagByName[name] : null;
+  // What a trigger hands the lookup besides its key: the path of the snippet
+  // it sits in (which glossary answers), and the function it belongs to. The
+  // function rides on the snippet container (`data-fnkey`, one attribute per
+  // snippet, not one per word) or on the trigger itself (`data-kwctx`, the
+  // badges of a function).
+  //
+  // `[data-path]` rather than `.fn-snip`: a keyword decorated inside a fenced
+  // block has a path and is no snippet.
+  function kwContext(el){
+    var snip = el.closest && el.closest("[data-path]");
+    var owner = el.closest && el.closest("[data-fnkey]");
+    return {
+      path: snip ? snip.dataset.path : null,
+      fnKey: el.dataset.kwctx || (owner ? owner.dataset.fnkey : null)
+    };
   }
 
+  // One card for every kind: the registry answers, this shows the answer.
+  // What a kind knows and how its card reads is with the kind (see
+  // `lookupRegister`); nothing here knows that there are keywords or checks.
   function kwOpen(el){
-    // The third kind. Unlike keywords and stdlib names it has no snippet
-    // behind it and therefore no per-language glossary: an annotation means
-    // the same thing wherever it is written, which is exactly why the
-    // catalogue is one table and the glossaries are one per language.
-    if(el.dataset.kwkind === "tag"){
-      var tag = tagEntry(el.dataset.kw);
-      if(!tag) return;
-      var th = '<div class="kw-word">@' + esc(tag.name) + '</div>' +
-        '<div class="kw-sum">' + prose(tag.summary) + '</div>' +
-        '<div class="kw-origin">' + (tag.origin === "luals"
-          ? "LuaCATS annotation" : "this project's own convention") + '</div>';
-      // Only where the origin publishes one. A LuaLS link for `@todo` would
-      // load, look authoritative and not contain the answer -- the same rule
-      // that withholds the Lua-manual link from `vim.*` below.
-      if(tag.url){
-        th += '<div class="kw-ref"><a href="' + esc(tag.url) +
-          '" target="_blank" rel="noreferrer noopener">LuaLS reference &#8599;</a></div>';
-      }
-      kwAnchor = el;
-      kwpop.innerHTML = th;
-      kwpop.classList.add("on");
-      kwPlace(el);
-      return;
-    }
-
-    // `[data-path]` rather than `.fn-snip`, which is what `snippetHTML`'s own
-    // comment already describes ("the path rides on the container ... and the
-    // lookup walks up to it"). Written as a class name it silently meant "and
-    // only snippets"; a keyword decorated inside a fenced block would have
-    // found no container, read no glossary, and shown nothing on click.
-    var snip = el.closest && el.closest("[data-path]");
-    var gl = glossaryForPath(snip && snip.dataset.path);
-    var table = el.dataset.kwkind === "std" ? (gl && gl.stdlib) : (gl && gl.keywords);
-    var entry = table && Object.prototype.hasOwnProperty.call(table, el.dataset.kw)
-      ? table[el.dataset.kw]
-      : null;
+    var card = lookup(el.dataset.kwkind || "kw", el.dataset.kw, kwContext(el));
     // Nothing behind the trigger is a bug in whatever decorated it, not
     // something to show an empty card for.
-    if(!entry) return;
-
-    var h = '<div class="kw-word">' + esc(el.dataset.kw) + '</div>' +
-      '<div class="kw-sum">' + prose(entry.summary) + '</div>';
-    if(entry.note) h += '<div class="kw-note">' + esc(entry.note) + '</div>';
-    // Where the name comes from, when it is not the language itself. The
-    // distinction is the whole reason `vim.*` entries can sit in a Lua
-    // glossary without pretending to be Lua: a reader is told the difference
-    // rather than left to infer it.
-    if(entry.origin) h += '<div class="kw-origin">' + esc(entry.origin) + '</div>';
-    // Only for entries that *are* the language. A `vim.*` name is not in the
-    // Lua manual, and sending a reader there would be a link that looks
-    // right and answers nothing.
-    if(!entry.origin && gl.reference && gl.reference.url){
-      // The one link, per language, that this feature is allowed to depend
-      // on nothing for: every sentence above it is already the answer. There
-      // is one base URL rather than one URL per keyword.
-      h += '<div class="kw-ref"><a href="' + esc(gl.reference.url + (entry.anchor || "")) +
-        '" target="_blank" rel="noreferrer noopener">' + esc(gl.reference.label) + ' &#8599;</a></div>';
-    }
-
+    if(!card) return;
     kwAnchor = el;
-    kwpop.innerHTML = h;
+    kwpop.innerHTML = lookupCardHTML(card);
+    kwpop.scrollTop = 0;
     kwpop.classList.add("on");
     kwPlace(el);
   }
@@ -779,7 +734,32 @@ return [[
     else if(!(ev.target.closest && ev.target.closest("#kwpop"))) kwClose();
   });
 
-  document.addEventListener("keydown", function(ev){ if(ev.key === "Escape") kwClose(); });
+  document.addEventListener("keydown", function(ev){
+    if(ev.key === "Escape"){ kwClose(); return; }
+    // Enter on a focused trigger follows the card's own way on: the jump into
+    // the map, or else the reference link. The card sits at the end of the
+    // document, so Tab would never get there from the word.
+    if(ev.key !== "Enter" || !kwAnchor || document.activeElement !== kwAnchor) return;
+    if(!kwpop.classList.contains("on")) return;
+    var way = kwpop.querySelector("a[data-kw-nav]") || kwpop.querySelector("a[href]");
+    if(!way) return;
+    ev.preventDefault();
+    way.click();
+  });
+
+  // A jump out of a card: both floating layers go, then the page moves. The
+  // target is a state patch, the same thing every other control hands to
+  // `navigate`, so Back returns to where the card was opened.
+  document.addEventListener("click", function(ev){
+    var a = ev.target.closest && ev.target.closest("a[data-kw-nav]");
+    if(!a) return;
+    ev.preventDefault();
+    var to = null;
+    try { to = JSON.parse(a.dataset.kwNav); } catch(e){ to = null; }
+    kwClose();
+    sigClose();
+    if(to) navigate(to);
+  });
   // Same exemption as the annotation popup below: the keyword card is short
   // today, but it lives *inside* that card, so a scroll gesture aimed at the
   // snippet behind it must not take it down either.
@@ -836,7 +816,7 @@ return [[
       // A key with no entry is a bug in whatever rendered the trigger, not
       // something to paper over with an empty card — say nothing at all.
       if(!entry) return;
-      html = fnAnnotationHTML(entry.fn) + snippetHTML(entry.fn, entry.node) +
+      html = fnAnnotationHTML(entry.fn, entry.key) + snippetHTML(entry.fn, entry.node) +
         '<div class="fn-desc fn-see"><a href="#" data-sig-goto="' +
         esc(entry.node.id) + '">' + esc(entry.node.module || entry.node.path) +
         ':' + entry.fn.line + '</a></div>';

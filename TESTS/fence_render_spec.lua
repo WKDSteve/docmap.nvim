@@ -90,7 +90,8 @@ return function(H)
     extract("function richText(s){"),
     extract("function exampleHTML(s){"),
     extract("function glossaryForPath(path){"),
-    extract("function snipBodyHTML(src, path){"),
+    extract("function own(obj, key){"),
+    extract("function snipBodyHTML(src, path, ctx){"),
   }, "\n\n")
 
   -- A glossary in the shape `lang_registry.glossaries()` produces: keyed by

@@ -156,6 +156,23 @@ or module the tree no longer has is a drift finding.
 - **Docs:** [`docs/features_format.md`](../features_format.md) "The way
   back".
 
+## Lookup cards: snippets, types and check ids
+
+One card for whatever notation the page shows, behind a dwell, a focus or a
+click: in a function's snippet its own name, the calls that resolve in the
+tree, the `require` paths and the external modules; in the annotations the
+type names and, on `deprecated` and `internal`, who still calls the function;
+in the findings views the check behind a finding. All of it is read from the
+map as it is, and where the map does not hold the data the card says "Not
+known" and why.
+
+- **Module:** `core/render/html/js/01_marks_and_dimming.lua`,
+  `core/render/html/js/02_explorer_and_state.lua`,
+  `core/render/html/js/10_search_menus_popups.lua`, `core/findings.lua`
+  (`M.for_page`)
+- **Config:** none.
+- **Docs:** [`docs/pipeline.md`](../pipeline.md) "The lookup layer".
+
 ## Promoted feature tabs
 
 A `- **Tab:** true` bullet promotes one feature out of the Features catalog

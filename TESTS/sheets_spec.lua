@@ -1,6 +1,6 @@
 -- TESTS/sheets_spec.lua — the live checks of TESTS/sheets/*.sheet.lua (testing.sheet). Busted style on
 -- purpose: each sheet is its own case named `sheet:<id>`, the name `testing sheets report` finds the result by.
--- @cache-inputs TESTS/sheets/ TESTS/fixtures/keyword_page/ TESTS/fixtures/maps_page/ TESTS/fixtures/routes_page/ lua/docmap/
+-- @cache-inputs TESTS/sheets/ TESTS/fixtures/keyword_page/ TESTS/fixtures/maps_page/ TESTS/fixtures/routes_page/ TESTS/fixtures/lookup_page/ lua/docmap/
 ---@diagnostic disable: undefined-global
 -- luacheck: read globals describe it
 
@@ -12,11 +12,13 @@ local root = vim.fs.dirname(vim.fs.dirname(this))
 -- program): TESTS/sheets/out/<name>.html, next to the screenshots (git-ignored). keyword-page carries tags,
 -- maps-page a small layered tree with markers and uneven documentation (and its own .docmap.json), routes-page a
 -- Next.js tree with an `app` and a `pages` directory (its routes need the tsx and typescript parsers; without
--- them the page is rendered all the same, with no route in it).
+-- them the page is rendered all the same, with no route in it), lookup-page one function whose snippet holds
+-- every kind of the lookup layer.
 local PAGES = {
   { name = "keyword-page", fixture = "keyword_page", source = "lua" },
   { name = "maps-page", fixture = "maps_page", source = "lua/app" },
   { name = "routes-page", fixture = "routes_page", source = "src" },
+  { name = "lookup-page", fixture = "lookup_page", source = "lua/look" },
 }
 
 local function render_pages()

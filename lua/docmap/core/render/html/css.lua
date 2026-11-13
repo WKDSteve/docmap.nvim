@@ -297,7 +297,24 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
    cannot borrow it. Narrower, because the content is two sentences. */
 .kwpop{position:fixed;z-index:70;display:none;max-width:340px;
   background:var(--bg);border:1px solid var(--line);border-radius:8px;
-  box-shadow:0 8px 28px rgba(0,0,0,.18);padding:10px 12px}
+  box-shadow:0 8px 28px rgba(0,0,0,.18);padding:10px 12px;
+  max-height:50vh;overflow-y:auto}
+/* The parts a card of the lookup layer may have beyond word and summary. One
+   card, bounded: rows are cut by the script and the omitted amount stated
+   (.kw-more), the box itself scrolls before it outgrows half the window. */
+.kw-kind{font-family:system-ui,sans-serif;font-size:10.5px;color:var(--muted);margin-left:8px;
+  text-transform:uppercase;letter-spacing:.04em}
+.kw-unknown{font-size:12px;line-height:1.45;color:var(--muted);font-style:italic}
+.kw-line{font-size:12px;line-height:1.45;margin-top:4px}
+.kw-label{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
+.kw-rows-title{font-size:10.5px;margin-top:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.kw-rows{list-style:none;margin:3px 0 0;padding:0;font-size:11.5px;line-height:1.5}
+.kw-rows li{overflow-wrap:anywhere}
+.kw-rows code,.kw-sum code,.kw-line code,.kw-unknown code{font-family:var(--mono);font-size:11px}
+.kw-n{color:var(--muted)}
+.kw-more{font-size:11px;color:var(--muted);margin-top:2px}
+.sev[data-kw]{cursor:help}
+.sev[data-kw]:focus{outline:1px solid var(--accent);outline-offset:1px}
 .kwpop.on{display:block}
 .kw-word{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:4px}
 .kw-sum{font-size:12px;line-height:1.45}
@@ -305,6 +322,9 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
    than a second half of the definition. */
 .kw-note{font-size:11.5px;line-height:1.4;color:var(--muted);margin-top:6px}
 .kw-ref{font-size:11px;margin-top:8px}
+/* The browser default link blue is unreadable on the dark card. */
+.kw-ref a{color:var(--accent);text-decoration:none}
+.kw-ref a:hover,.kw-ref a:focus{text-decoration:underline}
 .kw-origin{font-size:10.5px;margin-top:6px;color:var(--muted);
   text-transform:uppercase;letter-spacing:.04em}
 /* Decorated keywords stay unobtrusive until pointed at: a snippet where

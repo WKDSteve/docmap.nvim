@@ -161,6 +161,10 @@ function M.render(ir, findings, opts)
     -- cost of a few hundred bytes; two panels each inlining their own copy is
     -- the duplication this repository argues against everywhere else.
     tags = require("docmap.core.tags").for_page(),
+    -- The check catalogue, the fourth kind of the lookup layer: what each check compares and why it
+    -- exists, from `core/findings.lua`, where the sentences of the findings live. Tool data on the same
+    -- terms as `tags`: the same bytes in every checkout, so on the page and not in the artifact.
+    checks = require("docmap.core.findings").for_page(),
     -- The keyword table `core/markers.lua` matched with, so the Notes tab
     -- renders sections in the same order and with the same names the
     -- scanner used. Passed rather than repeated in JavaScript: a second
@@ -228,10 +232,13 @@ function M.render(ir, findings, opts)
     -- that actually carry the attribute, so an unresolvable target silently
     -- stays inert instead of being a dead click.
     local node_attr = f.node and (' data-node="%s"'):format(esc(f.node)) or ""
-    rows[#rows + 1] = ([[<tr%s><td><span class="sev %s">%s</span></td><td class="msg">%s</td><td class="msg">%s</td></tr>]]):format(
+    -- The check id is a trigger of the lookup layer (kind `check`): the card says what the check compares
+    -- and why it exists. Focusable, so the keyboard reaches it like every other trigger.
+    rows[#rows + 1] = ([[<tr%s><td><span class="sev %s">%s</span></td><td class="msg"><span class="kw" data-kw="%s" data-kwkind="check" tabindex="0">%s</span></td><td class="msg">%s</td></tr>]]):format(
       node_attr,
       f.severity,
       f.severity,
+      esc(f.check),
       esc(f.check),
       esc(fmt_finding(f))
     )
