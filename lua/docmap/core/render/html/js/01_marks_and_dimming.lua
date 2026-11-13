@@ -155,10 +155,11 @@ return [[
     Object.keys(hboxes).forEach(function(key){
       hboxes[key].classList.toggle("hidden", isHidden(key));
     });
-    // Tree rows and Treemap areas dim by node id too; "show all" has to
-    // reach them without waiting for the next redraw.
+    // Tree rows, Treemap areas and the dots of the Coupling plot dim by
+    // node id too; "show all" has to reach them without waiting for the
+    // next redraw.
     var alt = document.getElementById("halt-body");
-    if(alt) alt.querySelectorAll(".ht-row[data-id], .tm-group[data-id], .tm-tile[data-id]").forEach(function(el){
+    if(alt) alt.querySelectorAll(".ht-row[data-id], .tm-group[data-id], .tm-tile[data-id], .cq-dot[data-id]").forEach(function(el){
       el.classList.toggle("dim", isHidden(el.dataset.id));
     });
     var bar = document.getElementById("hiddenbar");

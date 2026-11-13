@@ -96,7 +96,11 @@ return function(H)
   local sync = src:match("function syncHidden%(%)(.-)\n  }\n")
   ok(sync ~= nil, "wide levels: syncHidden is found")
   ok(
-    (sync or ""):find('".ht-row[data-id], .tm-group[data-id], .tm-tile[data-id]"', 1, true) ~= nil,
+    (sync or ""):find(
+      '".ht-row[data-id], .tm-group[data-id], .tm-tile[data-id], .cq-dot[data-id]"',
+      1,
+      true
+    ) ~= nil,
     "wide levels: syncHidden re-dims tree rows and treemap areas"
   )
 end

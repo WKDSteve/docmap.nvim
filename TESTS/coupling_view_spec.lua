@@ -34,6 +34,10 @@ return function(H)
     "a click opens the module"
   )
   has('aria-live="polite"', "the readout is announced")
+  has(
+    '.tm-tile[data-id], .cq-dot[data-id]"',
+    "a dimmed module is shown again by show all, without a redraw"
+  )
   -- nothing new in the payload: the plot reads `requires` and `required_by`
   local html_lua = H.slurp((vim.fn.getcwd():gsub("\\", "/")) .. "/lua/docmap/core/render/html.lua")
   ok(
