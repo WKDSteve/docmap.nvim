@@ -501,6 +501,9 @@ return [[
     // `center` in practice — see `navigate()`'s own note on why setting one
     // clears the other.
     hideroot: 0,
+    // The tint of the Modules view: null (off, the default), "doc", "test",
+    // "fix" or "debt" (see the Tint section of the maps slice).
+    tint: null,
     // Analysis sort. `null` means "this panel's own default order", which is
     // deliberately not spelled as an explicit column: each panel's default is
     // an editorial choice (worst coverage first, highest fan-in first) that a
@@ -636,6 +639,9 @@ return [[
       if((s.view || "modules") === "modules" && s.hideroot) {
         parts.push("hideroot=" + encodeURIComponent(String(s.hideroot)));
       }
+      // The tint is an encoding of the Modules view; off is the default and
+      // stays out of the link.
+      if((s.view || "modules") === "modules" && s.tint) parts.push("tint=" + encodeURIComponent(s.tint));
       if(isGraphView(s.view)){
         parts.push("dir=" + encodeURIComponent(s.dir || "out"));
         parts.push("depth=" + encodeURIComponent(String(s.depth === 0 ? 0 : (s.depth || 2))));
@@ -693,6 +699,8 @@ return [[
       // `depth` above.
       else if(k === "hideroot"){ var hr = parseInt(v, 10); s.hideroot = (isNaN(hr) || hr < 0) ? 0 : hr; }
       else if(k === "fn") s.fn = v;
+      // An unknown tint is no tint: a link with a typo opens the plain view.
+      else if(k === "tint") s.tint = (v === "doc" || v === "test" || v === "fix" || v === "debt") ? v : null;
       else if(k === "ext") s.ext = (v === "1" || v === "true");
       else if(k === "iview") s.iview = (v === "modules") ? "modules" : "functions";
       else if(k === "atool") s.atool = (v === "doc" || v === "deps" || v === "complexity" ||

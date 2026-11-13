@@ -255,6 +255,11 @@ return [[
       "Everything under the center as nested areas, sized by lines of code " +
       "(or functions): where the weight of a wide level sits, at a glance. " +
       "Click to zoom in.",
+    "hier.tint":
+      "Tints the Modules boxes by one measure of everything below each box: " +
+      "the share of functions that are documented or tested, or how many FIX " +
+      "or TODO/HACK/PERF markers there are per 1,000 lines. A stronger tint means " +
+      "look here first. The value is printed on each box and the legend names the steps.",
     "view.modules":
       "The directory hierarchy itself — every module and namespace, nested " +
       "the way the tree is. The one view with no direction, because " +

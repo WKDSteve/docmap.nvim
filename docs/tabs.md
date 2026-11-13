@@ -53,6 +53,19 @@ lines of code, or by functions (`tm=functions`): a click zooms into a group, a
 leaf opens in the Tree tab, and ▲ Up and the path above go back. Rows and tiles
 take the same right-click menu as boxes, and dimmed nodes stay dimmed.
 
+The Modules view has one more encoding, off by default: the **Tint** switch in its toolbar colours each
+box by a measure of everything below it. *documented* and *tested* are the share of functions that
+are (`@internal` functions are left out of the documented share, as in the Documentation panel);
+*FIX markers* and *TODO / HACK / PERF* are comment markers per 1,000 lines, kept apart because a
+`FIX` marker says a line is wrong and the other three are scheduled work. A stronger tint means
+"look here first", so one glance says whether the weak spot is one corner or the whole tree. The
+steps are fixed and named in the legend (80%, 60%, 40%, 20% for a share; 1, 3 and 6 markers per
+1,000 lines), every box prints its value, the tooltip has the counts, and a box with nothing to
+measure is dashed instead of being drawn as 0%. The tint rides in the link (`tint=doc`, `test`, `fix`
+or `debt`), works together with dimmed boxes and the language legend, and the SVG export keeps it,
+with the legend as a line below the diagram. Nothing new is in the artifact for it: the page
+computes it from the functions, markers and line counts it already carries.
+
 The Deps and Module Calls views' `+ external` toggle answers *why* a
 dependency is there, not just that it is: each external box's tooltip
 breaks down exactly which functions were actually called and how often

@@ -213,6 +213,7 @@ local specs = {
   "hierarchy_gestures_spec.lua",
   "hierarchy_default_center_spec.lua",
   "hierarchy_wide_levels_spec.lua",
+  "hierarchy_tint_spec.lua",
   "explain_spec.lua",
   "analysis_tools_spec.lua",
   "plugin_wrappers_spec.lua",

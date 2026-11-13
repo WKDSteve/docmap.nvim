@@ -10,6 +10,7 @@ return [[
   --error:#b3261e; --warn:#8a5a00; --info:#4a4a48;
   --mod:#3b6ea8; --ns:#7a7a76; --file:#5c8a5c;
   --dep:#a35a2a; --call:#6b4c9a; --fn:#8a5a00; --ext:#2a7a6f;
+  --tint:200,100,0; --ta1:.14; --ta2:.3; --ta3:.48; --ta4:.68;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){
@@ -19,6 +20,7 @@ return [[
     --error:#f2837b; --warn:#e0b060; --info:#a8a8a3;
     --mod:#7aa9dd; --ns:#9a9a95; --file:#8fbf8f;
     --dep:#d99b6a; --call:#b09ada; --fn:#e0b060; --ext:#6fc0b3;
+    --tint:240,150,40; --ta1:.14; --ta2:.26; --ta3:.38; --ta4:.5;
   }
 }
 :root[data-theme="light"]{
@@ -27,6 +29,7 @@ return [[
   --error:#b3261e; --warn:#8a5a00; --info:#4a4a48;
   --mod:#3b6ea8; --ns:#7a7a76; --file:#5c8a5c;
   --dep:#a35a2a; --call:#6b4c9a; --fn:#8a5a00; --ext:#2a7a6f;
+  --tint:200,100,0; --ta1:.14; --ta2:.3; --ta3:.48; --ta4:.68;
 }
 :root[data-theme="dark"]{
   --bg:#16171a; --panel:#1d1f23; --ink:#e6e6e3; --muted:#9a9a95; --line:#2e3136;
@@ -34,6 +37,7 @@ return [[
   --error:#f2837b; --warn:#e0b060; --info:#a8a8a3;
   --mod:#7aa9dd; --ns:#9a9a95; --file:#8fbf8f;
   --dep:#d99b6a; --call:#b09ada; --fn:#e0b060; --ext:#6fc0b3;
+  --tint:240,150,40; --ta1:.14; --ta2:.26; --ta3:.38; --ta4:.5;
 }
 *{box-sizing:border-box}
 /* Type scale: 9.5 / 10.5 / 11.5 / 12.5 / 13 / 14 / 15 / 17 / 19 / 20px.
@@ -133,6 +137,7 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
     --error:#900; --warn:#750; --info:#444;
     --mod:#245; --ns:#666; --file:#363; --dep:#743; --call:#534;
     --fn:#750; --ext:#255;
+    --tint:200,100,0; --ta1:.14; --ta2:.3; --ta3:.48; --ta4:.68;
   }
   @page{margin:14mm}
   body{background:#fff;color:#111;font-size:10.5pt}
@@ -878,6 +883,23 @@ li:hover>.marki,tr:hover .marki{opacity:.8}
 .hlegend .sw.call.weak{border-top-style:dashed}
 .hlegend .bx{width:11px;height:11px;border-radius:3px;border:1px solid currentColor}
 .hnode.k-fn .hnm{color:var(--fn)}
+/* Tint of the Modules view (see the maps slice). One hue in four steps of opacity over the box's own
+   background, so the steps differ in lightness in both themes; the value is printed on the box, so the colour
+   is never the only carrier. From step 3 on the name is drawn in the ink colour: the kind colours do not
+   hold their contrast on the darker steps. */
+.tint-1{background-image:linear-gradient(rgba(var(--tint),var(--ta1)),rgba(var(--tint),var(--ta1)))}
+.tint-2{background-image:linear-gradient(rgba(var(--tint),var(--ta2)),rgba(var(--tint),var(--ta2)))}
+.tint-3{background-image:linear-gradient(rgba(var(--tint),var(--ta3)),rgba(var(--tint),var(--ta3)))}
+.tint-4{background-image:linear-gradient(rgba(var(--tint),var(--ta4)),rgba(var(--tint),var(--ta4)))}
+.hnode.tint-3 .hnm,.hnode.tint-4 .hnm,.hnode.tint-3 .hsm,.hnode.tint-4 .hsm{color:var(--ink)}
+.hnode.tint-na,.hlegend .bx.tint-na{border-style:dashed}
+#hstage.tinted .hnode .hnm{padding-right:38px}
+.hnode .htv{position:absolute;top:6px;right:8px;font-family:var(--mono);font-size:10.5px;font-weight:600;
+  color:var(--ink)}
+.htint{display:inline-flex;align-items:center;gap:6px}
+.htint select{font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--line);border-radius:7px;
+  background:var(--panel);color:var(--ink)}
+.hlegend .lg-tint b{color:var(--ink);font-weight:600}
 .hnode.center{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .hnode .hline{font-size:9.5px;color:var(--muted);margin-top:1px;font-family:var(--mono)}
 

@@ -16,6 +16,7 @@ local SLICES = {
   "docmap.core.render.html.js.08_history_tree_treemap",
   "docmap.core.render.html.js.09_zoom_graph_export",
   "docmap.core.render.html.js.10_search_menus_popups",
+  "docmap.core.render.html.js.10b_maps",
   "docmap.core.render.html.js.11_quicks_compare_init",
 }
 

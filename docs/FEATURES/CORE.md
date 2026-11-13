@@ -256,6 +256,21 @@ busiest node when the URL names no center (the root has no edges of its own).
 - **Config:** none
 - **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
 
+## Tint of the Modules view (health and marker density)
+
+One switch in the Hierarchy toolbar tints the Modules boxes by a measure of
+each box's whole subtree: the share of documented or tested functions, or the
+density of `FIX` markers and of `TODO`/`HACK`/`PERF` markers per 1,000 lines.
+It answers "where is this repository weakest, and is the weakness concentrated
+or spread", which a percentage in a panel cannot. Off by default; the steps
+are fixed and named in the legend, each box prints its value, and the SVG
+export keeps tint, values and legend.
+
+- **Module:** `core/render/html/js/10b_maps.lua` (`tintTotals`, `tintOf`,
+  `applyTint`, `tintLegend`)
+- **Config:** none; `tint=doc|test|fix|debt` in the link.
+- **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
+
 ## Call hierarchy in native LSP UI
 
 `opts.callhierarchy` attaches a second, narrow LSP client to Lua buffers

@@ -487,6 +487,7 @@ return [[
     var items = entries.map(function(it){
       return '<span class="lg"><span class="sw ' + it.sw + '"></span>' + esc(it.text) + '</span>';
     });
+    items = items.concat(tintLegend());
     items.push('<span class="lg">wheel zooms · shift+wheel pans · ' +
       (isGraphView(view) ? 'zoom past the edge changes depth' : 'zoom right in to open a module') +
       ' · right-click for more</span>');

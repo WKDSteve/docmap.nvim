@@ -391,6 +391,9 @@ return [[
       if(el) el.style.display = diag;
     });
     document.getElementById("hdir").style.display = show;
+    // The tint belongs to the Modules boxes; the select shows what the link says.
+    document.getElementById("htintwrap").style.display = (s.view || "modules") === "modules" ? "" : "none";
+    document.getElementById("htint").value = (s.tint && TINT_MODES[s.tint]) ? s.tint : "";
     document.getElementById("hdepth").style.display = show;
     // External requires/calls exist only in Deps and Module Calls; the
     // per-function Calls view has no equivalent, since a call into a module
@@ -491,6 +494,10 @@ return [[
     if(!svg) return null;
     var w = svg.getAttribute("width"), h = svg.getAttribute("height");
     var cs = getComputedStyle(document.body);
+    // A tinted diagram is exported tinted, with its legend as a line below it.
+    var tintLine = tintLegendText();
+    var graphH = h;
+    if(tintLine){ h = String(parseFloat(h) + 26); w = String(Math.max(parseFloat(w), 760)); }
     var parts = ['<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" '+
       'viewBox="0 0 '+w+' '+h+'" font-family="monospace">'];
     parts.push('<rect width="100%" height="100%" fill="'+cs.backgroundColor+'"/>');
@@ -521,11 +528,24 @@ return [[
       var x = parseFloat(el.style.left), y = parseFloat(el.style.top);
       var st = getComputedStyle(el);
       parts.push('<rect x="'+x+'" y="'+y+'" width="'+BOX_W+'" height="'+BOX_H+'" rx="7" '+
-        'fill="'+st.backgroundColor+'" stroke="'+st.borderTopColor+'"/>');
+        'fill="'+st.backgroundColor+'" stroke="'+st.borderTopColor+'"'+
+        (el.dataset.tint === "na" ? ' stroke-dasharray="3 3"' : '')+'/>');
+      // The tint as a second rectangle over the box (colour plus opacity, which every SVG reader
+      // understands) and the value as text, so the file says what the screen said.
+      var tinted = el.dataset.tint !== undefined;
+      if(tinted && el.dataset.tint !== "na" && el.dataset.tint !== "0"){
+        var paint = tintPaint(el.dataset.tint);
+        parts.push('<rect x="'+x+'" y="'+y+'" width="'+BOX_W+'" height="'+BOX_H+'" rx="7" '+
+          'fill="'+paint.rgb+'" fill-opacity="'+paint.opacity+'"/>');
+      }
       var nm = el.querySelector(".hnm"), sub = el.querySelector(".hsm, .hkind, .hline");
       if(nm){
         parts.push('<text x="'+(x+9)+'" y="'+(y+19)+'" font-size="11" font-weight="600" '+
-          'fill="'+getComputedStyle(nm).color+'">'+esc(clip(nm.textContent, 22))+'</text>');
+          'fill="'+getComputedStyle(nm).color+'">'+esc(clip(nm.textContent, tinted ? 16 : 22))+'</text>');
+      }
+      if(tinted){
+        parts.push('<text x="'+(x+BOX_W-8)+'" y="'+(y+19)+'" font-size="10" text-anchor="end" '+
+          'fill="'+cs.color+'">'+esc(el.dataset.tintText || "")+'</text>');
       }
       if(sub){
         parts.push('<text x="'+(x+9)+'" y="'+(y+35)+'" font-size="9.5" '+
@@ -533,6 +553,10 @@ return [[
       }
     });
 
+    if(tintLine){
+      parts.push('<text x="8" y="'+(parseFloat(graphH)+17)+'" font-size="10" fill="'+cs.color+'">'+
+        esc(tintLine)+'</text>');
+    }
     parts.push('</svg>');
     return parts.join("\n");
   }

@@ -1,0 +1,7 @@
+{
+  "tests_dir": "checks",
+  "layers": [
+    { "from": "app.core", "to": "app.ui", "why": "the core knows no window" },
+    { "from": "app.util", "to": "app.core", "why": "helpers stay below the core" }
+  ]
+}

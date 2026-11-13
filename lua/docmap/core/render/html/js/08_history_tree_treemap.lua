@@ -690,6 +690,7 @@ return [[
     else if(hidingRoot) centerKey = null;
 
     var moved = reconcile(positions, view, centerKey);
+    applyTint();
 
     // The layer axis and the spread axis swap with the orientation; the
     // canvas has to swap with them or half the graph is outside it.

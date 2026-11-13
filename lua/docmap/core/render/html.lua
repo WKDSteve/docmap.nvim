@@ -428,6 +428,16 @@ function M.render(ir, findings, opts)
     '<div class="hview-toggle" id="hgest">',
     '<button class="hgest-btn" title="Classic gestures: single click leaves for the Tree view, double click recentres. Off by default — a single click recentres and stays here.">⇵ Classic clicks</button>',
     "</div>",
+    -- One switch for every tint of the Modules view (documented, tested, marker density). Off by default:
+    -- density on demand. A select rather than a row of pills, so four readings cost one control.
+    '<label class="htint" id="htintwrap" data-explain="hier.tint"><span class="hctl-label">Tint</span>',
+    '<select id="htint" aria-label="Tint the Modules boxes">',
+    '<option value="">off</option>',
+    '<option value="doc">documented</option>',
+    '<option value="test">tested</option>',
+    '<option value="fix">FIX markers</option>',
+    '<option value="debt">TODO / HACK / PERF</option>',
+    "</select></label>",
     '<button id="hzoomreset" title="Reset zoom to 100% (or press 0)">⌕ 100%</button>',
     '<span class="hzoom" id="hzoomlabel">100%</span>',
     '<button id="hexport" title="Download the current diagram as a standalone SVG">↓ SVG</button>',
