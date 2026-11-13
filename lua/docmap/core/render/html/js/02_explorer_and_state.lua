@@ -188,14 +188,21 @@ return [[
   // one; so is, in a map that carries no class details at all, a name spelled
   // like a LuaCATS class (`Docmap.Node`), where the card says that the
   // details are not known and why. Everything else stays plain text.
-  function typeHTML(text){
+  //
+  // `lang` is the language of the function the type belongs to, when the
+  // caller knows it. The "not known" card names what would supply the
+  // details, and that is LuaLS: for a `System.String` of a C# file the same
+  // sentence would be advice that cannot work, so only Lua (or a caller that
+  // does not know) gets the trigger.
+  function typeHTML(text, lang){
     var out = "", last = 0, m;
     var re = /[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/g;
+    var guess = !hasTypeDetail() && (!lang || lang === "lua");
     text = text || "";
     while((m = re.exec(text)) !== null){
       var name = m[0];
       var known = own(classByName, name);
-      if(!known && (hasTypeDetail() || !/^[A-Z][A-Za-z0-9_]*\.[A-Za-z_]/.test(name))) continue;
+      if(!known && (!guess || !/^[A-Z][A-Za-z0-9_]*\.[A-Za-z_]/.test(name))) continue;
       out += esc(text.slice(last, m.index)) + '<span class="kw" data-kw="' + esc(name) +
         '" data-kwkind="type" tabindex="0">' + esc(name) + '</span>';
       last = m.index + name.length;
@@ -207,6 +214,7 @@ return [[
   // `internal` badges can say who still calls the function.
   function fnAnnotationHTML(fn, key){
     var h = [];
+    var lang = (key && own(fnByKey, key)) ? fnByKey[key].node.language : null;
     var badges = [];
     // The badges *are* the tags, so they are the third trigger surface of
     // the lookup layer (`ReferenceTab.md` § One layer, four trigger
@@ -249,7 +257,7 @@ return [[
     if(fn.params && fn.params.length){
       h.push('<ul class="fn-plist">');
       fn.params.forEach(function(p){
-        h.push('<li><code>'+esc(p.name)+(p.optional?'?':'')+'</code> '+typeHTML(p.type)
+        h.push('<li><code>'+esc(p.name)+(p.optional?'?':'')+'</code> '+typeHTML(p.type, lang)
           +(p.desc?' — '+esc(p.desc):'')+'</li>');
       });
       h.push('</ul>');
@@ -257,7 +265,7 @@ return [[
     if(fn.returns && fn.returns.length){
       h.push('<ul class="fn-plist">');
       fn.returns.forEach(function(r){
-        h.push('<li>→ <code>'+typeHTML(r.type)+'</code>'+(r.name?' '+esc(r.name):'')
+        h.push('<li>→ <code>'+typeHTML(r.type, lang)+'</code>'+(r.name?' '+esc(r.name):'')
           +(r.desc?' — '+esc(r.desc):'')+'</li>');
       });
       h.push('</ul>');

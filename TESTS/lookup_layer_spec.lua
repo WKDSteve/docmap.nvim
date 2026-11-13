@@ -91,8 +91,8 @@ return function(H)
     "(node ? ' data-fnkey=\"' + esc(fnKey(node.id, fn.name)) + '\"' : '')",
     "the function rides on the snippet container, once"
   )
-  has("typeHTML(p.type)", "a parameter's type is a trigger surface")
-  has("typeHTML(r.type)", "so is a return type")
+  has("typeHTML(p.type, lang)", "a parameter's type is a trigger surface")
+  has("typeHTML(r.type, lang)", "so is a return type")
   has(
     "html = fnAnnotationHTML(entry.fn, entry.key) + snippetHTML(entry.fn, entry.node)",
     "the popup hands the badges their function"
@@ -186,7 +186,7 @@ return function(H)
     "  else push(depOut, e.from, e); });",
     "function getExternalCallTotals(){ return { dkjson: { encode: 3, decode: 1 } }; }",
     cut(s01, "  function esc(s){", "  // Markdown info strings that are not"),
-    cut(s02, "  function typeHTML(text){", "  // `key` (the function's `fnKey`) is optional"),
+    cut(s02, "  function typeHTML(text, lang){", "  // `key` (the function's `fnKey`) is optional"),
     cut(s02, "  function glossaryForPath(path){", "  // Artifact lives in out_dir"),
     "var A = 'lua/a.lua#M.run', out = {};",
     "out.snip = snipBodyHTML(SNIP, 'lua/a.lua', { fnKey: A });",
@@ -232,6 +232,8 @@ return function(H)
     "IR.nodes[1].types_detail = null; classByName = {}; mapHasTypes = null;",
     "out.typeNoDetail = lookup('type', 'B.Opts');",
     "out.typeHTMLNoDetail = typeHTML('table<string, B.Opts>|string|Opts|vim.api.x');",
+    "out.typeHTMLLua = typeHTML('B.Opts', 'lua');",
+    "out.typeHTMLOther = typeHTML('System.String', 'csharp');",
     "console.log(JSON.stringify(out));",
   }, "\n")
   local tmp = vim.fn.tempname() .. ".js"
@@ -381,6 +383,16 @@ return function(H)
     got.typeHTMLNoDetail,
     "table&lt;string, " .. span("B.Opts", "type", "B.Opts") .. "&gt;|string|Opts|vim.api.x",
     "type: without them a name spelled like a class is one, and says not known"
+  )
+  eq(
+    got.typeHTMLLua,
+    span("B.Opts", "type", "B.Opts"),
+    "type: the same for a function the caller knows to be Lua"
+  )
+  eq(
+    got.typeHTMLOther,
+    "System.String",
+    "type: a type of another language gets no card that could only point it at LuaLS"
   )
 
   -- req / ext
