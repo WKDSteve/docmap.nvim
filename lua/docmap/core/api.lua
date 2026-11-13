@@ -438,6 +438,72 @@ function M.commit(opts, sha)
   }
 end
 
+---`/api/shape/<a>` and `/api/shape/<a>/<b>` — what changed about the shape
+---of the tree between two committed maps, for the page to mark in the
+---Hierarchy tab. `a` is the older side. Without `b` the newer side is the map
+---on disk, which is the one the page is showing.
+---
+---Two path segments rather than git's own `a..b`: a transport is right to
+---refuse a path with `..` in it, and `editor/serve.lua`'s does.
+---
+---The comparison is `core/diff.lua`'s (`shape` for the graph, `compare` and
+---`render` for the same change as text), so the page and `:DocMap diff`
+---cannot come to different answers about one pair of maps.
+---@param opts table Needs `opts.git`.
+---@param a string Already validated (`M.safe_sha`).
+---@param b string|nil Already validated; nil for the map on disk.
+---@return table
+function M.shape(opts, a, b)
+  if not opts.git then
+    return { available = false, reason = "no git access configured" }
+  end
+  local function missing(sha)
+    return {
+      available = false,
+      reason = ("no map is committed at %s (the revision does not exist, or it is older than the map)"):format(
+        sha:sub(1, 8)
+      ),
+    }
+  end
+  local before = ir_at(opts, a)
+  if not before then
+    return missing(a)
+  end
+  local after
+  if b then
+    after = ir_at(opts, b)
+    if not after then
+      return missing(b)
+    end
+  else
+    local err
+    after, err = current_ir(opts)
+    if not after then
+      return { available = false, reason = err or "this project has no map on disk yet" }
+    end
+  end
+
+  local diff = require("docmap.core.diff")
+  local shape = diff.shape(before, after)
+  local label = b and (a:sub(1, 8) .. ".." .. b:sub(1, 8)) or a:sub(1, 8)
+  return {
+    available = true,
+    before = { sha = a, schema = shape.schema.before },
+    after = { sha = b, current = b == nil, schema = shape.schema.after },
+    deps_comparable = shape.deps_comparable,
+    reasons = shape.reasons,
+    nodes_added = shape.nodes_added,
+    nodes_removed = shape.nodes_removed,
+    deps_added = shape.deps_added,
+    deps_removed = shape.deps_removed,
+    cycles_added = shape.cycles_added,
+    cycles_removed = shape.cycles_removed,
+    -- The same change the way `:DocMap diff` prints it, functions and blast
+    -- radius included: the graph can mark nodes and edges and nothing else.
+    text = diff.render(diff.compare(before, after), before, after, label),
+  }
+end
+
 ---Every fixed-name route this module answers, by the path segment that
 ---names it. `commit/<sha>` is not in here — see `M.answer` — because its
 ---name is parametrised by the sha itself, not fixed.
@@ -497,6 +563,21 @@ function M.answer(name, opts, param)
     return M.commit(opts, sha), nil
   end
 
+  -- `shape/<a>` and `shape/<a>/<b>`: the same reasoning, for one or two
+  -- shas. Each is validated on its own, so nothing but hex ever reaches git.
+  local spec = name:match("^shape/(.+)$")
+  if spec then
+    local a, b = spec:match("^([^/]+)/([^/]+)$")
+    if not a then
+      a, b = spec, nil
+    end
+    local sha_a, sha_b = M.safe_sha(a), b and M.safe_sha(b) or nil
+    if not sha_a or (b and not sha_b) then
+      return nil, "not a commit hash"
+    end
+    return M.shape(opts, sha_a, sha_b), nil
+  end
+
   local route = M.routes[name]
   if not route then
     local names = {}
@@ -505,6 +586,7 @@ function M.answer(name, opts, param)
     end
     table.sort(names)
     names[#names + 1] = "commit/<sha>"
+    names[#names + 1] = "shape/<sha>[/<sha>]"
     return nil, ("no such route: %s (have: %s)"):format(tostring(name), table.concat(names, ", "))
   end
   return route(opts, param), nil

@@ -543,6 +543,25 @@
 ---@field cycles_removed string[]
 ---@field impact_changed { id: string, before: integer, after: integer }[] Sorted by how much the blast radius moved.
 
+---One require edge of a `Docmap.Shape`, both ends as node ids.
+---@class Docmap.ShapeEdge
+---@field from string
+---@field to string
+---@field deferred boolean The edge is a lazy require.
+---@field changed boolean? The edge exists in both maps and only its laziness differs.
+
+---The shape change between two maps as a drawn graph can mark it, from `docmap.core.diff.shape`.
+---@class Docmap.Shape
+---@field schema { before: integer, after: integer } `meta.schema` of the two maps.
+---@field deps_comparable boolean False when one of the maps predates the dependency graph; the edge and cycle lists are then empty because they are unknowable.
+---@field reasons string[] What could not be compared, as sentences. Empty when everything was.
+---@field nodes_added string[] Node ids the newer map has and the older does not, sorted.
+---@field nodes_removed { id: string, name: string, anchor: string? }[] The reverse, each with its module name (or path) and the nearest ancestor the newer map still has.
+---@field deps_added Docmap.ShapeEdge[]
+---@field deps_removed Docmap.ShapeEdge[]
+---@field cycles_added string[] Load-time cycles introduced, members joined with ` ↔ `.
+---@field cycles_removed string[]
+
 ---One classified change to a published function, from `docmap.core.diff.surface`.
 ---@class Docmap.SurfaceChange
 ---@field key string `"<node id>#<declared name>"`.

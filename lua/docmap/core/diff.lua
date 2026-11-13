@@ -673,4 +673,124 @@ function M.render(diff, before, after, label)
   return out
 end
 
+---The nearest ancestor of a node of `ir` that `other` still has, or nil.
+---
+---A removed node cannot be drawn on a map that no longer holds it; what the
+---page can mark is the place it was removed *from*.
+---@param ir Docmap.IR The map that holds `id`.
+---@param other Docmap.IR The map to look the ancestors up in.
+---@param id string
+---@return string?
+local function surviving_ancestor(ir, other, id)
+  local seen = {}
+  local up = (ir.nodes[id] or {}).parent
+  while up and not seen[up] do
+    if (other.nodes or {})[up] then
+      return up
+    end
+    seen[up] = true
+    up = (ir.nodes[up] or {}).parent
+  end
+  return nil
+end
+
+---The shape change between two maps, as a graph can show it: the nodes and
+---the require edges one map has and the other does not.
+---
+---`M.compare` answers the same question for a reader of text (keys joined
+---into strings, functions, blast radius). This is the form a page needs to
+---*mark* a drawn graph: every edge with both ends as ids, and every removed
+---node with its name and the place it was removed from, because the map on
+---screen no longer holds either.
+---
+---The schema rule is `M.compare`'s: against a map that predates the
+---dependency graph the edge lists stay empty and `reasons` says why. Both
+---sides are asked, not only the older one, because the page lets a reader
+---pick any two commits in either order.
+---@param before Docmap.IR
+---@param after Docmap.IR
+---@return Docmap.Shape
+function M.shape(before, after)
+  local was, now = node_set(before), node_set(after)
+  ---@type Docmap.Shape
+  local shape = {
+    schema = {
+      before = (before.meta or {}).schema or 1,
+      after = (after.meta or {}).schema or 1,
+    },
+    deps_comparable = true,
+    reasons = {},
+    nodes_added = {},
+    nodes_removed = {},
+    deps_added = {},
+    deps_removed = {},
+    cycles_added = {},
+    cycles_removed = {},
+  }
+
+  for _, id in ipairs(sorted_keys(now)) do
+    if not was[id] then
+      shape.nodes_added[#shape.nodes_added + 1] = id
+    end
+  end
+  for _, id in ipairs(sorted_keys(was)) do
+    if not now[id] then
+      local node = before.nodes[id] or {}
+      shape.nodes_removed[#shape.nodes_removed + 1] = {
+        id = id,
+        name = node.module or node.path or id,
+        anchor = surviving_ancestor(before, after, id),
+      }
+    end
+  end
+
+  for _, side in ipairs({ { before, "older" }, { after, "newer" } }) do
+    if predates_graphs(side[1]) then
+      shape.deps_comparable = false
+      shape.reasons[#shape.reasons + 1] = ("Requires and cycles are not compared: the %s map predates the dependency graph (schema %d)."):format(
+        side[2],
+        (side[1].meta or {}).schema or 1
+      )
+    end
+  end
+  if not shape.deps_comparable then
+    return shape
+  end
+
+  ---Require edges by `"from -> to"`; like `require_set`, the last occurrence
+  ---of a pair decides whether it is lazy.
+  ---@param ir Docmap.IR
+  ---@return table<string, Docmap.ShapeEdge>
+  local function edges_of(ir)
+    local set = {}
+    for _, e in ipairs(ir.edges or {}) do
+      if e.kind == "require" then
+        set[e.from .. " -> " .. e.to] = { from = e.from, to = e.to, deferred = e.deferred == true }
+      end
+    end
+    return set
+  end
+  local dep_was, dep_now = edges_of(before), edges_of(after)
+  for _, key in ipairs(sorted_keys(dep_now)) do
+    local e, old = dep_now[key], dep_was[key]
+    if not old then
+      shape.deps_added[#shape.deps_added + 1] = e
+    elseif old.deferred ~= e.deferred then
+      -- the edge was there; whether it loads at require time changed
+      shape.deps_added[#shape.deps_added + 1] =
+        { from = e.from, to = e.to, deferred = e.deferred, changed = true }
+    end
+  end
+  for _, key in ipairs(sorted_keys(dep_was)) do
+    if not dep_now[key] then
+      shape.deps_removed[#shape.deps_removed + 1] = dep_was[key]
+    end
+  end
+
+  local compared = M.compare(before, after)
+  shape.cycles_added = compared.cycles_added
+  shape.cycles_removed = compared.cycles_removed
+  return shape
+end
+
 return M

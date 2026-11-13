@@ -230,6 +230,9 @@ if head_pipe then
 end
 if head_sha and head_sha:match("^%x%x%x%x%x%x%x+$") then
   probe(root, { "--api=commit/" .. head_sha, "--out-dir=.deps/bundle-manifest-probe" })
+  -- `shape/<sha>` compares the map of that commit with the one on disk and reaches `core/diff`, which no other
+  -- route does. Same reasoning as the commit probe: a route that ships has to be measured.
+  probe(root, { "--api=shape/" .. head_sha, "--out-dir=.deps/bundle-manifest-probe" })
 else
   io.stderr:write(
     "bundle_manifest: could not resolve HEAD in "

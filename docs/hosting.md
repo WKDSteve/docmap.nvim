@@ -113,6 +113,7 @@ instead of generating anything. Today's routes:
 | `checklist` | The hand-verified ledger and what has drifted. |
 | `commits` | Recent commits, for the History tab. |
 | `commit/<sha>` | One commit's diff. Not in `routes` because its name carries the sha. |
+| `shape/<sha>`, `shape/<older>/<newer>` | The shape change between the map committed at a revision and the one on disk, or between two committed maps: nodes added and removed, requires gained and lost, and the same change as text. For the Hierarchy tab's comparison. Not in `routes`, for the same reason. |
 | `rules/catalog` | Every rule of the project's rulesets (`.rules.json`, else the vault): id, severity, family, title, section, text, source file and line, the check type if any, the agent hint. See below. |
 | `rules/run` | The mechanical run of a selection: one result per rule, `pass`, `fail`, `error`, `manual` or `waived`, with findings. See below. |
 | `rules/plan` | What an agent run over a selection would send: the requests (`system`, `prompt`, files, rules), what is not sent and why, sizes and a token estimate. Sends nothing. See below. |
