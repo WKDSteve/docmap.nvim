@@ -44,7 +44,7 @@ return function(H)
   )
 
   if not (ok_add and has_dt) then
-    ok(true, "lang.dart: dart parser not installed — skipping the rest")
+    print("n/a  lang.dart: dart parser not installed")
     return
   end
 

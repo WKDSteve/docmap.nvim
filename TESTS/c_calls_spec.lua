@@ -40,7 +40,7 @@ return function(H)
   ok(vim.fn.isdirectory(root) == 1, "c_calls: the fixture tree is checked in")
 
   if not (has("c") and has("cpp")) then
-    ok(true, "c_calls: the c or cpp parser is not installed -- skipping the tree")
+    print("n/a  c_calls: the c or cpp parser is not installed")
     return
   end
 

@@ -127,6 +127,6 @@ return function(H)
     -- this `heuristic`, and does not run at all here.
     eq(crossed and crossed.confidence, "exact", "polyglot: ... and is exact, not heuristic")
   else
-    ok(true, "polyglot: javascript parser not installed — function-level JS assertions skipped")
+    print("n/a  polyglot: javascript parser not installed (function-level JS assertions)")
   end
 end

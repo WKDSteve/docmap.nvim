@@ -34,7 +34,7 @@ return function(H)
   eq(kt.param_docs, true, "KDoc's @param names each one, as Javadoc's does")
 
   if not (ok_add and has_kt) then
-    ok(true, "lang.kotlin: kotlin parser not installed — skipping the rest")
+    print("n/a  lang.kotlin: kotlin parser not installed")
     return
   end
 

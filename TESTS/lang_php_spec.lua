@@ -41,7 +41,7 @@ return function(H)
   eq(php.line_comments[1], "//")
 
   if not (ok_add and has_php) then
-    ok(true, "lang.php: php parser not installed — skipping the rest")
+    print("n/a  lang.php: php parser not installed")
     return
   end
 

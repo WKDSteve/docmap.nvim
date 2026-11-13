@@ -29,7 +29,7 @@ return function(H)
     ok_add, has_zig = pcall(vim.treesitter.language.add, "zig")
   end
   if not (ok_add and has_zig) then
-    ok(true, "lang.zig: zig parser not installed — skipping (see this file's header)")
+    print("n/a  lang.zig: zig parser not installed")
     return
   end
 

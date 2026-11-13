@@ -49,7 +49,7 @@ return function(H)
   )
 
   if not (has_ml and has_mli) then
-    ok(true, "lang.ocaml: parsers not installed — skipping the rest")
+    print("n/a  lang.ocaml: parsers not installed")
     return
   end
 

@@ -20,7 +20,7 @@ return function(H)
   -- erroring when the parser is missing, so the pcall reports success.
   local ok_js, has_js = pcall(vim.treesitter.language.add, "javascript")
   if not (ok_js and has_js) then
-    ok(true, "lang.js gaps: javascript parser not installed — skipping (see this file's header)")
+    print("n/a  lang.js gaps: javascript parser not installed")
     return
   end
 

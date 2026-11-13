@@ -128,7 +128,7 @@ return function(H)
     vim.fn.mkdir(probe_root, "p")
     local have_git = git(probe_root, { "init", "-q" }).code == 0
     if not have_git then
-      ok(true, "usrcmds git commands: git unavailable on this machine, spec skipped")
+      print("n/a  usrcmds git commands: git unavailable on this machine")
       return
     end
 

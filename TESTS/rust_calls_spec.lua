@@ -118,7 +118,7 @@ return function(H)
     ok_add, has_rust = pcall(vim.treesitter.language.add, "rust")
   end
   if not (ok_add and has_rust) then
-    ok(true, "rust_calls: rust parser not installed — skipping the tree")
+    print("n/a  rust_calls: rust parser not installed")
     return
   end
 

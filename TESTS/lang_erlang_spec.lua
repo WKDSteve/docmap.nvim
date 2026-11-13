@@ -36,7 +36,7 @@ return function(H)
   eq(er.param_docs, false, "`-spec` names types rather than parameters")
 
   if not (ok_add and has_er) then
-    ok(true, "lang.erlang: erlang parser not installed — skipping the rest")
+    print("n/a  lang.erlang: erlang parser not installed")
     return
   end
 

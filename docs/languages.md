@@ -625,9 +625,10 @@ Lua-side consumers, and the same grouping in JavaScript on the generated page.
 
 ## Running the language specs
 
-Every backend spec **skips** when its grammar is absent, which is the normal
-local state and not a failure. To run one for real, point at a built grammar
-through that backend's own variable:
+Every backend spec prints `n/a  <lang> parser not installed` and stops when its
+grammar is absent: a reported skip (testing.nvim lists it with its reason and
+counts it in the summary), not a failure. To run one for real, point at a
+built grammar through that backend's own variable:
 
 ```bash
 DOCMAP_PYTHON_PARSER=/path/to/python.so bash scripts/test.sh

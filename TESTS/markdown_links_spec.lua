@@ -151,7 +151,7 @@ return function(H)
   local root = (vim.fn.getcwd():gsub("\\", "/"))
   local fd = io.open(root .. "/docs/map/overview.md", "rb")
   if not fd then
-    ok(true, "markdown links: no committed overview.md to check — skipping")
+    print("n/a  markdown links: no committed overview.md to check")
     return
   end
   local committed = fd:read("*a")

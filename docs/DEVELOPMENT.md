@@ -165,9 +165,10 @@ failure. `scripts/ci.sh tests` runs the same runner.
 [`TESTS/harness.lua`](../TESTS/harness.lua) (`eq`, `ok`, `tmpfile`,
 `read_lines` — no framework). [`TESTS/run.lua`](../TESTS/run.lua) is no longer
 the runner but still the **order manifest**: testing.nvim runs the specs in the
-order it lists them, and the order matters (alphabetical order fails
-`check_policy_spec.lua`, which depends on state an earlier spec leaves). A spec
-on disk but not listed runs last, with a note. A handful are worth knowing by
+order it lists them. The order no longer matters for correctness
+(`check_policy_spec.lua`, which used to depend on what an earlier spec left in
+the working directory, has its own empty root since 00435d7); it keeps the
+fast-failing specs first. A spec on disk but not listed runs last, with a note. A handful are worth knowing by
 name before touching what they cover:
 
 | Spec | Covers |
@@ -194,9 +195,9 @@ name before touching what they cover:
 | [`detect_source_links_spec.lua`](../TESTS/detect_source_links_spec.lua) | Source detection (`config.build`, every language backend's `detect_source`): a probed name that is a link out of the project is never opened, a link that stays inside is detected, nested links and a link back up the tree are not entered, and a directory that became a link since the last call is not answered from memory. |
 | [`win_links_spec.lua`](../TESTS/win_links_spec.lua) | Reading `dir /a:l` (`standalone/win_links.lua`), on listings in English and German (English labels), French and Spanish (translated labels, written from memory) plus ambiguous pairs, targets broken over two lines, a forged line and crafted floods; and the batched listing of many directories (forged marks, a wrong location, a missing segment); and reading the long name behind an 8.3 alias out of `dir /x`, which `uv.fs_realpath` uses. |
 | [`shim_links_spec.lua`](../TESTS/shim_links_spec.lua) | How the shim sees a link: against the editor on the host's file system, and its Windows branch on any host, driven on a canned listing that also holds a translated label, a name with a leading blank, an 8.3 alias, an ambiguous pair, a link with a broken target and UNC and device roots; 8.3 aliases that `uv.fs_realpath` resolves from a canned `dir /x`; a canned tree listed ahead in batches, and on a Windows host a real tree with real junctions where the number of `cmd.exe` processes is counted. |
-| `lang_*_spec.lua` | One per language backend. **Each skips when its grammar is absent**, which is the normal local state — see [`languages.md § Running the language specs`](languages.md#running-the-language-specs) for the `DOCMAP_<LANG>_PARSER` variable each one reads. |
+| `lang_*_spec.lua` | One per language backend. **Each prints `n/a` and stops when its grammar is absent** (a CI runner without built grammars, or a machine without them in `stdpath('data')`) — see [`languages.md § Running the language specs`](languages.md#running-the-language-specs) for the `DOCMAP_<LANG>_PARSER` variable each one reads. |
 | [`usrcmds_readonly_spec.lua`](../TESTS/usrcmds_readonly_spec.lua) | The `:DocMap` subcommands that read straight off the already-scanned IR — `why`, `graph`, `dot`, `mermaid`, `tools`, `bindings`, `plugins`, `endpoints`, `consumers` — none of which touch git. The algorithms one layer down (`core/deps.path`, `core/consumers.index`, …) already had literal-data coverage elsewhere; this is the command layer above them — usage errors, "nothing found" messages, collision/duplicate detection, sort order, and the `dot`/`mermaid` buffer-reuse-by-name regression. Literal `Docmap.IR` fixtures throughout, the same shape `docmap_spec.lua`'s churn/diff blocks use. |
-| [`usrcmds_git_spec.lua`](../TESTS/usrcmds_git_spec.lua) | The four `:DocMap` subcommands that shell out to git — `churn`, `diff`, `impact`, `checklist` — against a real, disposable fixture repository (`git init`, real commits, pinned `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE`), the same posture `api_spec.lua` and `mcp_spec.lua`'s `docmap_checklist` block already take: a stubbed `vim.system` would prove the wiring reads the stub, not that the real command, pathspec exclusion and async callback chain work. Skips outright on a machine with no `git`. |
+| [`usrcmds_git_spec.lua`](../TESTS/usrcmds_git_spec.lua) | The four `:DocMap` subcommands that shell out to git — `churn`, `diff`, `impact`, `checklist` — against a real, disposable fixture repository (`git init`, real commits, pinned `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE`), the same posture `api_spec.lua` and `mcp_spec.lua`'s `docmap_checklist` block already take: a stubbed `vim.system` would prove the wiring reads the stub, not that the real command, pathspec exclusion and async callback chain work. Prints `n/a` and stops on a machine with no `git`. |
 
 **What `bindings/usrcmds/*.lua` still has no direct spec, deliberately:**
 `open.lua` shells out to a real system opener (`explorer.exe`/`open`/
@@ -214,18 +215,22 @@ in this directory. `generate.lua`/`generate_all.lua`/`browse.lua`/
 `usrcmds_actions_spec.lua`).
 
 **A green run does not mean every backend was exercised.** Without grammars,
-the language specs report `ok` after their contract assertions and skip the
-parse. Point at built grammars before trusting a language change:
+the language specs pass their contract assertions and print `n/a  <lang> parser
+not installed` instead of parsing; testing.nvim lists every such line with its
+reason and counts them in the summary (`N case(s) n/a here`), and `--strict`
+makes them red. Point at built grammars before trusting a language change:
 
 ```bash
 DOCMAP_PYTHON_PARSER=/path/to/python.so bash scripts/test.sh
 ```
 
-The runner prints one line per spec and exits non-zero on the first failure. It
-writes to stdout directly rather than through `print`: `print` in a headless
-Neovim goes through the message area, and a spec that opens a window forces a
-redraw that swallows the pending newline, running two results together on one
-line. `docmap_browse_spec` mounts real floats, so that is not hypothetical.
+testing.nvim runs every spec, reports each failure with its file and line,
+prints a one-line summary and exits non-zero when anything failed. The old
+standalone runner (`TESTS/run.lua`, below) prints one line per spec and stops at
+the first failure; it writes to stdout directly rather than through `print`,
+because `print` in a headless Neovim goes through the message area and a spec
+that opens a window (`docmap_browse_spec` mounts real floats) forces a redraw
+that swallows the pending newline.
 
 Adding a spec means adding its filename to the `specs` list in
 [`TESTS/run.lua`](../TESTS/run.lua) — the order manifest, so the order is

@@ -46,7 +46,7 @@ return function(H)
   )
 
   if not (ok_add and has_rust) then
-    ok(true, "lang.rust: rust parser not installed — skipping the rest")
+    print("n/a  lang.rust: rust parser not installed")
     return
   end
 

@@ -312,7 +312,7 @@ return function(H)
           c.lang .. ": the note is the note, not the note plus a delimiter"
         )
       else
-        ok(true, "markers: no " .. c.lang .. " parser — skipping")
+        print("n/a  markers: no " .. c.lang .. " parser installed")
       end
     end
   end

@@ -40,7 +40,7 @@ return function(H)
   eq(cs.param_docs, true, '<param name="x"> names each one')
 
   if not (ok_add and has_cs) then
-    ok(true, "lang.csharp: c_sharp parser not installed — skipping the rest")
+    print("n/a  lang.csharp: c_sharp parser not installed")
     return
   end
 

@@ -57,7 +57,7 @@ return function(H)
   -- C
   -- =====================================================================
   if not have("c", "DOCMAP_C_PARSER") then
-    ok(true, "lang.c: c parser not installed — skipping (see this file's header)")
+    print("n/a  lang.c: c parser not installed")
   else
     -- ------------------------------------------------------------------
     -- A source file: definitions are the functions, and a forward
@@ -207,7 +207,7 @@ return function(H)
   -- C++
   -- =====================================================================
   if not have("cpp", "DOCMAP_CPP_PARSER") then
-    ok(true, "lang.cpp: cpp parser not installed — skipping (see this file's header)")
+    print("n/a  lang.cpp: cpp parser not installed")
   else
     local hppfile = H.tmpfile(".hpp")
     local hw = assert(io.open(hppfile, "w"))

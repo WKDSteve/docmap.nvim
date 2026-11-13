@@ -394,7 +394,7 @@ return function(H)
       -- No git on this machine/CI image at all — the tool's own degrade path
       -- (below, against the fixture-less root) still covers the "git log
       -- fails" branch, so this is a reduced run, not a skipped one.
-      ok(true, "checklist tool: git unavailable, real-repo assertions skipped")
+      print("n/a  checklist tool: git unavailable (real-repo assertions)")
     else
       dwrite(cl_root, "lua/demo/a.lua", { "---@module 'demo.a'", "-- a" })
       commit(cl_root, "2019-06-01T00:00:00")

@@ -51,7 +51,7 @@ return function(H)
   )
 
   if not (ok_add and has_go) then
-    ok(true, "go_calls: go parser not installed — skipping the tree")
+    print("n/a  go_calls: go parser not installed")
     return
   end
 

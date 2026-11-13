@@ -136,9 +136,12 @@ if [[ "${1:-}" != "surface" && "${1:-}" != "conformance" && "${1:-}" != "lint" ]
   fi
 fi
 
-# NVIM_APPNAME is deliberately NOT set to a throwaway name (the template does): the stdpath cases
-# of TESTS/shim_behavior_spec.lua compare the editor with standalone/vim_shim.lua, which does not
-# implement NVIM_APPNAME (see that spec's header), so a non-default app name fails that spec.
+# NVIM_APPNAME is NOT set to a throwaway name here (the template does). The original reason, that
+# standalone/vim_shim.lua ignored NVIM_APPNAME and so failed the stdpath cases of
+# TESTS/shim_behavior_spec.lua, is gone: the shim follows it since 00435d7, and that spec passes
+# under a throwaway app name. What the default name still does: the run sees the developer's
+# stdpath("data"), so the language specs find the tree-sitter parsers installed there (site/parser)
+# and run their real assertions instead of printing n/a. Switching to the template is open.
 # A run with `isolated = "none"` writes the plugin's state where Neovim keeps it: point state and
 # cache at a scratch directory, removed afterwards (a child editor has a sandbox of its own).
 scratch="$(mktemp -d)"

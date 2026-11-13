@@ -42,7 +42,7 @@ return function(H)
   eq(hs.line_comments[1], "--")
 
   if not (ok_add and has_hs) then
-    ok(true, "lang.haskell: haskell parser not installed — skipping the rest")
+    print("n/a  lang.haskell: haskell parser not installed")
     return
   end
 

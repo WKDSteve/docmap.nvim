@@ -28,7 +28,7 @@ return function(H)
     ok_add, has_java = pcall(vim.treesitter.language.add, "java")
   end
   if not (ok_add and has_java) then
-    ok(true, "lang.java: java parser not installed — skipping (see this file's header)")
+    print("n/a  lang.java: java parser not installed")
     return
   end
 

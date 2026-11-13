@@ -43,7 +43,7 @@ return function(H)
   )
 
   if not (ok_add and has_go) then
-    ok(true, "lang.go: go parser not installed — skipping the rest")
+    print("n/a  lang.go: go parser not installed")
     return
   end
 

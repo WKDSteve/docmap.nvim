@@ -33,7 +33,7 @@ return function(H)
   eq(sw.param_docs, true, "`- Parameter x:` is the language's own form, with DocC behind it")
 
   if not (ok_add and has_sw) then
-    ok(true, "lang.swift: swift parser not installed — skipping the rest")
+    print("n/a  lang.swift: swift parser not installed")
     return
   end
 

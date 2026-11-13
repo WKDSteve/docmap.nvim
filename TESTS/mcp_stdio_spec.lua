@@ -14,7 +14,7 @@ return function(H)
 
   local lib = vim.api.nvim_get_runtime_file("lua/lib/nvim", false)[1]
   if not lib then
-    H.ok(true, "mcp stdio: lib.nvim is not on the runtimepath here, nothing to start")
+    print("n/a  mcp stdio: lib.nvim is not on the runtimepath here, nothing to start")
     return
   end
   local lib_dir = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(lib)))

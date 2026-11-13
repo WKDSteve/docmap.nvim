@@ -189,7 +189,7 @@ return function(H)
     ok_add, has_python = pcall(vim.treesitter.language.add, "python")
   end
   if not (ok_add and has_python) then
-    ok(true, "python_calls: python parser not installed — skipping the tree")
+    print("n/a  python_calls: python parser not installed")
     return
   end
 

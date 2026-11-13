@@ -34,7 +34,7 @@ return function(H)
   eq(ex.param_docs, false, "ExDoc describes arguments in prose; `@spec` names types")
 
   if not (ok_add and has_ex) then
-    ok(true, "lang.elixir: elixir parser not installed — skipping the rest")
+    print("n/a  lang.elixir: elixir parser not installed")
     return
   end
 

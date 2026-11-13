@@ -34,7 +34,7 @@ return function(H)
   eq(sc.param_docs, true, "Scaladoc's @param names each one, as Javadoc's does")
 
   if not (ok_add and has_sc) then
-    ok(true, "lang.scala: scala parser not installed — skipping the rest")
+    print("n/a  lang.scala: scala parser not installed")
     return
   end
 

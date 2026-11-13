@@ -43,7 +43,7 @@ return function(H)
   )
 
   if not (ok_add and has_rb) then
-    ok(true, "lang.ruby: ruby parser not installed — skipping the rest")
+    print("n/a  lang.ruby: ruby parser not installed")
     return
   end
 
