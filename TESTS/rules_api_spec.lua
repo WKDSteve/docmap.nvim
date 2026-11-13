@@ -10,7 +10,7 @@
 -- runs the real engine over the fixture project (`TESTS/fixtures/rules_engine/
 -- project`, whose `.rules.json` names `../ruleset`) when a `rules.nvim` checkout
 -- is reachable -- `RULES_NVIM_DIR`, `.deps/rules.nvim` or a sibling, as
--- `scripts/ci.lua` finds it -- and skips it visibly otherwise (a developer machine
+-- `scripts/ci.lua` finds it -- and reports it as n/a otherwise (a developer machine
 -- without a checkout; under `CI` a missing checkout raises, since the `tests` job
 -- checks it out). The same routes are
 -- compared between Neovim and PUC Lua by the `standalone` gate of `scripts/ci.lua`.
@@ -270,10 +270,10 @@ return function(H)
 
   local rules_dir = locate_rules(repo, { RULES_NVIM_DIR = vim.env.RULES_NVIM_DIR, CI = vim.env.CI })
   if not rules_dir then
-    -- Visible, unlike a bare return: the runner's `ok` line alone reads the same for a skipped half.
-    io.stdout:write(
-      "skip  rules_api_spec.lua: real-engine half (rules.nvim not found; set RULES_NVIM_DIR)\n"
-    )
+    -- Visible, unlike a bare return: the n/a convention of testing.nvim marks the half as not
+    -- applicable here (counted and listed in the summary, red under --strict), where the runner's
+    -- `ok` line alone would read the same as a run of the real engine.
+    print("n/a  rules_api_spec: real-engine half (rules.nvim not found; set RULES_NVIM_DIR)")
     return
   end
 
