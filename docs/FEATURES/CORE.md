@@ -298,6 +298,19 @@ export keeps tint, values and legend.
 - **Config:** none; `tint=doc|test|fix|debt` in the link.
 - **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
 
+## Coupling view (fan-in against fan-out)
+
+A scatter plot among the Hierarchy views: each module a dot, by how many
+modules it requires and how many require it. Two lines at a fixed, stated 5
+make four named corners (hubs, tangles, pass-throughs, leaves), which is the
+answer to "what would be expensive to change" that the Dependencies panel's
+sorted table cannot give. Read from what the payload already carries.
+
+- **Module:** `core/render/html/js/10b_maps.lua` (`couplingRows`,
+  `couplingLayout`, `drawCoupling`)
+- **Config:** none; `view=coupling` in the link.
+- **Docs:** [`docs/tabs.md`](../tabs.md), the Hierarchy paragraphs.
+
 ## Call hierarchy in native LSP UI
 
 `opts.callhierarchy` attaches a second, narrow LSP client to Lua buffers

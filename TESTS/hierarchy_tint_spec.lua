@@ -78,6 +78,7 @@ return function(H)
     "var byId = {}; nodes.forEach(function(n){ byId[n.id] = n; });",
     'var state = { tab: "hierarchy", view: "modules", tint: "doc" };',
     "var hstage = { classList: { toggle: function(){} } }, hboxes = {};",
+    "var haltBody = { addEventListener: function(){} }, haltBar = {};",
     "var document = { getElementById: function(){ return { addEventListener: function(){} }; } };",
     "function esc(s){ return s; } function navigate(){}",
     slice,

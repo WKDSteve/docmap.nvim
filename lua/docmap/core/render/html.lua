@@ -397,6 +397,7 @@ function M.render(ir, findings, opts)
     '<button class="hview-btn" data-view="inheritance" data-explain="view.inheritance">Inheritance</button>',
     '<button class="hview-btn" data-view="tree" data-explain="view.tree">Tree</button>',
     '<button class="hview-btn" data-view="treemap" data-explain="view.treemap">Treemap</button>',
+    '<button class="hview-btn" data-view="coupling" data-explain="view.coupling">Coupling</button>',
     "</div>",
     -- Direction and depth belong to the directed views only; `syncGraphControls`
     -- hides them in Modules/Types rather than leaving two control groups that

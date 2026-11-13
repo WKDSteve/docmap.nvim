@@ -726,6 +726,21 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .tm-tile.tm-solo{background:color-mix(in srgb,var(--accent) 22%,var(--panel))}
 .tm-tile:hover,.tm-head:hover{outline:2px solid var(--accent);outline-offset:-2px}
 .tm-group.dim,.tm-tile.dim{opacity:.4}
+/* The Coupling plot. The corner a dot is in is said by its place, its
+   tooltip and the readout; the fill only tells the expensive corners from
+   the leaves, in lightness as well as hue. */
+.cq{display:block;margin:4px 5px}
+.cq-axis{fill:none;stroke:var(--line);stroke-width:1}
+.cq-split{stroke:var(--line);stroke-width:1;stroke-dasharray:4 4}
+.cq-tick,.cq-label{fill:var(--muted);font-size:11px}
+.cq-corner{fill:var(--muted);font-size:12px;font-weight:600}
+.cq-corner .cq-n{font-weight:400}
+.cq-dot{fill:color-mix(in srgb,var(--accent) 45%,var(--panel));stroke:var(--accent);stroke-width:1;cursor:pointer}
+.cq-dot.cq-hub,.cq-dot.cq-tangle{fill:var(--accent)}
+.cq-dot.cq-leaf{fill:var(--panel)}
+.cq-dot.dim{opacity:.35}
+.cq-dot:hover,.cq-dot:focus{stroke:var(--ink);stroke-width:2;outline:none}
+.cq-read{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink)}
 .htrunc.hauto{color:var(--muted)}
 /* Sits directly before `#hdepth`'s button group. "1"/"2"/"3"/"∞" alone
    read as a slider or a zoom control — reported exactly that way after

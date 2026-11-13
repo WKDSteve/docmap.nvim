@@ -214,6 +214,7 @@ local specs = {
   "hierarchy_default_center_spec.lua",
   "hierarchy_wide_levels_spec.lua",
   "hierarchy_tint_spec.lua",
+  "coupling_view_spec.lua",
   "explain_spec.lua",
   "analysis_tools_spec.lua",
   "plugin_wrappers_spec.lua",

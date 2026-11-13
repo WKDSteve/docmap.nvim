@@ -453,6 +453,10 @@ return [[
       "Everything under the center as nested areas, sized by lines of code " +
       "(or functions): where the weight of a wide level sits, at a glance. " +
       "Click to zoom in.",
+    "view.coupling":
+      "Every module as a dot: how many modules it requires across, how many " +
+      "require it up. The corners have names (hubs, tangles, pass-throughs, " +
+      "leaves) and say what would be expensive to change.",
     "hier.tint":
       "Tints the Modules boxes by one measure of everything below each box: " +
       "the share of functions that are documented or tested, or how many FIX " +

@@ -36,7 +36,7 @@ return function(H)
   -- Two buttons, two known views, one container outside the zooming wrap.
   has('data-view="tree" data-explain="view.tree">Tree</button>', "a Tree button")
   has('data-view="treemap" data-explain="view.treemap">Treemap</button>', "a Treemap button")
-  has("tree: 1, treemap: 1 };", "both are known views (an unknown one falls back to Modules)")
+  has("tree: 1, treemap: 1,", "both are known views (an unknown one falls back to Modules)")
   has(
     '<div id="halt" hidden><div id="halt-bar" class="hctl"></div><div id="halt-body"></div></div>',
     "their own container"

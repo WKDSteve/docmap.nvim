@@ -53,6 +53,21 @@ lines of code, or by functions (`tm=functions`): a click zooms into a group, a
 leaf opens in the Tree tab, and ▲ Up and the path above go back. Rows and tiles
 take the same right-click menu as boxes, and dimmed nodes stay dimmed.
 
+**Coupling** is the one view that is not a tree or a graph but a scatter plot:
+every module at or below the center that has a require edge is a dot, placed
+by how many modules it requires (fan-out, across) and how many require it
+(fan-in, up). It answers "what would be expensive to change?". Two dashed
+lines at 5 cut the plot into four corners with names: **hubs** (many require
+it, it requires few), **tangles** (many both ways), **pass-throughs** (few
+require it, it requires many) and **leaves**. The 5 is fixed and printed in
+the bar; a line that followed the median would call the busiest module of a
+three-file tree a hub. Both axes are square-root scales, because most modules
+have one or two edges, and modules with the same two numbers are laid around
+their point so each keeps a dot. The numbers count the whole tree, whatever
+the center. The plot is one tab stop: the arrows walk the modules, the
+expensive corners first, a readout names the module under the pointer or the
+focus, and a click or Enter opens it in the Tree tab.
+
 The Modules view has one more encoding, off by default: the **Tint** switch in its toolbar colours each
 box by a measure of everything below it. *documented* and *tested* are the share of functions that
 are (`@internal` functions are left out of the documented share, as in the Documentation panel);

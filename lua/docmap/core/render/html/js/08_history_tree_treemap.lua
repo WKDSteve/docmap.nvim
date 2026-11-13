@@ -252,7 +252,7 @@ return [[
   var halt = document.getElementById("halt");
   var haltBar = document.getElementById("halt-bar");
   var haltBody = document.getElementById("halt-body");
-  function isAltView(v){ return v === "tree" || v === "treemap"; }
+  function isAltView(v){ return v === "tree" || v === "treemap" || v === "coupling"; }
 
   // Which rows are open, by node id. The reader's, not the map's: it does
   // not ride in the URL (a link carries the center and the filter, which is
@@ -542,12 +542,16 @@ return [[
     hgraphWrap.parentNode.querySelectorAll(".htrunc").forEach(function(el){ el.remove(); });
     hlegendEl.innerHTML = view === "tree"
       ? '<span class="lg">click a name to root the tree there · ▸ folds · arrows, Enter, Home and End work · right-click for more</span>'
+      : view === "coupling"
+      ? '<span class="lg">a dot is a module at or below the center · the numbers count the whole tree · ' +
+        'click or Enter opens it in the Tree tab · right-click for more</span>'
       : '<span class="lg">area = ' + (state.tm === "functions" ? "functions" : "lines of code") +
         ' · one level nested · right-click for more</span>';
-    hpathEl.textContent = (center.module || center.path) + (view === "tree" ? " · tree" : " · treemap");
+    hpathEl.textContent = (center.module || center.path) + " · " + view;
     if(haltBar.dataset.view !== view) haltBar.innerHTML = "";
     haltBar.dataset.view = view;
     if(view === "tree") drawTree(hcenter);
+    else if(view === "coupling") drawCoupling(hcenter);
     else drawTreemap(hcenter);
   }
 

@@ -534,7 +534,8 @@ return [[
     if(msg) msg.remove();
   }
 
-  var VIEWS = { modules: 1, types: 1, inheritance: 1, deps: 1, calls: 1, modulecalls: 1, tree: 1, treemap: 1 };
+  var VIEWS = { modules: 1, types: 1, inheritance: 1, deps: 1, calls: 1, modulecalls: 1, tree: 1, treemap: 1,
+                coupling: 1 };
 
   // =====================================================================
   // Notes tab: Doxygen's Deprecated / Todo / Bug / Test lists.
