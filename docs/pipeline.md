@@ -1505,8 +1505,14 @@ map does not have is in the list, struck through, and nowhere else.
 edge and cycle lists stay empty, the two require counts are left out of the
 bar and a line says which side predates the graph. Nodes are compared in
 every schema. A commit without a map, a page opened from a file, a published
-copy and a host that does not know the route (`docmap-desktop` until it adopts
-it) each end as one sentence in the bar.
+copy and a host that does not know the route each end as one sentence in the
+bar. `docmap-desktop` forwards the route since its `19d52ab`.
+
+**Requires only, on purpose.** Call edges are not compared. An honest call
+diff needs the identity of a function across a rename, which no map carries,
+and without it every renamed function would show as a lost and a gained
+callee. Which functions came and went is in the text of `:DocMap diff` under
+the list.
 
 `TESTS/shape_diff_spec.lua` holds `diff.shape`, the route and the bar;
 `TESTS/sheets/shape-diff.sheet.lua` and `shape-diff-nodes.sheet.lua` work the
@@ -2223,8 +2229,17 @@ never reaches it from the word. Enter on a focused trigger takes the card's
 jump into the map (a state patch for `navigate`, so Back returns), or else
 its reference link.
 
-Not built: the commit that last touched a line of a snippet. It needs a host
-that can run git per line, which the static page does not have.
+Not built yet: the commit that last touched a line of a snippet. It needs a
+host that can run git per line, which the static page does not have; the
+trigger is decided (a click or Enter on a line of the pinned snippet, nothing
+drawn until then) and the work is task `lookup-snippet-line-last-commit`.
+
+**A limit, kept on purpose:** an external module is recognised in a snippet by
+its own name (`dkjson.encode`). A file that binds it to another local name
+above the function (`local json = require("dkjson")`) is not followed, because
+the binding is outside the snippet and not in the artifact; following it would
+be scanner work and a schema change for a convenience. The `require` string
+itself is always a trigger.
 
 `TESTS/lookup_layer_spec.lua` runs the registry, the tokenizer and the card
 in `node` against a hand-built IR; `TESTS/sheets/lookup-hovers.sheet.lua`
