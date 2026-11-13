@@ -55,12 +55,22 @@ return function(H)
         path = "lua/app/win",
         source = "lua/app/win/init.lua",
         functions = {},
-        children = { "lua/app/win/scratch.lua" },
+        children = { "lua/app/win/scratch.lua", "lua/app/win/deep" },
       },
       ["lua/app/win/scratch.lua"] = {
         path = "lua/app/win/scratch.lua",
         source = "lua/app/win/scratch.lua",
         functions = { { name = "M.make_scratch" } },
+      },
+      -- ... and a function of the same name two levels down, which is not the one meant.
+      ["lua/app/win/deep"] = {
+        path = "lua/app/win/deep",
+        children = { "lua/app/win/deep/far.lua" },
+      },
+      ["lua/app/win/deep/far.lua"] = {
+        path = "lua/app/win/deep/far.lua",
+        source = "lua/app/win/deep/far.lua",
+        functions = { { name = "M.make_scratch" }, { name = "M.only_here" } },
       },
     }
     return {
@@ -72,6 +82,8 @@ return function(H)
         "lua/app/core/precheck.lua",
         "lua/app/win",
         "lua/app/win/scratch.lua",
+        "lua/app/win/deep",
+        "lua/app/win/deep/far.lua",
       },
     }
   end
@@ -109,7 +121,7 @@ return function(H)
         "`core/check.lua` (`M.run`, `helper`, `M.LIMIT`, `opts.env`, `false`), `core/precheck.lua`", -- 10
         "`check.lua`", -- 20: the boundary — not precheck.lua
         "`app.core.check` (`run()`)", -- 30: the declared module name
-        "`app.win` (`make_scratch`)", -- 40: a module name that is only a path; the member one file down
+        "`app.win` (`make_scratch`, `only_here`)", -- 40: a module name that is only a path; members below it
         '[`core/check.lua`](../../lua/app/core/check.lua) — `filetypes = {"x"}`', -- 50: a link, then prose
         "`app.setup`", -- 60: module.member as one dotted name
         "`lua\\app\\core\\check.lua`", -- 70: backslashes
@@ -148,6 +160,13 @@ return function(H)
       lines_of(refs, "lua/app/win/scratch.lua#M.make_scratch"),
       "40",
       "index: a member the named module does not have is looked up in the files below it"
+    )
+    eq(
+      lines_of(refs, "lua/app/win/deep/far.lua#M.make_scratch")
+        .. "|"
+        .. lines_of(refs, "lua/app/win/deep/far.lua#M.only_here"),
+      "|40",
+      "index: the nearest level with that name ends the search; a name found only further down is still found"
     )
     eq(lines_of(refs, "lua/app"), "60", "index: module.member files the module …")
     eq(lines_of(refs, "lua/app#M.setup"), "60", "index: … and the member")

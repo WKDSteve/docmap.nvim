@@ -437,7 +437,7 @@ end
 
 ---Lookup tables over the scanned tree, built once per `M.index`.
 ---@param ir Docmap.IR
----@return { by_path: table<string, string>, by_module: table<string, string>, paths: { path: string, id: string }[], modules: { module: string, id: string }[], exts: table<string, true> }
+---@return { by_path: table<string, string>, by_module: table<string, string>, paths: { path: string, id: string, stem: string }[], modules: { module: string, id: string }[], exts: table<string, true> }
 local function node_lookup(ir)
   local by_path, by_module, paths, modules, exts = {}, {}, {}, {}, {}
   for _, id in ipairs(ir.order or {}) do
@@ -448,7 +448,12 @@ local function node_lookup(ir)
           p = p:gsub("\\", "/")
           if not by_path[p] then
             by_path[p] = id
-            paths[#paths + 1] = { path = p, id = id }
+            paths[#paths + 1] = {
+              path = p,
+              id = id,
+              -- The path as a module name would spell it: no extension, no `/init`.
+              stem = "/" .. p:gsub("%.%a%w*$", ""):gsub("/init$", ""),
+            }
             local ext = p:match("%.(%a%w*)$")
             if ext then
               exts[ext:lower()] = true
@@ -499,8 +504,7 @@ local function resolve_node(lookup, token)
     -- `@module` tag saying so.
     tail = "/" .. token:gsub("%.", "/")
     for _, p in ipairs(lookup.paths) do
-      local stem = p.path:gsub("%.%a%w*$", ""):gsub("/init$", "")
-      if #stem >= #tail and ("/" .. stem):sub(-#tail) == tail then
+      if p.stem:sub(-#tail) == tail then
         return p.id
       end
     end
@@ -531,35 +535,37 @@ local function claims_this_tree(lookup, token)
   end
 end
 
----Every function called `bare` in `node_id` or, when the node has none, in
----the files below it. A bullet often names a directory module
----(`lib.nvim.window` (`make_scratch`)) whose functions live one file down.
+---Every function called `bare` in `node_id` or, when the node has none, at
+---the nearest level below it that has one. A bullet often names a directory
+---module (`lib.nvim.window` (`make_scratch`)) whose functions live one file
+---down.
+---
+---Level by level, and the first level with a match ends the search: a
+---`close` three directories down is not what `window` (`close`) means when
+---`window/init.lua`'s neighbour has one.
 ---@param ir Docmap.IR
 ---@param node_id string
 ---@param bare string
 ---@return string[] keys `nodeId#fnName`, in tree order.
 local function member_keys(ir, node_id, bare)
   local keys = {}
-  local queue = { node_id }
-  local head = 1
-  while head <= #queue do
-    local id = queue[head]
-    head = head + 1
-    local node = ir.nodes[id]
-    if node then
-      for _, fn in ipairs(node.functions or {}) do
-        if bare_member(fn.name) == bare then
-          keys[#keys + 1] = id .. "#" .. fn.name
+  local level = { node_id }
+  while #level > 0 and #keys == 0 do
+    local below = {}
+    for _, id in ipairs(level) do
+      local node = ir.nodes[id]
+      if node then
+        for _, fn in ipairs(node.functions or {}) do
+          if bare_member(fn.name) == bare then
+            keys[#keys + 1] = id .. "#" .. fn.name
+          end
+        end
+        for _, child in ipairs(node.children or {}) do
+          below[#below + 1] = child
         end
       end
-      -- The node's own functions win: only a miss goes on to the subtree.
-      if #keys > 0 and id == node_id then
-        break
-      end
-      for _, child in ipairs(node.children or {}) do
-        queue[#queue + 1] = child
-      end
     end
+    level = below
   end
   return keys
 end
