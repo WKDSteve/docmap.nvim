@@ -709,8 +709,10 @@ end
 ---pick any two commits in either order.
 ---@param before Docmap.IR
 ---@param after Docmap.IR
+---@param compared Docmap.Diff? `M.compare(before, after)`, when the caller has it already: the cycles are read
+---from it, and computing it walks the blast radius of every node of both maps.
 ---@return Docmap.Shape
-function M.shape(before, after)
+function M.shape(before, after, compared)
   local was, now = node_set(before), node_set(after)
   ---@type Docmap.Shape
   local shape = {
@@ -787,7 +789,7 @@ function M.shape(before, after)
     end
   end
 
-  local compared = M.compare(before, after)
+  compared = compared or M.compare(before, after)
   shape.cycles_added = compared.cycles_added
   shape.cycles_removed = compared.cycles_removed
   return shape

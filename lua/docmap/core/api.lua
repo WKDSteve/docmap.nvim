@@ -484,7 +484,9 @@ function M.shape(opts, a, b)
   end
 
   local diff = require("docmap.core.diff")
-  local shape = diff.shape(before, after)
+  -- One `compare` for both forms of the answer: it walks the blast radius of every node of both maps.
+  local compared = diff.compare(before, after)
+  local shape = diff.shape(before, after, compared)
   local label = b and (a:sub(1, 8) .. ".." .. b:sub(1, 8)) or a:sub(1, 8)
   return {
     available = true,
@@ -500,7 +502,7 @@ function M.shape(opts, a, b)
     cycles_removed = shape.cycles_removed,
     -- The same change the way `:DocMap diff` prints it, functions and blast
     -- radius included: the graph can mark nodes and edges and nothing else.
-    text = diff.render(diff.compare(before, after), before, after, label),
+    text = diff.render(compared, before, after, label),
   }
 end
 

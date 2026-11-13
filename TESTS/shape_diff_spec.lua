@@ -199,6 +199,16 @@ return function(H)
       ("show %s:docs/map/module_map.json | show %s:docs/map/module_map.json"):format(OLD, NEW),
       "route: git is asked for exactly the two committed maps"
     )
+    -- `compare` walks the blast radius of every node of both maps; one answer needs it once.
+    local real_compare, calls = diff.compare, 0
+    diff.compare = function(...)
+      calls = calls + 1
+      return real_compare(...)
+    end
+    local again = api.answer(("shape/%s/%s"):format(OLD, NEW), opts, nil)
+    diff.compare = real_compare
+    eq(calls, 1, "route: the two maps are compared once for the graph and the text together")
+    eq(#again.cycles_added, 0, "route: and the cycles of that one comparison are the answer's")
   end
 
   -- One commit: the newer side is the map on disk, which is the one the page shows.
@@ -300,6 +310,14 @@ return function(H)
   has('if(s.cmp) parts.push("cmp=" + encodeURIComponent(s.cmp));', "the link carries it")
   has('else if(k === "cmp") s.cmp = shapeSpec(v);', "a link restores it, and only as commit hashes")
   has("syncShape(s);", "it is painted after every draw")
+  has(
+    "shapeForget(spec);\n    navigate({ cmp: spec });",
+    "choosing a comparison that failed before asks the host again"
+  )
+  has(
+    "if(list) list.scrollTop = scrolled;",
+    "rebuilding the bar leaves the list scrolled where it was"
+  )
   has(
     "paintShape(state.cmp ? shapeOf(state.cmp) : null);",
     "also after the draw the search preview does on its own"
@@ -409,6 +427,8 @@ return function(H)
     "location.protocol = 'file:'; shapeCommits = null; shapeLoadCommits();",
     "out.barFile = shapeBarHTML({ cmp: null, tab: 'hierarchy' });",
     "shapeFetch('ccccccc'); out.fileFetch = shapeCache['ccccccc'].error;",
+    "shapeForget('ccccccc'); shapeForget('abcdef0'); shapeForget('never'); shapeForget(null);",
+    "out.forgot = [own(shapeCache, 'ccccccc'), own(shapeCache, 'abcdef0')];",
     "console.log(JSON.stringify(out));",
   }, "\n")
   local tmp = vim.fn.tempname() .. ".js"
@@ -547,5 +567,10 @@ return function(H)
   ok(
     got.fileFetch:find("opened from a file", 1, true),
     "a link that carries a comparison says the same on a file page"
+  )
+  eq(
+    vim.inspect(got.forgot),
+    vim.inspect({ false, true }),
+    "a comparison that failed is forgotten when asked again; an answer is kept"
   )
 end

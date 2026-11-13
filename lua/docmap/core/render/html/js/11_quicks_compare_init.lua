@@ -644,6 +644,13 @@ return [[
 
   function shapeOf(spec){ return own(shapeCache, spec) ? shapeCache[spec] : null; }
 
+  // A comparison that failed is not an answer to keep: the host may have
+  // been down, or started since. Forgotten when the reader asks again, so
+  // the next look asks the host again. An answer stays for the page's life.
+  function shapeForget(spec){
+    if(spec && own(shapeCache, spec) && shapeCache[spec].error) delete shapeCache[spec];
+  }
+
   // JSON has no way to tell an empty list from an empty object, and a host
   // may send either for "none".
   function shapeList(v){ return Array.isArray(v) ? v : []; }
@@ -932,12 +939,26 @@ return [[
     if(show){
       shapeLoadCommits();
       if(s.cmp) shapeFetch(s.cmp);
-      // The bar is rebuilt as a whole; a control the reader is on keeps the
-      // focus across that.
+      // The bar is rebuilt as a whole. What the reader is on keeps the
+      // focus across that (a control by its id, a node of the list by the
+      // node it names), and the list stays scrolled where it was: following
+      // one of forty changes must not send the reader back to the first.
       var active = document.activeElement;
-      var keep = (active && shapeBar.contains(active)) ? active.id : null;
+      var inBar = !!active && shapeBar.contains(active);
+      var keepId = inBar ? active.id : null;
+      var keepNode = (inBar && active.dataset) ? active.dataset.sdCenter : null;
+      var list = document.getElementById("hshape-body");
+      var scrolled = list ? list.scrollTop : 0;
       shapeBar.innerHTML = shapeBarHTML(s);
-      if(keep && document.getElementById(keep)) document.getElementById(keep).focus();
+      list = document.getElementById("hshape-body");
+      if(list) list.scrollTop = scrolled;
+      var again = keepId ? document.getElementById(keepId) : null;
+      if(!again && keepNode){
+        shapeBar.querySelectorAll("[data-sd-center]").forEach(function(el){
+          if(!again && el.dataset.sdCenter === keepNode) again = el;
+        });
+      }
+      if(again) again.focus({ preventScroll: true });
     }
     shapeBar.hidden = !show;
     paintShape((onHier && s.cmp) ? shapeOf(s.cmp) : null);
@@ -960,7 +981,9 @@ return [[
     // alone is remembered by the select until one is chosen.
     if(!a){ if(state.cmp) navigate({ cmp: null }); return; }
     shapeOpen = true;
-    navigate({ cmp: shapeSpec(b ? a + ".." + b : a) });
+    var spec = shapeSpec(b ? a + ".." + b : a);
+    shapeForget(spec);
+    navigate({ cmp: spec });
   });
 
   shapeBar.addEventListener("click", function(ev){
@@ -968,6 +991,10 @@ return [[
     if(!t) return;
     if(t.id === "hshape-end"){
       shapeOpen = false; shapeListOpen = false;
+      // Closing is also the way to ask again: a commit list or a comparison
+      // that failed is asked for anew the next time the bar opens.
+      if(shapeCommits && shapeCommits.error) shapeCommits = null;
+      shapeForget(state.cmp);
       if(state.cmp) navigate({ cmp: null }); else syncShape(state);
       shapeBtn.focus();
       return;

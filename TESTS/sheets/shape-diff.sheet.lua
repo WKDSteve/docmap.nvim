@@ -141,6 +141,17 @@ return {
       note = "every change by name, and the same change as :DocMap diff prints it",
     },
     { shot = "list-light" },
+    { focus = '#hshape-body [data-sd-center="lua/app/ui/window.lua"]' },
+    { press = "Enter", note = "a node of the list, followed from the keyboard" },
+    {
+      wait = "/center=lua%2Fapp%2Fui%2Fwindow\\.lua/.test(location.hash) && /cmp=/.test(location.hash)",
+      note = "the diagram centres on it and the comparison stays",
+    },
+    {
+      expect = "!document.getElementById('hshape-body').hidden"
+        .. " && document.activeElement.dataset.sdCenter === 'lua/app/ui/window.lua'",
+      note = "the list is still open and the focus is still on that node",
+    },
   },
   judge = {
     "the file page explains in one sentence why nothing can be compared (file-light)",
