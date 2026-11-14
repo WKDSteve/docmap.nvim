@@ -95,8 +95,14 @@ MIT — see [LICENSE](LICENSE).
 
 **Uses**
 
+- [color_my_ascii.nvim](https://github.com/WKDSteve/color_my_ascii.nvim): In the detail pane of `:DocBrowse`, docmap.nvim hands fenced code blocks to color_my_ascii.nvim for highlighting. ([picture](assets/graphs/pair/docmap.nvim--color_my_ascii.nvim.png))
+- [github_stats.nvim](https://github.com/WKDSteve/github_stats.nvim): The `traffic` mode of `:DocBrowse` reads the traffic digest that github_stats.nvim publishes for the repository. ([picture](assets/graphs/pair/docmap.nvim--github_stats.nvim.png))
 - [hover.nvim](https://github.com/WKDSteve/hover.nvim): docmap.nvim registers a preview with hover.nvim (`hover.registry`). ([picture](assets/graphs/pair/docmap.nvim--hover.nvim.png))
 - [mdview.nvim](https://github.com/WKDSteve/mdview.nvim): docmap.nvim publishes its overview as Markdown to a running preview of mdview.nvim (`mdview.adapter.ws_client`). ([picture](assets/graphs/pair/docmap.nvim--mdview.nvim.png))
+- [pdfport.nvim](https://github.com/WKDSteve/pdfport.nvim): With `pdf = true`, docmap.nvim also writes the overview as a PDF through pdfport.nvim. ([picture](assets/graphs/pair/docmap.nvim--pdfport.nvim.png))
+- [pickers.nvim](https://github.com/WKDSteve/pickers.nvim): `:DocMap pick` lets you pick a route in an engine of pickers.nvim. ([picture](assets/graphs/pair/docmap.nvim--pickers.nvim.png))
+- [rules.nvim](https://github.com/WKDSteve/rules.nvim): docmap.nvim loads the engine of rules.nvim (settings, loader, runner, waivers) to show the rules of a gate and their results in its browser. ([picture](assets/graphs/pair/docmap.nvim--rules.nvim.png))
+- [runtime-analysis.nvim](https://github.com/WKDSteve/runtime-analysis.nvim): docmap.nvim joins its static map with the counts runtime-analysis.nvim collects: which routes ran, and how often. ([picture](assets/graphs/pair/docmap.nvim--runtime-analysis.nvim.png))
 - [ui.nvim](https://github.com/WKDSteve/ui.nvim): The map browser of docmap.nvim uses the context menu and the kit of ui.nvim (`ui.contextmenu`, `ui.kit`). ([picture](assets/graphs/pair/docmap.nvim--ui.nvim.png))
 - [lib.nvim](https://github.com/WKDSteve/lib.nvim): the shared base of the plugins.
 
