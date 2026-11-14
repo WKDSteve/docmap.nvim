@@ -220,6 +220,7 @@ local specs = {
   "routes_view_spec.lua",
   "explain_spec.lua",
   "analysis_tools_spec.lua",
+  "analysis_language_panels_spec.lua",
   "plugin_wrappers_spec.lua",
   "snippet_spec.lua",
   "bindings_spec.lua",
