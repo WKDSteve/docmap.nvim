@@ -31,6 +31,25 @@ function M.selection(catalog)
   return table.concat(families, ",")
 end
 
+---Whether there is a corpus to compare at all, read off the two `rules/catalog` answers.
+---
+---`RULES_VAULT` can be set and still name nothing this host can use (a folder that is gone, a Windows path inherited
+---by a Linux process). Both hosts then say so with the same words, and that is "no corpus here", not a difference
+---between them: the optional case steps aside instead of turning a gate red over somebody's environment. One host
+---with a catalog and one without is a difference like any other and is left to `first_difference`.
+---@param in_nvim table The catalog answer under Neovim.
+---@param in_binary table The catalog answer of the standalone build.
+---@return boolean usable
+---@return string|nil reason Why not, for the "not run" line.
+function M.usable(in_nvim, in_binary)
+  local a = type(in_nvim) == "table" and in_nvim or {}
+  local b = type(in_binary) == "table" and in_binary or {}
+  if a.available ~= true and b.available ~= true and a.reason == b.reason then
+    return false, tostring(a.reason)
+  end
+  return true, nil
+end
+
 ---A short, printable form of a leaf value.
 ---@param v any
 ---@return string

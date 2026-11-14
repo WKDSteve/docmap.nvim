@@ -99,4 +99,37 @@ return function(H)
   )
   eq(corpus.selection({ rules = {} }), nil, "rules_corpus: an empty catalog has no selection")
   eq(corpus.selection({ available = false }), nil, "rules_corpus: an answer without rules has none")
+
+  -- a vault neither host can use is no corpus (the case steps aside), not a difference between the hosts
+  do
+    local no = { available = false, reason = "the vault folder does not exist" }
+    local usable, why = corpus.usable(no, { available = false, reason = no.reason })
+    eq(usable, false, "rules_corpus: the same refusal on both hosts is no corpus")
+    eq(
+      why,
+      "the vault folder does not exist",
+      "rules_corpus: the reason is handed on for the not-run line"
+    )
+  end
+  -- one host with a catalog and one without, or two different refusals: that is a difference, and it is compared
+  eq(
+    (corpus.usable({ available = true, rules = {} }, { available = false, reason = "x" })),
+    true,
+    "rules_corpus: a catalog on one host only is compared, not stepped over"
+  )
+  eq(
+    (corpus.usable({ available = false, reason = "a" }, { available = false, reason = "b" })),
+    true,
+    "rules_corpus: two different refusals are compared"
+  )
+  eq(
+    corpus.first_difference({ available = true, rules = {} }, { available = false, reason = "x" }),
+    "answer.available: true ~= false",
+    "rules_corpus: and the comparison names it"
+  )
+  eq(
+    (corpus.usable({ available = true }, { available = true })),
+    true,
+    "rules_corpus: two catalogs are a corpus"
+  )
 end

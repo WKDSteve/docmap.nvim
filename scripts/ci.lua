@@ -832,47 +832,48 @@ function GATES.standalone()
     if not cat_nvim or not cat_binary then
       return
     end
-    if cat_nvim.available ~= true then
-      fail(
-        ("rules routes over RULES_VAULT (%s): the catalog is not available: %s"):format(
-          vault,
-          tostring(cat_nvim.reason)
+    -- A vault this host cannot use is no corpus, not a red gate: both hosts say the same "no", and the cases
+    -- after this one still have to run (so no `return` here).
+    local usable, why_not = corpus.usable(cat_nvim, cat_binary)
+    local diff = usable and corpus.first_difference(cat_nvim, cat_binary) or nil
+    if not usable then
+      say(
+        ("  not run: rules routes over a real corpus (RULES_VAULT gives no catalog on this host: %s)"):format(
+          why_not
         )
       )
-      return
-    end
-    local diff = corpus.first_difference(cat_nvim, cat_binary)
-    if diff then
+    elseif diff then
       fail(
         ("rules/catalog over RULES_VAULT differs between Neovim and the standalone build:\n  %s"):format(
           diff
         )
       )
       return
-    end
-    local selection = corpus.selection(cat_nvim)
-    if not selection then
-      fail(("rules routes over RULES_VAULT (%s): the catalog lists no rule"):format(vault))
-      return
-    end
-    local run_nvim, run_binary = on_both("rules/run", { "--select=" .. selection })
-    if not run_nvim or not run_binary then
-      return
-    end
-    diff = corpus.first_difference(run_nvim, run_binary)
-    if diff then
-      fail(
-        ("rules/run over RULES_VAULT differs between Neovim and the standalone build:\n  %s"):format(
-          diff
+    else
+      local selection = corpus.selection(cat_nvim)
+      if not selection then
+        fail(("rules routes over RULES_VAULT (%s): the catalog lists no rule"):format(vault))
+        return
+      end
+      local run_nvim, run_binary = on_both("rules/run", { "--select=" .. selection })
+      if not run_nvim or not run_binary then
+        return
+      end
+      diff = corpus.first_difference(run_nvim, run_binary)
+      if diff then
+        fail(
+          ("rules/run over RULES_VAULT differs between Neovim and the standalone build:\n  %s"):format(
+            diff
+          )
+        )
+        return
+      end
+      say(
+        ("  ok: rules routes over RULES_VAULT: catalog and run of %d rules identical on both hosts"):format(
+          #(cat_nvim.rules or {})
         )
       )
-      return
     end
-    say(
-      ("  ok: rules routes over RULES_VAULT: catalog and run of %d rules identical on both hosts"):format(
-        #(cat_nvim.rules or {})
-      )
-    )
   end
 
   -- ------------------------------------------------------------------
