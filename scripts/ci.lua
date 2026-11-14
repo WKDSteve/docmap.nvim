@@ -539,9 +539,10 @@ function GATES.standalone()
   local agent_project_api = api_fixtures .. "/agent/project"
   local agent_answers = api_fixtures .. "/agent/answers"
   ---@param cmd string[]
+  ---@param env table<string, string>|nil The environment of the route (default: no vault, no trust).
   ---@return table|nil
-  local function api_answer(cmd)
-    local proc = vim.system(cmd, { cwd = root, text = true, env = rules_env }):wait()
+  local function api_answer(cmd, env)
+    local proc = vim.system(cmd, { cwd = root, text = true, env = env or rules_env }):wait()
     if proc.code ~= 0 then
       fail(
         ("rules route failed (exit %d): %s\n%s"):format(
@@ -783,6 +784,95 @@ function GATES.standalone()
       return
     end
     say(("  ok: rules route, %s: identical on both hosts and as expected"):format(case.label))
+  end
+
+  -- The same two routes over a real corpus, when there is one: `rules/catalog` and `rules/run` of every family of
+  -- `$RULES_VAULT`, in a project without a `.rules.json` (so the vault is what `rules.settings` resolves). The
+  -- fixture above has a dozen rules written to hit known cases; a vault has hundreds nobody wrote for this gate,
+  -- and the comparison of the two hosts over it was done by hand once (575 rules). This makes it repeatable.
+  --
+  -- Optional by design: CI has no vault, and this is not counted as a skipped gate there (`skip` would mark every
+  -- CI run partial). No trust is passed: a vault's predicates are code, and "not trusted" is the same answer on
+  -- both hosts. Only identity is asked for, there is nothing written by hand to hold a stranger's rules to.
+  local vault = vim.env.RULES_VAULT
+  if not vault or vault == "" then
+    say(
+      "  not run: rules routes over a real corpus (optional: set RULES_VAULT to compare the hosts over it)"
+    )
+  else
+    local corpus = dofile(root .. "/standalone/rules_corpus.lua")
+    local corpus_env = { RULES_VAULT = vault, RULES_TRUST = "", RULES_NVIM_DIR = rules_dir }
+    local corpus_project = api_fixtures .. "/bare"
+    ---@param route string
+    ---@param extra string[]
+    ---@return table|nil in_nvim
+    ---@return table|nil in_binary
+    local function on_both(route, extra)
+      local in_nvim = api_answer(
+        vim.list_extend({
+          vim.v.progpath,
+          "-n",
+          "--headless",
+          "-u",
+          "NONE",
+          "-l",
+          "standalone/rules_api.lua",
+          corpus_project,
+          route,
+        }, extra),
+        corpus_env
+      )
+      local in_binary = api_answer(
+        vim.list_extend({ lua, "standalone/docmap.lua", corpus_project, "--api=" .. route }, extra),
+        corpus_env
+      )
+      return in_nvim, in_binary
+    end
+    local cat_nvim, cat_binary = on_both("rules/catalog", {})
+    if not cat_nvim or not cat_binary then
+      return
+    end
+    if cat_nvim.available ~= true then
+      fail(
+        ("rules routes over RULES_VAULT (%s): the catalog is not available: %s"):format(
+          vault,
+          tostring(cat_nvim.reason)
+        )
+      )
+      return
+    end
+    local diff = corpus.first_difference(cat_nvim, cat_binary)
+    if diff then
+      fail(
+        ("rules/catalog over RULES_VAULT differs between Neovim and the standalone build:\n  %s"):format(
+          diff
+        )
+      )
+      return
+    end
+    local selection = corpus.selection(cat_nvim)
+    if not selection then
+      fail(("rules routes over RULES_VAULT (%s): the catalog lists no rule"):format(vault))
+      return
+    end
+    local run_nvim, run_binary = on_both("rules/run", { "--select=" .. selection })
+    if not run_nvim or not run_binary then
+      return
+    end
+    diff = corpus.first_difference(run_nvim, run_binary)
+    if diff then
+      fail(
+        ("rules/run over RULES_VAULT differs between Neovim and the standalone build:\n  %s"):format(
+          diff
+        )
+      )
+      return
+    end
+    say(
+      ("  ok: rules routes over RULES_VAULT: catalog and run of %d rules identical on both hosts"):format(
+        #(cat_nvim.rules or {})
+      )
+    )
   end
 
   -- ------------------------------------------------------------------

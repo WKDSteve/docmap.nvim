@@ -105,6 +105,12 @@ reading) over a small fixture project on both hosts and demands identical output
 ([`standalone/rules_agent_smoke.lua`](../standalone/rules_agent_smoke.lua),
 [`TESTS/fixtures/rules_agent/project`](../TESTS/fixtures/rules_agent/project)); writing is not part of it.
 
+With `RULES_VAULT` set, the gate also compares the two hosts over that vault: `rules/catalog`, then `rules/run` of
+every family, in a project without a `.rules.json`. It asks for identical answers and names the first place they
+differ by the rule it sits in ([`standalone/rules_corpus.lua`](../standalone/rules_corpus.lua)). No trust is passed,
+so a predicate reports `predicate not trusted` on both. Without the variable the case prints `not run` and the gate
+is not counted as skipped: CI has no vault, so this one is for a developer's machine.
+
 The gate also makes real links with the real rock — `docs/map` as a link out of
 the project, and a link out of the source tree — and checks that the build
 refuses to write through the first and does not read behind the second. On
