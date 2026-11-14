@@ -97,9 +97,16 @@ return function(H)
   ok(names["M.polyglot_fixture_add"], "polyglot: the Lua module's function is extracted")
 
   local ok_js, has_js = pcall(vim.treesitter.language.add, "javascript")
+  -- The import and the call below are read out of `src/parse.ts`, which the TypeScript parser reads, not the
+  -- JavaScript one: a machine with only the JavaScript parser extracts the JS function but sees no import in
+  -- the TS file, and must count that as not applicable rather than as a failure.
+  local ok_ts, has_ts = pcall(vim.treesitter.language.add, "typescript")
   if ok_js and has_js then
     ok(names["polyglotFixtureJoin"], "polyglot: the JS function is extracted too")
-
+  else
+    print("n/a  polyglot: javascript parser not installed (function-level JS assertions)")
+  end
+  if ok_js and has_js and ok_ts and has_ts then
     -- A relative specifier resolving to a node at all. Before this, `./util.js`
     -- was recorded as an external module, because the module index is keyed on
     -- declared `@module` paths and an ECMA node declares none — so no JS import
@@ -127,6 +134,8 @@ return function(H)
     -- this `heuristic`, and does not run at all here.
     eq(crossed and crossed.confidence, "exact", "polyglot: ... and is exact, not heuristic")
   else
-    print("n/a  polyglot: javascript parser not installed (function-level JS assertions)")
+    print(
+      "n/a  polyglot: javascript or typescript parser not installed (the import of parse.ts and its call)"
+    )
   end
 end
