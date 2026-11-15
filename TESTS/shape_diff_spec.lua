@@ -380,6 +380,17 @@ return function(H)
     "function esc(s){ return String(s == null ? '' : s).replace(/[&<>\"]/g, function(c){",
     "  return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]; }); }",
     "function own(o, k){ return !!o && Object.prototype.hasOwnProperty.call(o, k); }",
+    -- The runtime of the catalog with what the page embeds, and the page's helpers around it.
+    require("docmap.core.render.html.i18n_js"),
+    "var I18N = docmapI18n(" .. vim.json.encode(
+      require("docmap.core.i18n").for_page(
+        { "page.", "finding.", "report.", "check." },
+        { en = true }
+      )
+    ) .. ");",
+    "function t(key, params){ return I18N.t(key, params); }",
+    "function fmtNum(n){ return I18N.number(n); }",
+    "function fmtDay(day){ return I18N.date(day); }",
     "function historyAvailable(){ return location.protocol === 'http:'; }",
     "function explainFetchFailure(){ return { then: function(){} }; }",
     "function edgePath(){ return ''; }",
@@ -480,7 +491,7 @@ return function(H)
 
   ok(
     got.bar:find('<option value="abcdef0123456789abcdef0123456789abcdef01" selected>', 1, true)
-      and got.bar:find("abcdef0 · 2026-01-02 · one &lt;b&gt; ", 1, true)
+      and got.bar:find("abcdef0 · Jan 2, 2026 · one &lt;b&gt; ", 1, true)
       and got.bar:find("…</option>", 1, true),
     "bar: the older side is chosen from the commits, subject escaped and cut"
   )
