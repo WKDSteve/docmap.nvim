@@ -86,6 +86,13 @@ return function(H)
 
   -- Controls that belong to the drawn diagram step aside.
   has('["hlr", "hgest", "hzoomreset", "hzoomlabel", "hexport"]', "diagram-only controls are hidden")
+  -- Depth belongs to the directed views: its label goes with its buttons.
+  has('<span class="hctl-label" id="hdepthlabel"', "the depth label can be found")
+  has(
+    'document.getElementById("hdepth").style.display = show;\n'
+      .. '    document.getElementById("hdepthlabel").style.display = show;',
+    "the depth label is hidden with the depth buttons"
+  )
   -- ...and so are their keys: + - 0 would zoom the diagram that is not shown.
   has(
     'if(state.tab !== "hierarchy") return;\n    // Tree and Treemap hide the zoom controls; the keys would otherwise\n    // change the zoom of the diagram that is not on screen.\n    if(isAltView(state.view)) return;',

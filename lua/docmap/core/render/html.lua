@@ -469,7 +469,7 @@ function M.render(ir, findings, opts)
     "</div>",
     -- Not a zoom control -- the label exists because it read like one
     -- without it (see .hctl-label's own comment).
-    '<span class="hctl-label" data-i18n="page.hier.depth.label" data-i18n-title="page.hier.depth.title" title="How many hops from the centered node to draw">Depth</span>',
+    '<span class="hctl-label" id="hdepthlabel" data-i18n="page.hier.depth.label" data-i18n-title="page.hier.depth.title" title="How many hops from the centered node to draw">Depth</span>',
     '<div class="hview-toggle" id="hdepth">',
     '<button class="hdepth-btn" data-i18n-title="page.hier.depth.n" data-i18n-params="{&quot;depth&quot;:1}" data-depth="1" title="Depth 1">1</button>',
     '<button class="hdepth-btn active" data-i18n-title="page.hier.depth.n" data-i18n-params="{&quot;depth&quot;:2}" data-depth="2" title="Depth 2">2</button>',

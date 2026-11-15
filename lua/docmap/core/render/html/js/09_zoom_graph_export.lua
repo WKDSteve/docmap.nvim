@@ -409,7 +409,10 @@ return [[
     // The tint belongs to the Modules boxes; the select shows what the link says.
     document.getElementById("htintwrap").style.display = (s.view || "modules") === "modules" ? "" : "none";
     document.getElementById("htint").value = (s.tint && TINT_MODES[s.tint]) ? s.tint : "";
+    // The label goes with its buttons, or a bare DEPTH stays in Tree,
+    // Treemap, Coupling and the other views without them.
     document.getElementById("hdepth").style.display = show;
+    document.getElementById("hdepthlabel").style.display = show;
     // External requires/calls exist only in Deps and Module Calls; the
     // per-function Calls view has no equivalent, since a call into a module
     // the map never scanned leaves no resolvable name behind to draw.
