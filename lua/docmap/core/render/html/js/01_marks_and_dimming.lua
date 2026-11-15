@@ -138,6 +138,16 @@ return [[
       o.textContent = l.name;
       sel.append(o);
     });
+    syncLangChoice(s);
+  }
+  // What the picker shows as chosen: the language this state names, else the
+  // one a host or this browser's storage names, else "Browser language". Said
+  // again at every state, not only when the locale changes: going from a
+  // link that names English to one that names nothing leaves the page in
+  // English and the choice no longer made.
+  function syncLangChoice(s){
+    var sel = document.getElementById("langsel");
+    if(!sel) return;
     sel.value = I18N.normalize(s.lang) || I18N.normalize(I18N_QUERY && I18N_QUERY.get("lang")) ||
       offeredLocale(storedLang()) || "";
   }
@@ -147,7 +157,7 @@ return [[
   // locale this state asks for differs from the one on screen.
   function syncLocale(s){
     var want = wantedLocale(s);
-    if(want === appliedLocale) return;
+    if(want === appliedLocale){ syncLangChoice(s); return; }
     appliedLocale = want;
     I18N.configure({ locale: want });
     document.documentElement.lang = want;

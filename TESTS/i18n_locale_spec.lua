@@ -67,6 +67,25 @@ return function(H)
   )
   i18n._reset()
 
+  -- ── A run told its language from outside ────────────────────────────────
+  -- `core.cli.run` also runs inside an editor session. A run that names no language must leave the locale the
+  -- editor chose: it used to read "nothing given" as English and switched a German editor on the side.
+  i18n._use({ en = source, de = { ["finding.missing-readme"] = "{path} hat keine README.md" } })
+  i18n.configure({ locale = "de" })
+  eq(i18n.configure_run(nil, nil), "de", "run: no flag and no variable leave the editor's locale")
+  eq(i18n.configure_run("", ""), "de", "run: empty ones too")
+  eq(i18n.locale(), "de", "run: and the active locale is still the editor's")
+  eq(i18n.configure_run("en", nil), "en", "run: --locale= decides")
+  eq(i18n.configure_run(nil, "de_DE.UTF-8"), "de", "run: $DOCMAP_LOCALE decides without a flag")
+  eq(i18n.configure_run("en", "de"), "en", "run: the flag wins over the variable")
+  eq(
+    i18n.configure_run("zz", "de"),
+    "de",
+    "run: a flag no catalog answers falls through to the variable"
+  )
+  eq(i18n.configure_run("zz", nil), "en", "run: and to English when there is none")
+  i18n._reset()
+
   -- ── Who names the source locale ──────────────────────────────────────────
   local function src(rel)
     return assert(H.slurp("lua/docmap/" .. rel), rel .. " is readable")
@@ -110,7 +129,7 @@ return function(H)
   local cli = src("core/cli.lua")
   ok(cli:find('cli_locale = a:sub(#"--locale=" + 1)', 1, true), "the engine reads --locale=")
   ok(
-    cli:find('i18n.resolve(cli_locale, os.getenv("DOCMAP_LOCALE"))', 1, true),
+    cli:find('configure_run(cli_locale, os.getenv("DOCMAP_LOCALE"))', 1, true),
     "the engine: then $DOCMAP_LOCALE, and nothing else"
   )
   ok(

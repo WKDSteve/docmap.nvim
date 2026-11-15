@@ -203,6 +203,22 @@ function M.configure(opts)
   return active
 end
 
+---The locale of a run that is told its language from outside: a flag, then an environment variable.
+---
+---**Changes nothing when neither names anything.** A standalone process then keeps the English it started
+---with, and a run inside an editor (`require("docmap").cli.run(...)` from a session) keeps the locale that
+---editor's `setup()` chose: reading "no flag, no variable" as "English" would switch a German editor to
+---English as a side effect of generating a map.
+---@param flag string? The value of `--locale=`.
+---@param env string? The value of `$DOCMAP_LOCALE`.
+---@return string locale The locale now active.
+function M.configure_run(flag, env)
+  if (flag ~= nil and flag ~= "") or (env ~= nil and env ~= "") then
+    active = M.resolve(flag, env)
+  end
+  return active
+end
+
 ---@return string
 function M.locale()
   return active
@@ -292,7 +308,11 @@ end
 ---committed artifacts pass `M.SOURCE`.
 ---@return string
 function M.t(key, params, locale)
-  local code = locale and (M.normalize(locale) or M.SOURCE) or active
+  -- The common case first (a renderer naming a shipped code, or nothing): `normalize` is for tags.
+  local code = locale == nil and active
+    or (shipped(locale) and locale)
+    or M.normalize(locale)
+    or M.SOURCE
   local found = template(code, key, params)
   if found then
     return M.interpolate(found, params)

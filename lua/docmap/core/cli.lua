@@ -403,8 +403,8 @@ function M.run(opts, argv)
   -- language"). **Not `$LANG`**: hosts and CI scripts read this report as text, and a run that turned German
   -- because the machine is German would break every one of them without a line of theirs changing. Only what
   -- this run prints is affected; the artifacts it writes are the same bytes in every locale.
-  local i18n = require("docmap.core.i18n")
-  i18n.configure({ locale = i18n.resolve(cli_locale, os.getenv("DOCMAP_LOCALE")) })
+  -- Neither given leaves the locale alone: this function also runs inside an editor that chose its own.
+  require("docmap.core.i18n").configure_run(cli_locale, os.getenv("DOCMAP_LOCALE"))
 
   -- **Replaced, not appended**, so parsing the same argv twice is the same
   -- as parsing it once. `standalone/docmap.lua` deliberately reads both

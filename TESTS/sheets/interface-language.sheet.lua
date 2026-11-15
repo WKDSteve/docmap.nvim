@@ -166,6 +166,22 @@ return {
     { press = "Escape", note = "the explanation of the tab is put away" },
     { shot = "en-dark" },
     { scheme = "light" },
+
+    -- The picker says what is chosen, not what was: from a link that names English to one that names nothing
+    -- the page stays English (the browser's own), and the choice is no longer made.
+    {
+      expect = "(location.hash = '#tab=hierarchy&lang=en', true)",
+      note = "a link that names English",
+    },
+    { wait = "document.getElementById('langsel').value === 'en'" },
+    {
+      expect = "(location.hash = '#tab=hierarchy', true)",
+      note = "and one that names no language",
+    },
+    {
+      wait = "document.getElementById('langsel').value === '' && document.documentElement.lang === 'en'",
+      note = "the picker is back on Browser language while the page stays English",
+    },
   },
   judge = {
     "German: tab bar, toolbar and the row of Hierarchy controls do not wrap badly or overflow",
