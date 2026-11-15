@@ -601,6 +601,11 @@ return [[
     return esc(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
   }
 
+  // A catalog paragraph of the Analysis tab: code spans as `prose` sets them, `**…**` strong, `*…*` emphasis.
+  function rich(s){
+    return prose(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\*([^*\s][^*]*)\*/g, "<em>$1</em>");
+  }
+
   // A span that says a message and names it, for markup drawn once and kept (the Tree): `applyI18n` says it
   // again at a change of language, as it does for the static markup.
   function i18nSpan(cls, key, params){

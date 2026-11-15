@@ -157,6 +157,7 @@ function H.page_i18n_js()
     "function fmtMoment(seconds){ return I18N.dateTime(seconds); }",
     fn("prose"),
     fn("bold"),
+    fn("rich"),
     fn("i18nSpan"),
   }, "\n")
 end

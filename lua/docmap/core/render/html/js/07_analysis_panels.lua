@@ -336,41 +336,36 @@ return [[
   function checklistStateLabel(st){
     if(!st) return { cls: "cl-unknown", text: "—" };
     if(st.state === "stale"){
-      return { cls: "cl-stale", text: st.commits + " commit" + (st.commits === 1 ? "" : "s") + " since" };
+      return { cls: "cl-stale", text: t("page.checklist.state.stale", { count: st.commits }) };
     }
-    if(st.state === "unverified") return { cls: "cl-unverified", text: "never verified" };
-    if(st.state === "uncited") return { cls: "cl-uncited", text: "no citation" };
-    return { cls: "cl-current", text: "unchanged" };
+    if(st.state === "unverified") return { cls: "cl-unverified", text: t("page.checklist.state.unverified") };
+    if(st.state === "uncited") return { cls: "cl-uncited", text: t("page.checklist.state.uncited") };
+    return { cls: "cl-current", text: t("page.checklist.state.current") };
   }
 
   function renderChecklistBody(){
     var led = IR.checklist;
     if(!led){
-      return '<p class="ntext none">This repository has no checklist. Create ' +
-        '<code>docs/CHECKLIST/*.md</code> (or <code>docs/CHECKLIST.md</code>) — ' +
-        'see <code>docs/checklist_format.md</code>.</p>';
+      return '<p class="ntext none">' + rich(t("page.checklist.none")) + '</p>';
     }
 
     var out = [];
     var note;
     if(checklistStatus){
       var c = checklistStatus.counts || {};
-      note = '<p class="ntext">' + (c.stale || 0) + ' stale, ' + (c.unverified || 0) +
-        ' unverified, ' + (c.current || 0) + ' current, ' + (c.uncited || 0) +
-        ' uncited — of ' + led.total + ' item' + (led.total === 1 ? "" : "s") + '.</p>';
+      note = '<p class="ntext">' + esc(t("page.checklist.counts", { stale: c.stale || 0, unverified: c.unverified || 0,
+        current: c.current || 0, uncited: c.uncited || 0, items: t("page.checklist.n.items", { count: led.total }) })) + '</p>';
     } else if(!historyAvailable() || checklistFailed){
       // `checklistFailed` covers the published copy: the protocol says
       // fetching is possible, the enrichment still cannot be answered, and
       // without this the note sat on "Reading history…" forever. The wording
       // below is already right for both — the verdict needs git *and* a local
       // server, neither of which a static host has.
-      note = '<p class="ntext">' + led.done + ' of ' + led.total + ' done, ' + led.cited +
-        ' cited. <em>Changed-since-verified needs git, so it is not in this file.</em> Run ' +
-        '<code>:DocMap serve</code> and open the URL it prints to fill in the verdict — or ' +
-        '<code>:DocMap checklist</code> for the same answer in the quickfix list.</p>';
+      note = '<p class="ntext">' + esc(t("page.checklist.done", { done: led.done, total: led.total, cited: led.cited })) +
+        ' ' + rich(t("page.checklist.no-git")) + '</p>';
     } else {
-      note = '<p class="ntext">' + led.done + ' of ' + led.total + ' done, ' + led.cited +
-        ' cited. Reading history…</p>';
+      note = '<p class="ntext">' + esc(t("page.checklist.done", { done: led.done, total: led.total, cited: led.cited })) +
+        ' ' + esc(t("page.checklist.reading")) + '</p>';
     }
     out.push(note);
 
@@ -393,7 +388,7 @@ return [[
             bits.push('<span class="cl-ref">' + esc(it.ref) +
               (it.ref_line ? ":" + it.ref_line : "") + '</span>');
           }
-          if(it.verified) bits.push('<span class="cl-date">verified ' + esc(it.verified) + '</span>');
+          if(it.verified) bits.push('<span class="cl-date">' + esc(t("page.checklist.verified", { date: fmtDay(it.verified) })) + '</span>');
           if(st) bits.push('<span class="cl-state ' + lab.cls + '">' + esc(lab.text) + '</span>');
           (it.meta || []).forEach(function(m){
             bits.push('<span class="cl-meta"><b>@' + esc(m.key) + '</b> ' + esc(m.value) + '</span>');

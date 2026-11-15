@@ -25,8 +25,17 @@ return function(H)
   end
 
   -- An empty state that names the language: no Python is not the same as no decorators.
-  has("Only Python files are", "decorators: the empty state names the language")
-  has("Rust files are checked", "rust: the empty state names the language")
+  local i18n = require("docmap.core.i18n")
+  has('t("page.an.decorators.none")', "decorators: the empty state is said from the catalog")
+  has('t("page.an.rust.none")', "rust: the empty state is said from the catalog")
+  H.ok(
+    i18n.t("page.an.decorators.none", nil, "en"):find("Only Python files are", 1, true),
+    "decorators: the empty state names the language"
+  )
+  H.ok(
+    i18n.t("page.an.rust.none", nil, "en"):find("Rust files are checked", 1, true),
+    "rust: the empty state names the language"
+  )
 
   -- The clusters: reachable from the panel, and part of what the panel cache is keyed on, or the
   -- button would redraw the cached list.

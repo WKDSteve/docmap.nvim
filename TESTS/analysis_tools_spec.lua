@@ -112,7 +112,11 @@ return function(H)
     "plugins: `lazy = true` with no trigger is its own state, not startup"
   )
   ok(
-    src:find("loads only when required", 1, true) ~= nil,
+    src:find('t("page.an.lazy.ondemand")', 1, true) ~= nil
+      and require("docmap.core.i18n")
+          .t("page.an.lazy.ondemand", nil, "en")
+          :find("loads only when required", 1, true)
+        ~= nil,
     "plugins: ...and the row says so rather than claiming a startup cost"
   )
   ok(

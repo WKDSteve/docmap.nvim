@@ -195,6 +195,15 @@ return {
       ) .. " === 'Laufzeit'",
       note = "the tools of the Analysis tab",
     },
+    {
+      wait = "document.querySelector('#anbody .nsub, #anbody .none') !== null",
+      note = "a tool is drawn",
+    },
+    {
+      expect = "[...document.querySelectorAll('#anbody th')].every(th => !/^(Module|Function|Functions|Tested|Documented)\\b/.test(th.textContent))"
+        .. " && !/ functions \\(| documented functions| modules with at least/.test(document.getElementById('anbody').textContent)",
+      note = "its column heads and its line are German",
+    },
     { hover = "h1" },
     { press = "Escape", note = "the explanation of the tab is put away" },
     { shot = "de-dark-analysis" },

@@ -55,7 +55,7 @@ return [[
   function anHead(cols){
     var out = ['<thead><tr>'];
     cols.forEach(function(c){
-      if(!c.key){ out.push('<th>' + (c.label || "") + '</th>'); return; }
+      if(!c.key){ out.push('<th>' + esc(c.label || "") + '</th>'); return; }
       var active = state.asort === c.key;
       // The arrow is on the active column only. An idle arrow on every header
       // reads as "these are all sorted", which is exactly backwards.
@@ -68,7 +68,7 @@ return [[
         esc(c.key) + '" data-initial="' + (c.initial === "asc" ? "asc" : "desc") +
         '" tabindex="0" role="button" aria-sort="' +
         (active ? (state.adir === "asc" ? "ascending" : "descending") : "none") +
-        '" title="Sort by ' + esc(c.label) + '">' + c.label + arrow + '</th>');
+        '" title="' + esc(t("page.an.sort-by", { column: c.label })) + '">' + esc(c.label) + arrow + '</th>');
     });
     out.push('</tr></thead>');
     return out.join("");
@@ -117,8 +117,7 @@ return [[
   ///of forty rows looks like a map with three modules in it.
   function anFilterNote(shown, total){
     if(shown === total) return "";
-    return ' <strong>' + shown + ' of ' + total + '</strong> shown, filtered by "' +
-      esc(state.q) + '".';
+    return ' ' + rich(t("page.an.filtered", { shown: shown, total: total, query: state.q }));
   }
 
   function renderAnalysisPanel(label, sub, pick, excludeInternal){
@@ -146,7 +145,7 @@ return [[
     var totalRows = rows.length;
 
     if(rows.length === 0){
-      return '<p class="ntext none">This map contains no documented functions.</p>';
+      return '<p class="ntext none">' + esc(t("page.index.functions.none")) + '</p>';
     }
 
     // Worst-first: the module that needs attention most belongs at the top
@@ -156,9 +155,9 @@ return [[
     // 20 functions matters more than one with 1), then module id for a
     // stable order once both numbers tie exactly.
     var cols = [
-      { label: "Module", key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.an.col.module"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
       { label: label, key: "pct", get: function(r){ return r.pct; }, initial: "asc" },
-      { label: "Functions", key: "total", get: function(r){ return r.total; }, initial: "desc" },
+      { label: t("page.an.col.functions"), key: "total", get: function(r){ return r.total; }, initial: "desc" },
       { label: "", key: null }
     ];
 
@@ -176,11 +175,10 @@ return [[
     });
 
     var parts = [];
-    parts.push('<p class="nsub">' + label + ': <strong>' + totalHit + '/' + totalAll +
-      '</strong> functions (' + overallPct + '%). ' + sub +
-      anFilterNote(rows.length, totalRows) + '</p>');
+    parts.push('<p class="nsub">' + rich(t("page.an.coverage.head", { label: label, hit: totalHit, total: totalAll,
+      percent: overallPct })) + ' ' + esc(sub) + anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No module matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.module")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -218,14 +216,14 @@ return [[
     });
 
     if(rows.length === 0){
-      return '<p class="ntext none">This map contains no require edges.</p>';
+      return '<p class="ntext none">' + esc(t("page.an.deps.none")) + '</p>';
     }
 
     var totalRows = rows.length;
     var cols = [
-      { label: "Module", key: "name", get: function(r){ return r.name; }, initial: "asc" },
-      { label: "Fan-in", key: "fanIn", get: function(r){ return r.fanIn; }, initial: "desc" },
-      { label: "Fan-out", key: "fanOut", get: function(r){ return r.fanOut; }, initial: "desc" },
+      { label: t("page.an.col.module"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.an.col.fan-in"), key: "fanIn", get: function(r){ return r.fanIn; }, initial: "desc" },
+      { label: t("page.an.col.fan-out"), key: "fanOut", get: function(r){ return r.fanOut; }, initial: "desc" },
       { label: "", key: null }
     ];
 
@@ -249,12 +247,10 @@ return [[
     var maxFanIn = rows.reduce(function(m, r){ return Math.max(m, r.fanIn); }, 0);
 
     var parts = [];
-    parts.push('<p class="nsub">' + totalRows + ' modules with at least one require ' +
-      'edge. Fan-in is how many other modules require this one — the blast radius if it ' +
-      'changes. Fan-out is how many modules it requires itself.' +
+    parts.push('<p class="nsub">' + rich(t("page.an.deps.sub", { count: totalRows })) +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No module matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.module")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -324,63 +320,63 @@ return [[
   function renderAnalysisAnnotations(){
     var catalogue = IR.tags || [];
     if(!catalogue.length){
-      return '<p class="ntext none">This map was generated before the annotation ' +
-        'catalogue existed, so there is nothing to report adoption against.</p>';
+      return '<p class="ntext none">' + esc(t("page.an.tags.old-map")) + '</p>';
     }
 
     // Only function-scope tags: a module tag lives on the file and a class
     // tag on a type, and folding three denominators into one column would
     // produce a percentage of nothing in particular.
-    var fnTags = catalogue.filter(function(t){ return t.scope === "function" && t.field; });
+    var fnTags = catalogue.filter(function(tag){ return tag.scope === "function" && tag.field; });
 
     var total = 0;
     var counts = {};
-    fnTags.forEach(function(t){ counts[t.name] = { n: 0, nodes: {} }; });
+    fnTags.forEach(function(tag){ counts[tag.name] = { n: 0, nodes: {} }; });
 
     IR.nodes.forEach(function(n){
       (n.functions || []).forEach(function(fn){
         total++;
-        fnTags.forEach(function(t){
-          var v = fn[t.field];
+        fnTags.forEach(function(tag){
+          var v = fn[tag.field];
           // Three shapes behind one question: a list with something in it, a
           // string with something in it, a flag that is set. `false` and `[]`
           // and `""` all mean the same thing here and none of them counts.
           var has = Array.isArray(v) ? v.length > 0 : (typeof v === "string" ? v.length > 0 : !!v);
           if(has){
-            counts[t.name].n++;
-            counts[t.name].nodes[n.id] = true;
+            counts[tag.name].n++;
+            counts[tag.name].nodes[n.id] = true;
           }
         });
       });
     });
 
     if(total === 0){
-      return '<p class="ntext none">This map contains no functions to report adoption over.</p>';
+      return '<p class="ntext none">' + esc(t("page.an.tags.no-functions")) + '</p>';
     }
 
-    var rows = fnTags.map(function(t){
-      var c = counts[t.name];
+    // `LuaCATS` and `docmap` name where a tag comes from, the way the catalogue spells it.
+    var rows = fnTags.map(function(tag){
+      var c = counts[tag.name];
       var files = 0;
       for(var k in c.nodes){ if(c.nodes.hasOwnProperty(k)) files++; }
       return {
-        tag: "@" + t.name,
-        name: t.name,
-        origin: t.origin === "luals" ? "LuaCATS" : "docmap",
-        summary: t.summary,
-        url: t.url || null,
+        tag: "@" + tag.name,
+        name: tag.name,
+        origin: tag.origin === "luals" ? "LuaCATS" : "docmap",
+        summary: tag.summary,
+        url: tag.url || null,
         n: c.n,
         files: files,
         pct: Math.round(1000 * c.n / total) / 10,
-        haystack: "@" + t.name + " " + t.summary,
-        sortkey: t.name
+        haystack: "@" + tag.name + " " + tag.summary,
+        sortkey: tag.name
       };
     });
 
     var cols = [
-      { label: "Tag", key: "name", get: function(r){ return r.name; }, initial: "asc" },
-      { label: "From", key: "origin", get: function(r){ return r.origin; }, initial: "asc" },
-      { label: "Functions", key: "n", get: function(r){ return r.n; }, initial: "desc" },
-      { label: "Files", key: "files", get: function(r){ return r.files; }, initial: "desc" },
+      { label: t("page.an.col.tag"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.an.col.from"), key: "origin", get: function(r){ return r.origin; }, initial: "asc" },
+      { label: t("page.an.col.functions"), key: "n", get: function(r){ return r.n; }, initial: "desc" },
+      { label: t("page.an.col.files"), key: "files", get: function(r){ return r.files; }, initial: "desc" },
       { label: "", key: null }
     ];
 
@@ -396,18 +392,14 @@ return [[
     });
 
     var parts = [];
-    parts.push('<p class="nsub">' + totalRows + ' function-scope tag' +
-      (totalRows === 1 ? "" : "s") + ' this pipeline reads, against ' + total +
-      ' function' + (total === 1 ? "" : "s") + ' in this map' +
-      (unused ? ' - ' + unused + ' of them used nowhere here' : '') +
-      '. Counted per <em>function that carries the tag at least once</em>, not ' +
-      'per occurrence: eleven hundred <code>@param</code> lines is a fact about ' +
-      'typing effort, "most functions document a parameter" is a fact about the ' +
-      'tree. Module-scope and type-scope tags are left out rather than folded ' +
-      'in, because their denominator is files and types rather than functions.' +
+    var tagsAgainst = { tags: t("page.an.n.tags", { count: totalRows }), functions: t("page.an.n.functions", { count: total }) };
+    parts.push('<p class="nsub">' + esc(unused
+        ? t("page.an.tags.sub.unused", { tags: tagsAgainst.tags, functions: tagsAgainst.functions, unused: unused })
+        : t("page.an.tags.sub", tagsAgainst)) +
+      ' ' + rich(t("page.an.tags.sub.how")) +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No tag matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.tag")) + '</p>';
     }
 
     var maxN = rows.reduce(function(m, r){ return Math.max(m, r.n); }, 1);
@@ -418,7 +410,7 @@ return [[
         '<td><code>' + esc(r.tag) + '</code><div class="ntext">' + prose(r.summary) + '</div></td>' +
         '<td>' + esc(r.origin) + '</td>' +
         '<td>' + r.n + (r.n ? ' <span class="ntext">(' + r.pct + '%)</span>' : '') + '</td>' +
-        '<td>' + (r.files || "none") + '</td>' +
+        '<td>' + (r.files || esc(t("page.an.none"))) + '</td>' +
         '<td><div class="anbar"><div class="anfill" style="width:' + barPct + '%"></div></div></td>' +
         '</tr>');
     });
@@ -463,8 +455,7 @@ return [[
     });
 
     if(rows.length === 0){
-      return '<p class="ntext none">This map exposes no functions - everything ' +
-        'it declares is marked internal, or nothing was extracted.</p>';
+      return '<p class="ntext none">' + esc(t("page.an.api.none")) + '</p>';
     }
 
     var totalRows = rows.length;
@@ -472,11 +463,11 @@ return [[
     var unreached = rows.reduce(function(a, r){ return a + (r.callers === 0 ? 1 : 0); }, 0);
 
     var cols = [
-      { label: "Function", key: "sig", get: function(r){ return r.sig; }, initial: "asc" },
-      { label: "Module", key: "name", get: function(r){ return r.name; }, initial: "asc" },
-      { label: "Documented", key: "documented",
+      { label: t("page.an.col.function"), key: "sig", get: function(r){ return r.sig; }, initial: "asc" },
+      { label: t("page.an.col.module"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.an.col.documented"), key: "documented",
         get: function(r){ return r.documented ? 1 : 0; }, initial: "asc" },
-      { label: "Callers here", key: "callers",
+      { label: t("page.an.col.callers-here"), key: "callers",
         get: function(r){ return r.callers; }, initial: "desc" }
     ];
 
@@ -507,26 +498,13 @@ return [[
     // being excluded depended on. A tree with two marked functions out of
     // 776 -- this repository, measured -- is nearer to the zero case than to
     // a curated surface, and no cut-off would have said so honestly.
-    var caveat = ' ' + (marked === 0
-      ? '<strong>Nothing here is marked internal.</strong>'
-      : marked + ' function' + (marked === 1 ? " is" : "s are") +
-        ' marked internal and excluded.') +
-      ' Internal is declared, never inferred - a keyword in Zig, Java and C, ' +
-      'an <code>@internal</code> tag in Lua and JS/TS. In a tag language ' +
-      'that means an untagged file-local helper reads the same here as an ' +
-      'entry point, so the list is the surface only as far as the tree ' +
-      'bothered to say.';
-    parts.push('<p class="nsub">' + totalRows + ' published function' +
-      (totalRows === 1 ? "" : "s") + ' - ' + documented + ' documented, ' +
-      unreached + ' with no caller inside this repository.' + caveat +
-      ' <strong>No caller here does not mean unused</strong> - a published API ' +
-      'is consumed by other repositories by definition, and that is what an ' +
-      'entry point looks like from inside. The column counts call edges from ' +
-      'a different module of this tree, so a dynamically dispatched call is ' +
-      'invisible to it, the same blind spot the Calls view has.' +
+    var caveat = ' ' + rich(marked === 0 ? t("page.an.api.marked.none") : t("page.an.api.marked", { count: marked })) +
+      ' ' + rich(t("page.an.api.internal"));
+    parts.push('<p class="nsub">' + esc(t("page.an.api.sub", { count: totalRows, documented: documented,
+      unreached: unreached })) + caveat + ' ' + rich(t("page.an.api.unused")) +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No function matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.function")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -534,8 +512,8 @@ return [[
         '<td>' + esc(r.sig) + sigTrigger(r.node.id, r.fn.name) +
           docTrigger(fnKey(r.node.id, r.fn.name)) + '</td>' +
         '<td>' + esc(r.name) + '</td>' +
-        '<td>' + (r.documented ? "yes" : "no") + '</td>' +
-        '<td>' + (r.callers === 0 ? "none" : r.callers) + '</td>' +
+        '<td>' + esc(t(r.documented ? "page.an.yes" : "page.an.no")) + '</td>' +
+        '<td>' + (r.callers === 0 ? esc(t("page.an.none")) : r.callers) + '</td>' +
         '</tr>');
     });
     parts.push("</tbody></table>");
@@ -559,14 +537,14 @@ return [[
     });
 
     if(rows.length === 0){
-      return '<p class="ntext none">This map contains no documented functions.</p>';
+      return '<p class="ntext none">' + esc(t("page.index.functions.none")) + '</p>';
     }
 
     var totalRows = rows.length;
     var cols = [
-      { label: "Function", key: "sig", get: function(r){ return r.sig; }, initial: "asc" },
-      { label: "Module", key: "name", get: function(r){ return r.name; }, initial: "asc" },
-      { label: "Complexity", key: "complexity", get: function(r){ return r.complexity; },
+      { label: t("page.an.col.function"), key: "sig", get: function(r){ return r.sig; }, initial: "asc" },
+      { label: t("page.an.col.module"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.an.col.complexity"), key: "complexity", get: function(r){ return r.complexity; },
         initial: "desc" },
       { label: "", key: null }
     ];
@@ -581,11 +559,10 @@ return [[
     var maxC = rows.reduce(function(m, r){ return Math.max(m, r.complexity); }, 1);
 
     var parts = [];
-    parts.push('<p class="nsub">' + totalRows + ' documented functions, ranked by ' +
-      'cyclomatic complexity (McCabe) — one point per if/elseif/while/for/repeat/and/or, ' +
-      'plus a base of 1. Highest first.' + anFilterNote(rows.length, totalRows) + '</p>');
+    parts.push('<p class="nsub">' + esc(t("page.an.complexity.sub", { count: totalRows })) +
+      anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No function matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.function")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -627,9 +604,9 @@ return [[
   // goes to the module, and `sigTrigger` carries the mark for Compare.
   function renderDuplicateCluster(g){
     var mods = duplicateClusterModules(g);
-    var html = ['<section class="dupcl"><h3 class="nhead">' + g.members.length +
-      ' functions in ' + mods.length + ' module' + (mods.length === 1 ? '' : 's') + ', ' +
-      g.size + ' nodes</h3><div class="dupcl-mods">'];
+    var html = ['<section class="dupcl"><h3 class="nhead">' + esc(t("page.an.dup.cluster", {
+      functions: g.members.length, modules: t("page.n.module", { count: mods.length }), size: g.size })) +
+      '</h3><div class="dupcl-mods">'];
     mods.forEach(function(mod){
       html.push('<div class="dupcl-mod" style="flex-grow:' + mod.members.length + '">' +
         '<div class="dupcl-name">' + esc(mod.module) + '</div>');
@@ -652,30 +629,19 @@ return [[
   function renderAnalysisDuplicates(){
     var dup = IR.duplicates;
     if(!dup){
-      return '<p class="ntext none">This map was generated before duplicate ' +
-        'detection existed. Regenerate it to see this panel.</p>';
+      return '<p class="ntext none">' + esc(t("page.an.dup.old-map")) + '</p>';
     }
 
     var parts = [];
     if(!dup.groups || dup.groups.length === 0){
-      parts.push('<p class="nsub">No two functions in this tree share a structure. ' +
-        dup.considered + ' functions were large enough to compare (at least ' +
-        dup.min_size + ' syntax nodes); anything smaller is excluded, because ' +
-        'every tree has a dozen one-line accessors that match each other and ' +
-        'mean nothing.</p>');
-      parts.push('<p class="ntext none">Nothing to report.</p>');
+      parts.push('<p class="nsub">' + esc(t("page.an.dup.none", { considered: dup.considered, min: dup.min_size })) + '</p>');
+      parts.push('<p class="ntext none">' + esc(t("page.an.dup.nothing")) + '</p>');
       return parts.join("");
     }
 
-    parts.push('<p class="nsub">' + dup.groups.length + ' group' +
-      (dup.groups.length === 1 ? '' : 's') + ' of structurally identical functions, ' +
-      'covering ' + dup.functions + ' of the ' + dup.considered + ' functions large ' +
-      'enough to compare (at least ' + dup.min_size + ' syntax nodes). Identifier and ' +
-      'literal names are ignored, so a renamed copy still matches — but a single ' +
-      'edited line does not. Largest group first.</p>');
-    parts.push('<p class="nsub">Sharing a shape is not by itself a defect: two ' +
-      'adapters around different APIs can be the same five lines of plumbing. ' +
-      'This is a ranking to read, never a check that fails.</p>');
+    parts.push('<p class="nsub">' + esc(t("page.an.dup.sub", { count: dup.groups.length, functions: dup.functions,
+      considered: dup.considered, min: dup.min_size })) + '</p>');
+    parts.push('<p class="nsub">' + esc(t("page.an.dup.not-a-defect")) + '</p>');
 
     // Filtered by *group*, not by member: a duplicate group with its matching
     // members removed is no longer a duplicate group, and showing "3
@@ -690,18 +656,18 @@ return [[
             .toLowerCase().indexOf(query) >= 0;
         });
       });
-      parts.push('<p class="nsub"><strong>' + groups.length + ' of ' +
-        dup.groups.length + '</strong> groups shown, filtered by "' + esc(state.q) +
-        '". A group matches when any of its members does, and is then shown whole — ' +
-        'a group with members removed would no longer be one.</p>');
+      parts.push('<p class="nsub">' + rich(t("page.an.dup.filtered", { shown: groups.length, total: dup.groups.length,
+        query: state.q })) + '</p>');
       if(groups.length === 0){
-        return parts.join("") + '<p class="ntext none">No group matches that filter.</p>';
+        return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.group")) + '</p>';
       }
     }
 
-    parts.push('<p class="dupview" role="group" aria-label="How to show the groups">' +
-      '<button class="dupview-btn' + (dupView === "list" ? ' active' : '') + '" data-dupview="list">List</button>' +
-      '<button class="dupview-btn' + (dupView === "clusters" ? ' active' : '') + '" data-dupview="clusters">Clusters</button>' +
+    parts.push('<p class="dupview" role="group" aria-label="' + esc(t("page.an.dup.view.aria")) + '">' +
+      '<button class="dupview-btn' + (dupView === "list" ? ' active' : '') + '" data-dupview="list">' +
+      esc(t("page.an.dup.view.list")) + '</button>' +
+      '<button class="dupview-btn' + (dupView === "clusters" ? ' active' : '') + '" data-dupview="clusters">' +
+      esc(t("page.an.dup.view.clusters")) + '</button>' +
       '</p>');
     if(dupView === "clusters"){
       groups.forEach(function(g){ parts.push(renderDuplicateCluster(g)); });
@@ -709,10 +675,9 @@ return [[
     }
 
     groups.forEach(function(g){
-      parts.push('<h3 class="nhead">' + g.members.length + ' identical, ' +
-        g.size + ' nodes</h3>');
-      parts.push('<table class="antable"><thead><tr><th>Function</th><th>Module</th>' +
-        '<th>Line</th></tr></thead><tbody>');
+      parts.push('<h3 class="nhead">' + esc(t("page.an.dup.group", { count: g.members.length, size: g.size })) + '</h3>');
+      parts.push('<table class="antable"><thead><tr><th>' + esc(t("page.an.col.function")) + '</th><th>' +
+        esc(t("page.an.col.module")) + '</th><th>' + esc(t("page.an.col.line")) + '</th></tr></thead><tbody>');
       g.members.forEach(function(m){
         parts.push('<tr class="anrow" data-node="' + esc(m.node) + '">' +
           '<td>' + esc(m.signature || m.name) + sigTrigger(m.node, m.name) + '</td>' +
@@ -762,16 +727,17 @@ return [[
   function pluginTraits(spec){
     var bits = [];
     var load = pluginLoad(spec);
-    if(spec.lazy === false) bits.push("eager");
+    // `event:`, `cmd:`, `keys:` and `ft:` are the fields of a lazy.nvim spec, kept as the config spells them.
+    if(spec.lazy === false) bits.push(t("page.an.lazy.eager"));
     if((spec.event || []).length) bits.push("event:" + spec.event.join(","));
     if((spec.cmd || []).length) bits.push("cmd:" + spec.cmd.join(","));
     if((spec.keys || []).length) bits.push("keys:" + spec.keys.join(","));
     if((spec.ft || []).length) bits.push("ft:" + spec.ft.join(","));
-    if(spec.enabled === false) bits.push("disabled");
+    if(spec.enabled === false) bits.push(t("page.an.lazy.disabled"));
     if(load === "ondemand"){
-      bits.push("lazy = true, no trigger — loads only when required");
+      bits.push(t("page.an.lazy.ondemand"));
     }else if(bits.length === 0){
-      bits.push("no trigger — loads at startup");
+      bits.push(t("page.an.lazy.startup"));
     }
     return bits.join("  ");
   }
@@ -845,8 +811,8 @@ return [[
       return {
         kind: b.kind,
         value: b.value,
-        label: b.kind === "startup" ? "at startup"
-          : b.kind === "ondemand" ? "when required by something else"
+        label: b.kind === "startup" ? t("page.an.lazy.at-startup")
+          : b.kind === "ondemand" ? t("page.an.lazy.when-required")
           : b.kind + ": " + b.value,
         count: b.repos.length,
         repos: b.repos.join(", "),
@@ -856,15 +822,13 @@ return [[
     });
 
     if(total === 0){
-      return '<p class="ntext none">No lazy.nvim-shaped plugin spec found in this tree, ' +
-        'so there is nothing to say about when anything loads. ' +
-        'See <code>core/plugins.lua</code> for what is recognized.</p>';
+      return '<p class="ntext none">' + rich(t("page.an.lazy.none")) + '</p>';
     }
 
     var cols = [
-      { label: "Loads", key: "label", get: function(r){ return r.label; }, initial: "asc" },
-      { label: "Plugins", key: "count", get: function(r){ return r.count; }, initial: "desc" },
-      { label: "Which", key: "repos", get: function(r){ return r.repos; }, initial: "asc" }
+      { label: t("page.an.col.loads"), key: "label", get: function(r){ return r.label; }, initial: "asc" },
+      { label: t("page.an.col.plugins"), key: "count", get: function(r){ return r.count; }, initial: "desc" },
+      { label: t("page.an.col.which"), key: "repos", get: function(r){ return r.repos; }, initial: "asc" }
     ];
 
     var totalRows = rows.length;
@@ -886,13 +850,12 @@ return [[
     var nstartup = startup ? startup.repos.length : 0;
 
     var parts = [];
-    parts.push('<p class="nsub">' + total + ' plugin spec entr' +
-      (total === 1 ? 'y' : 'ies') + ' across ' + totalRows + ' distinct load point' +
-      (totalRows === 1 ? '' : 's') + '. <strong>' + nstartup + '</strong> load' +
-      (nstartup === 1 ? 's' : '') + ' at startup — everything else is deferred.' +
+    parts.push('<p class="nsub">' + esc(t("page.an.lazy.sub", { entries: t("page.an.n.spec-entries", { count: total }),
+      points: t("page.an.n.load-points", { count: totalRows }) })) + ' ' +
+      rich(t("page.an.lazy.sub.startup", { count: nstartup })) +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No load point matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.load")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -925,9 +888,7 @@ return [[
     });
 
     if(rows.length === 0){
-      return '<p class="ntext none">No lazy.nvim-shaped plugin spec found in this tree. ' +
-        'See <code>core/plugins.lua</code> for what is recognized — packer.nvim and ' +
-        'vim-plug specs look different and are not.</p>';
+      return '<p class="ntext none">' + rich(t("page.an.plugins.none")) + '</p>';
     }
 
     var totalRows = rows.length;
@@ -935,9 +896,9 @@ return [[
     Object.keys(seen).forEach(function(r){ if(seen[r] > 1) ndup++; });
 
     var cols = [
-      { label: "Repo", key: "repo", get: function(r){ return r.repo; }, initial: "asc" },
-      { label: "Triggers", key: "traits", get: function(r){ return r.traits; }, initial: "asc" },
-      { label: "Declared in", key: "name", get: function(r){ return r.name; }, initial: "asc" }
+      { label: t("page.an.col.repo"), key: "repo", get: function(r){ return r.repo; }, initial: "asc" },
+      { label: t("page.an.col.triggers"), key: "traits", get: function(r){ return r.traits; }, initial: "asc" },
+      { label: t("page.an.col.declared-in"), key: "name", get: function(r){ return r.name; }, initial: "asc" }
     ];
 
     rows = anFilter(rows);
@@ -947,19 +908,16 @@ return [[
     });
 
     var parts = [];
-    parts.push('<p class="nsub">' + totalRows + ' plugin spec entr' +
-      (totalRows === 1 ? 'y' : 'ies') + '.' +
-      (ndup > 0 ? ' <strong>' + ndup + '</strong> repo' + (ndup === 1 ? '' : 's') +
-        ' declared more than once — in a config split across files, the last one ' +
-        'lazy.nvim imports silently wins.' : '') +
+    parts.push('<p class="nsub">' + esc(t("page.an.plugins.sub", { entries: t("page.an.n.spec-entries", { count: totalRows }) })) +
+      (ndup > 0 ? ' ' + rich(t("page.an.plugins.dup", { count: ndup })) : '') +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No spec matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.spec")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
       parts.push('<tr class="anrow" data-node="' + esc(r.node.id) + '">' +
-        '<td>' + esc(r.repo) + (r.dup ? ' <span class="anflag">⚠ duplicate</span>' : '') + '</td>' +
+        '<td>' + esc(r.repo) + (r.dup ? ' <span class="anflag">' + esc(t("page.an.flag.duplicate")) + '</span>' : '') + '</td>' +
         '<td>' + esc(r.traits) + '</td>' +
         '<td>' + esc(r.name) + '</td>' +
         '</tr>');
@@ -1033,11 +991,7 @@ return [[
     });
 
     if(rows.length === 0){
-      return '<p class="ntext none">No keymap, user command or autocmd found. ' +
-        'The <code>vim.*</code> APIs are always recognized; a config that binds ' +
-        'through its own helper — <code>map(...)</code>, ' +
-        '<code>usercmd.create(...)</code> — must declare it in ' +
-        '<code>opts.bindings.wrappers</code>. See <code>core/bindings.lua</code>.</p>';
+      return '<p class="ntext none">' + rich(t("page.an.bindings.none")) + '</p>';
     }
 
     var totalRows = rows.length;
@@ -1045,10 +999,10 @@ return [[
     Object.keys(seen).forEach(function(k){ if(seen[k] > 1) ndup++; });
 
     var cols = [
-      { label: "Binding", key: "label", get: function(r){ return r.sortkey; }, initial: "asc" },
-      { label: "Kind", key: "kind", get: function(r){ return r.kind; }, initial: "asc" },
-      { label: "Description", key: "desc", get: function(r){ return r.desc; }, initial: "asc" },
-      { label: "Declared in", key: "name", get: function(r){ return r.name; }, initial: "asc" }
+      { label: t("page.an.col.binding"), key: "label", get: function(r){ return r.sortkey; }, initial: "asc" },
+      { label: t("page.an.col.kind"), key: "kind", get: function(r){ return r.kind; }, initial: "asc" },
+      { label: t("page.an.col.description"), key: "desc", get: function(r){ return r.desc; }, initial: "asc" },
+      { label: t("page.an.col.declared-in"), key: "name", get: function(r){ return r.name; }, initial: "asc" }
     ];
 
     rows = anFilter(rows);
@@ -1058,24 +1012,22 @@ return [[
     });
 
     var parts = [];
-    parts.push('<p class="nsub">' + counts.keymap + ' keymap' +
-      (counts.keymap === 1 ? '' : 's') + ', ' + counts.usercmd + ' command' +
-      (counts.usercmd === 1 ? '' : 's') + ', ' + counts.autocmd + ' autocmd' +
-      (counts.autocmd === 1 ? '' : 's') + '.' +
-      (ndup > 0 ? ' <strong>' + ndup + '</strong> bound more than once — ' +
-        'whichever module loads last silently wins.' : '') +
+    parts.push('<p class="nsub">' + esc(t("page.an.bindings.sub", { keymaps: t("page.an.n.keymaps", { count: counts.keymap }),
+      commands: t("page.an.n.commands", { count: counts.usercmd }),
+      autocmds: t("page.an.n.autocmds", { count: counts.autocmd }) })) +
+      (ndup > 0 ? ' ' + rich(t("page.an.bindings.dup", { count: ndup })) : '') +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No binding matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.binding")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
       parts.push('<tr class="anrow" data-node="' + esc(r.node.id) + '">' +
         '<td><code>' + esc(r.label) + '</code>' +
-        (r.dup ? ' <span class="anflag">⚠ duplicate</span>' : '') +
-        (r.buffer ? ' <span class="anflag">buf</span>' : '') + '</td>' +
+        (r.dup ? ' <span class="anflag">' + esc(t("page.an.flag.duplicate")) + '</span>' : '') +
+        (r.buffer ? ' <span class="anflag">' + esc(t("page.an.flag.buffer")) + '</span>' : '') + '</td>' +
         '<td>' + esc(r.kind) + '</td>' +
-        '<td>' + esc(r.desc || ("via " + r.via)) + '</td>' +
+        '<td>' + esc(r.desc || t("page.an.bindings.via", { callee: r.via })) + '</td>' +
         '<td>' + esc(r.name) + '</td>' +
         '</tr>');
     });
@@ -1105,7 +1057,7 @@ return [[
         var handlerFn = spec.handler ? fnByName[spec.handler] : null;
         rows.push({
           node: n, spec: spec, method: spec.method.toUpperCase(),
-          path: spec.path, handler: spec.handler || "(inline handler)",
+          path: spec.path, handler: spec.handler || t("page.an.endpoints.inline"),
           handlerFn: handlerFn, framework: spec.framework || "", name: name,
           documented: !!spec.documented, line: spec.line,
           haystack: spec.method + " " + spec.path + " " + (spec.handler || "") +
@@ -1119,15 +1071,13 @@ return [[
     // Hierarchy draws them. Said here either way, so a tree that routes by
     // file does not read as a tree without routes.
     var fileRoutes = (IR.routes || {}).routes || 0;
+    // The link is markup the sentence takes as a parameter: said with a mark, set after the escaping.
     var fileRoutesLine = fileRoutes
-      ? 'This tree also has ' + fileRoutes + ' file-based route' + (fileRoutes === 1 ? '' : 's') +
-        ' (the Next.js <code>app</code> and <code>pages</code> directories): ' +
-        '<a href="#tab=hierarchy&view=routes">the Routes view of the Hierarchy</a> draws them.'
-      : 'File-based routing (the Next.js <code>app</code> and <code>pages</code> directories) is drawn by ' +
-        'the Routes view of the Hierarchy; this tree has none.';
+      ? rich(t("page.an.endpoints.files", { count: fileRoutes, link: "\u0001" })).replace("\u0001",
+          '<a href="#tab=hierarchy&view=routes">' + esc(t("page.an.endpoints.files.link")) + '</a>')
+      : rich(t("page.an.endpoints.files.none"));
     if(rows.length === 0){
-      return '<p class="ntext none">No call-based route registration found in this ' +
-        'tree. See <code>core/endpoints.lua</code> for what is recognized. ' + fileRoutesLine + '</p>';
+      return '<p class="ntext none">' + rich(t("page.an.endpoints.none")) + ' ' + fileRoutesLine + '</p>';
     }
 
     var totalRows = rows.length;
@@ -1135,11 +1085,11 @@ return [[
     rows.forEach(function(r){ if(r.documented) ndoc++; });
 
     var cols = [
-      { label: "Method", key: "method", get: function(r){ return r.method; }, initial: "asc" },
-      { label: "Path", key: "path", get: function(r){ return r.path; }, initial: "asc" },
-      { label: "Handler", key: "handler", get: function(r){ return r.handler; }, initial: "asc" },
-      { label: "Framework", key: "framework", get: function(r){ return r.framework; }, initial: "asc" },
-      { label: "Declared in", key: "name", get: function(r){ return r.name; }, initial: "asc" }
+      { label: t("page.an.col.method"), key: "method", get: function(r){ return r.method; }, initial: "asc" },
+      { label: t("page.an.col.path"), key: "path", get: function(r){ return r.path; }, initial: "asc" },
+      { label: t("page.an.col.handler"), key: "handler", get: function(r){ return r.handler; }, initial: "asc" },
+      { label: t("page.an.col.framework"), key: "framework", get: function(r){ return r.framework; }, initial: "asc" },
+      { label: t("page.an.col.declared-in"), key: "name", get: function(r){ return r.name; }, initial: "asc" }
     ];
 
     rows = anFilter(rows);
@@ -1149,12 +1099,10 @@ return [[
     });
 
     var parts = [];
-    parts.push('<p class="nsub">' + totalRows + ' route' + (totalRows === 1 ? '' : 's') +
-      ' found. <strong>' + ndoc + '</strong> of ' + totalRows +
-      ' handler' + (totalRows === 1 ? '' : 's') + ' documented.' +
+    parts.push('<p class="nsub">' + rich(t("page.an.endpoints.sub", { count: totalRows, documented: ndoc })) +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No route matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.route")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -1202,19 +1150,15 @@ return [[
     });
 
     if(rows.length === 0){
-      return '<p class="ntext none">No function named like a React hook ' +
-        '(<code>^use[A-Z]</code> — the same convention ' +
-        '<code>eslint-plugin-react-hooks</code> itself relies on) was found. ' +
-        'Only JavaScript/TypeScript/TSX files are checked for this — see ' +
-        '<code>core/lang/ecma.lua</code>.</p>';
+      return '<p class="ntext none">' + rich(t("page.an.hooks.none")) + '</p>';
     }
 
     var totalRows = rows.length;
     var cols = [
-      { label: "Hook", key: "name", get: function(r){ return r.name; }, initial: "asc" },
-      { label: "Signature", key: "signature", get: function(r){ return r.signature; }, initial: "asc" },
-      { label: "Declared in", key: "module", get: function(r){ return r.module; }, initial: "asc" },
-      { label: "Line", key: "line", get: function(r){ return r.line; }, initial: "asc" }
+      { label: t("page.an.col.hook"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.an.col.signature"), key: "signature", get: function(r){ return r.signature; }, initial: "asc" },
+      { label: t("page.an.col.declared-in"), key: "module", get: function(r){ return r.module; }, initial: "asc" },
+      { label: t("page.an.col.line"), key: "line", get: function(r){ return r.line; }, initial: "asc" }
     ];
 
     rows = anFilter(rows);
@@ -1224,10 +1168,10 @@ return [[
     });
 
     var parts = [];
-    parts.push('<p class="nsub">' + totalRows + ' hook' + (totalRows === 1 ? '' : 's') +
-      ' found by name.' + anFilterNote(rows.length, totalRows) + '</p>');
+    parts.push('<p class="nsub">' + esc(t("page.an.hooks.sub", { count: totalRows })) +
+      anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No hook matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.hook")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -1258,7 +1202,7 @@ return [[
     parts.push('<p class="nsub">' + words.summary(totalRows) +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">Nothing matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.any")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -1292,17 +1236,16 @@ return [[
     });
     rows.forEach(function(r){ r.uses = uses[r.name]; });
     return renderLanguageRows(rows, [
-      { label: "Decorator", key: "name", get: function(r){ return r.name; }, initial: "asc" },
-      { label: "Uses", key: "uses", get: function(r){ return r.uses; }, initial: "desc" },
-      { label: "Function", key: "fname", get: function(r){ return r.fname; }, initial: "asc" },
-      { label: "Declared in", key: "module", get: function(r){ return r.module; }, initial: "asc" },
-      { label: "Line", key: "line", get: function(r){ return r.line; }, initial: "asc" }
+      { label: t("page.an.col.decorator"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.an.col.uses"), key: "uses", get: function(r){ return r.uses; }, initial: "desc" },
+      { label: t("page.an.col.function"), key: "fname", get: function(r){ return r.fname; }, initial: "asc" },
+      { label: t("page.an.col.declared-in"), key: "module", get: function(r){ return r.module; }, initial: "asc" },
+      { label: t("page.an.col.line"), key: "line", get: function(r){ return r.line; }, initial: "asc" }
     ], {
-      empty: "No function with a decorator was found. Only Python files are " +
-        "checked for this, so a tree without Python has none.",
+      empty: esc(t("page.an.decorators.none")),
       summary: function(total){
-        return total + " use" + (total === 1 ? "" : "s") + " of " +
-          Object.keys(uses).length + " decorator" + (Object.keys(uses).length === 1 ? "" : "s") + ".";
+        return esc(t("page.an.decorators.sub", { uses: t("page.an.n.uses", { count: total }),
+          decorators: t("page.an.n.decorators", { count: Object.keys(uses).length }) }));
       }
     });
   }
@@ -1325,24 +1268,24 @@ return [[
         }
         if(fn.impl_trait) row("impl", fn.impl_trait + " for " + fn.owner, "");
         if(fn.is_unsafe) row("unsafe", "unsafe fn", "");
+        // `impl`, `unsafe fn` and `unsafe block` are Rust's own words.
         if(fn.unsafe_blocks) row("unsafe", "unsafe block",
-          fn.unsafe_blocks + " block" + (fn.unsafe_blocks === 1 ? "" : "s"));
+          t("page.an.rust.blocks", { count: fn.unsafe_blocks }));
       });
     });
     return renderLanguageRows(rows, [
-      { label: "Kind", key: "kind", get: function(r){ return r.kind; }, initial: "asc" },
-      { label: "What", key: "name", get: function(r){ return r.name; }, initial: "asc" },
-      { label: "Function", key: "fname", get: function(r){ return r.fname; }, initial: "asc" },
-      { label: "Detail", key: "detail", get: function(r){ return r.detail; }, initial: "asc" },
-      { label: "Declared in", key: "module", get: function(r){ return r.module; }, initial: "asc" },
-      { label: "Line", key: "line", get: function(r){ return r.line; }, initial: "asc" }
+      { label: t("page.an.col.kind"), key: "kind", get: function(r){ return r.kind; }, initial: "asc" },
+      { label: t("page.an.col.what"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.an.col.function"), key: "fname", get: function(r){ return r.fname; }, initial: "asc" },
+      { label: t("page.an.col.detail"), key: "detail", get: function(r){ return r.detail; }, initial: "asc" },
+      { label: t("page.an.col.declared-in"), key: "module", get: function(r){ return r.module; }, initial: "asc" },
+      { label: t("page.an.col.line"), key: "line", get: function(r){ return r.line; }, initial: "asc" }
     ], {
-      empty: "No trait implementation and no <code>unsafe</code> was found. Only " +
-        "Rust files are checked for this, so a tree without Rust has none.",
+      empty: rich(t("page.an.rust.none")),
       summary: function(total){
         var impl = rows.filter(function(r){ return r.kind === "impl"; }).length;
-        return impl + " trait method" + (impl === 1 ? "" : "s") + ", " +
-          (total - impl) + " place" + (total - impl === 1 ? "" : "s") + " with <code>unsafe</code>.";
+        return rich(t("page.an.rust.sub", { methods: t("page.an.n.trait-methods", { count: impl }),
+          places: t("page.an.n.unsafe-places", { count: total - impl }) }));
       }
     });
   }
@@ -1368,9 +1311,7 @@ return [[
     var files = (IR.docs && IR.docs.files) || [];
 
     if(files.length === 0){
-      return '<p class="ntext none">No <code>.md</code> file was found under this ' +
-        'tree (see <code>core/docs.lua</code> for what counts as the corpus), or this ' +
-        'map was generated before the docs corpus scan existed.</p>';
+      return '<p class="ntext none">' + rich(t("page.an.docs.none")) + '</p>';
     }
 
     var rows = files.map(function(f){
@@ -1384,9 +1325,9 @@ return [[
     rows.forEach(function(r){ totalRefs += r.refs; });
 
     var cols = [
-      { label: "Path", key: "path", get: function(r){ return r.path; }, initial: "asc" },
-      { label: "Title", key: "title", get: function(r){ return r.title; }, initial: "asc" },
-      { label: "References", key: "refs", get: function(r){ return r.refs; }, initial: "desc" }
+      { label: t("page.an.col.path"), key: "path", get: function(r){ return r.path; }, initial: "asc" },
+      { label: t("page.an.col.title"), key: "title", get: function(r){ return r.title; }, initial: "asc" },
+      { label: t("page.an.col.references"), key: "refs", get: function(r){ return r.refs; }, initial: "desc" }
     ];
 
     rows = anFilter(rows);
@@ -1395,12 +1336,11 @@ return [[
     });
 
     var parts = [];
-    parts.push('<p class="nsub">' + totalRows + ' documentation file' +
-      (totalRows === 1 ? '' : 's') + ', ' + totalRefs + ' code-span reference' +
-      (totalRefs === 1 ? '' : 's') + ' resolved in total.' +
+    parts.push('<p class="nsub">' + esc(t("page.an.docs.sub", { files: t("page.an.n.doc-files", { count: totalRows }),
+      refs: t("page.an.n.code-refs", { count: totalRefs }) })) +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No file matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.file")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
@@ -1428,13 +1368,10 @@ return [[
     var errors = (spec && spec.errors) || [];
 
     if(!spec){
-      return '<p class="ntext none">No <code>docs/install.json</code> or ' +
-        '<code>docs/INSTALL.md</code> found in this repo (or lib.nvim.deps was not ' +
-        'available when this map was generated) — see <code>core/tools.lua</code>, or ' +
-        'lib.nvim\'s <code>:help lib.nvim-deps-declaring</code>.</p>';
+      return '<p class="ntext none">' + rich(t("page.an.tools.none")) + '</p>';
     }
     if(tools.length === 0 && errors.length === 0){
-      return '<p class="ntext none">' + esc(spec.source) + ' declares no tools.</p>';
+      return '<p class="ntext none">' + esc(t("page.an.tools.empty", { source: spec.source })) + '</p>';
     }
 
     var rows = tools.map(function(t){
@@ -1449,10 +1386,10 @@ return [[
     rows.forEach(function(r){ if(r.required) nrequired++; });
 
     var cols = [
-      { label: "Tool", key: "bin", get: function(r){ return r.bin; }, initial: "asc" },
-      { label: "Required", key: "required", get: function(r){ return r.required ? 1 : 0; }, initial: "desc" },
-      { label: "Why", key: "why", get: function(r){ return r.why; }, initial: "asc" },
-      { label: "Packages", key: "pkg", get: function(r){ return r.pkg; }, initial: "asc" }
+      { label: t("page.an.col.tool"), key: "bin", get: function(r){ return r.bin; }, initial: "asc" },
+      { label: t("page.an.col.required"), key: "required", get: function(r){ return r.required ? 1 : 0; }, initial: "desc" },
+      { label: t("page.an.col.why"), key: "why", get: function(r){ return r.why; }, initial: "asc" },
+      { label: t("page.an.col.packages"), key: "pkg", get: function(r){ return r.pkg; }, initial: "asc" }
     ];
 
     rows = anFilter(rows);
@@ -1461,19 +1398,17 @@ return [[
     });
 
     var parts = [];
-    parts.push('<p class="nsub">' + totalRows + ' tool' + (totalRows === 1 ? '' : 's') +
-      ' declared in ' + esc(spec.source) + ', ' + nrequired + ' required.' +
-      (errors.length > 0 ? ' <strong>' + errors.length + '</strong> invalid entr' +
-        (errors.length === 1 ? 'y' : 'ies') + ' — see the drift findings below.' : '') +
+    parts.push('<p class="nsub">' + esc(t("page.an.tools.sub", { count: totalRows, source: spec.source, required: nrequired })) +
+      (errors.length > 0 ? ' ' + rich(t("page.an.tools.invalid", { count: errors.length })) : '') +
       anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      return parts.join("") + '<p class="ntext none">No tool matches that filter.</p>';
+      return parts.join("") + '<p class="ntext none">' + esc(t("page.an.nomatch.tool")) + '</p>';
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
       parts.push('<tr>' +
         '<td><code>' + esc(r.bin) + '</code></td>' +
-        '<td>' + (r.required ? 'required' : 'optional') + '</td>' +
+        '<td>' + esc(t(r.required ? "page.an.tools.required" : "page.an.tools.optional")) + '</td>' +
         '<td>' + esc(r.why) + '</td>' +
         '<td>' + esc(r.pkg) + '</td>' +
         '</tr>');
@@ -1497,27 +1432,23 @@ return [[
 
   function anCacheKey(atool){
     return atool + "|" + (state.asort || "") + "|" + (state.adir || "") + "|" + (state.q || "") +
-      "|" + dupView;
+      "|" + dupView + "|" + appliedLocale;
   }
 
   ///Render one panel from scratch. Sort and filter come from `state`.
   function renderAnalysis(atool){
     if(atool === "test"){
       return renderAnalysisPanel(
-        "Tested",
-        "A function counts as tested when its bare name is found somewhere " +
-        "under the configured tests directory — see docmap's coverage.lua " +
-        "for what that heuristic can and cannot see.",
+        t("page.an.col.tested"),
+        t("page.an.test.sub"),
         function(fn){ return !!fn.tested; },
         false
       );
     }
     if(atool === "doc"){
       return renderAnalysisPanel(
-        "Documented",
-        "A function counts as documented when it has a summary and its " +
-        "parameters are fully and correctly named — @internal functions " +
-        "are excluded entirely, not counted as undocumented.",
+        t("page.an.col.documented"),
+        t("page.an.doc.sub"),
         function(fn){ return !!fn.documented; },
         true
       );

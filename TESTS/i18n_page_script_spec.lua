@@ -111,6 +111,17 @@ return function(H)
       from = "  // Shape diff: two maps",
       task = "i18n-page-hierarchy-views (the map comparison)",
     },
+    {
+      slice = "06_analysis_tools",
+      from = "  function anHead(cols){",
+      task = "i18n-page-analysis-panels (every tool of the Analysis tab)",
+    },
+    {
+      slice = "07_analysis_panels",
+      from = "  // ── Checklist",
+      to = '    return out.join("");\n  }',
+      task = "i18n-page-analysis-panels (the Checklist)",
+    },
   }
 
   -- Literals a region keeps although they read as text. Keyed by slice, then by the literal; the value says why.
@@ -152,6 +163,11 @@ return function(H)
       ["Pages Router"] = "the name Next.js gives the router, not a word of the page",
       ["Next.js "] = "a product name before the router's name",
       ["hnode rt-"] = "class names of a route box",
+    },
+    ["06_analysis_tools"] = {
+      ["LuaCATS"] = "where a tag comes from, the name of the annotation dialect",
+      ["unsafe fn"] = "Rust's own words for an unsafe function",
+      ["unsafe block"] = "Rust's own words for an unsafe block",
     },
     ["11_quicks_compare_init"] = {
       ["hedge hedge-dep sd-del"] = "class names of a lost edge",
