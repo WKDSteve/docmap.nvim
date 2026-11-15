@@ -361,9 +361,11 @@ return function(H)
       :find("No file-based routes in this map.", 1, true),
     "routes: the message names the conventions it reads"
   )
-  has(
-    '<a href="#tab=hierarchy&view=routes">the Routes view of the Hierarchy</a> draws them.',
-    "the Endpoints panel points at the view"
+  has('<a href="#tab=hierarchy&view=routes">', "the Endpoints panel points at the view")
+  H.ok(
+    require("docmap.core.i18n").t("page.an.endpoints.files.link", nil, "en")
+      == "the Routes view of the Hierarchy",
+    "routes: the link says where it goes"
   )
   ok(
     src:find("unbuilt concept", 1, true) == nil,
