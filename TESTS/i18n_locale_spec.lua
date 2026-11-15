@@ -3,7 +3,7 @@
 --   * a finding is rendered in the active locale for an interactive surface, and in the locale a renderer
 --     names: that is what keeps `overview.md` and SARIF the same bytes on a machine that speaks German;
 --   * the renderers of committed files name the source locale, the interactive ones do not (pinned as text);
---   * the hosts resolve their locale in the documented order (pinned as text; the order itself is
+--   * the hosts resolve their locale in the documented order, and the engine never guesses from `$LANG` (pinned as text; the order itself is
 --     `i18n.resolve`, which the golden cases cover);
 --   * the suite itself is pinned to English.
 
@@ -110,9 +110,12 @@ return function(H)
   local cli = src("core/cli.lua")
   ok(cli:find('cli_locale = a:sub(#"--locale=" + 1)', 1, true), "the engine reads --locale=")
   ok(
-    cli:find('os.getenv("DOCMAP_LOCALE"),', 1, true)
-      and cli:find('os.getenv("LC_MESSAGES"),', 1, true),
-    "the engine: then $DOCMAP_LOCALE and the POSIX variables"
+    cli:find('i18n.resolve(cli_locale, os.getenv("DOCMAP_LOCALE"))', 1, true),
+    "the engine: then $DOCMAP_LOCALE, and nothing else"
+  )
+  ok(
+    not cli:find('os.getenv("LANG")', 1, true) and not cli:find('os.getenv("LC_', 1, true),
+    "the engine does not guess from $LANG: hosts read its report as text"
   )
   ok(
     require("docmap.config").build ~= nil

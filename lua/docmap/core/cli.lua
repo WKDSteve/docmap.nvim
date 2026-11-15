@@ -399,18 +399,12 @@ function M.run(opts, argv)
     end
   end
 
-  -- The language of the report: `--locale=`, then the environment (`docs/i18n.md`, "Which locale"). Only what
-  -- this run prints; the artifacts it writes are the same bytes in every locale.
+  -- The language of the report: `--locale=`, then `$DOCMAP_LOCALE`, else English (`docs/i18n.md`, "Choosing a
+  -- language"). **Not `$LANG`**: hosts and CI scripts read this report as text, and a run that turned German
+  -- because the machine is German would break every one of them without a line of theirs changing. Only what
+  -- this run prints is affected; the artifacts it writes are the same bytes in every locale.
   local i18n = require("docmap.core.i18n")
-  i18n.configure({
-    locale = i18n.resolve(
-      cli_locale,
-      os.getenv("DOCMAP_LOCALE"),
-      os.getenv("LC_ALL"),
-      os.getenv("LC_MESSAGES"),
-      os.getenv("LANG")
-    ),
-  })
+  i18n.configure({ locale = i18n.resolve(cli_locale, os.getenv("DOCMAP_LOCALE")) })
 
   -- **Replaced, not appended**, so parsing the same argv twice is the same
   -- as parsing it once. `standalone/docmap.lua` deliberately reads both
