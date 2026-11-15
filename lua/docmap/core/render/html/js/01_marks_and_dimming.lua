@@ -602,8 +602,12 @@ return [[
   }
 
   // A catalog paragraph of the Analysis tab: code spans as `prose` sets them, `**…**` strong, `*…*` emphasis.
+  // Code spans are left as they are: `docs/CHECKLIST/*.md` keeps its star.
   function rich(s){
-    return prose(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\*([^*\s][^*]*)\*/g, "<em>$1</em>");
+    return prose(s).split(/(<code>[\s\S]*?<\/code>)/).map(function(part, i){
+      if(i % 2) return part;
+      return part.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\*([^*\s][^*]*)\*/g, "<em>$1</em>");
+    }).join("");
   }
 
   // A span that says a message and names it, for markup drawn once and kept (the Tree): `applyI18n` says it

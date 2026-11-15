@@ -353,6 +353,38 @@ return function(H)
     )
   end
 
+  -- The helpers that set emphasis from a catalog text, run in node with the page's own code.
+  if vim.fn.executable("node") == 1 then
+    local tmp = H.tmpfile(".js")
+    local program = table.concat({
+      -- The page's own `esc` (slice 01), which the helpers call.
+      "function esc(s){ return (s||'').replace(/[&<>\"]/g, function(c){",
+      "  return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]; }); }",
+      H.page_i18n_js(),
+      "process.stdout.write(JSON.stringify([",
+      "  rich('`a/*.md` or `b/*.md`, **two** and *one*'),",
+      "  bold('**3** modules <b>'),",
+      "  i18nSpan('nm', 'page.tree.functions', { count: 2 })",
+      "]));",
+    }, "\n")
+    H.write(tmp, vim.split(program, "\n", { plain = true }))
+    local result = vim.system({ "node", tmp }, { text = true }):wait()
+    vim.fn.delete(tmp)
+    eq(result.code, 0, "helpers: run in node — " .. tostring(result.stderr))
+    local got = vim.json.decode(result.stdout or "[]")
+    eq(
+      got[1],
+      "<code>a/*.md</code> or <code>b/*.md</code>, <strong>two</strong> and <em>one</em>",
+      "rich: code spans keep their stars, strong and emphasis outside them"
+    )
+    eq(got[2], "<b>3</b> modules &lt;b&gt;", "bold: the bold part set, the rest escaped")
+    eq(
+      got[3],
+      '<span class="nm" data-i18n="page.tree.functions" data-i18n-params="{&quot;count&quot;:2}">ƒ 2 functions</span>',
+      "i18nSpan: the text, its key and its parameters"
+    )
+  end
+
   -- The tokenizer itself, on the cases it has to tell apart.
   local probe = literals([[
     var a = t("page.x"), b = "Plain words", c = '<div class="kw">'; // "Comment words"
