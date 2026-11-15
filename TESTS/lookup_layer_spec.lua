@@ -143,7 +143,10 @@ return function(H)
     "var IR = { tags: [ { name: 'deprecated', summary: 'Marks it old.', origin: 'luals', url: 'https://x/#d' },",
     "                   { name: 'internal', summary: 'Not API.', origin: 'project' } ],",
     "  checks: [ { name: 'layer-violation', severity: 'warn', compares: 'Edges against `layers`.',",
-    "              why: 'A decision.', templates: ['{from} requires {to}'] } ],",
+    "              why: 'A decision.', templates: ['{from} requires {to}'], keys: ['layer-violation'] },",
+    -- A check the catalog has no sentences for (a page older than `check.*`): its own English stands in.
+    "            { name: 'old-check', severity: 'info', compares: 'Old words.', why: 'Old why.',",
+    "              templates: ['old {x}'] } ],",
     "  glossaries: { lua: { keywords: { 'function': { summary: 'a function' }, 'local': { summary: 'a local' },",
     "                                    'return': { summary: 'r' }, 'end': { summary: 'e' } },",
     "    stdlib: { 'table.concat': { summary: 'joins', anchor: '#tc' },",
@@ -185,6 +188,16 @@ return function(H)
     "  if(e.kind === 'call'){ push(callOut, fnKey(e.from, e.from_fn), e); push(callIn, fnKey(e.to, e.to_fn), e); }",
     "  else push(depOut, e.from, e); });",
     "function getExternalCallTotals(){ return { dkjson: { encode: 3, decode: 1 } }; }",
+    -- The runtime of the catalog with what the page embeds, and the page's own helpers around it.
+    require("docmap.core.render.html.i18n_js"),
+    "var I18N = docmapI18n(" .. vim.json.encode(
+      require("docmap.core.i18n").for_page(
+        { "page.", "finding.", "report.", "check." },
+        { en = true }
+      )
+    ) .. ");",
+    "function t(key, params){ return I18N.t(key, params); }",
+    "function fmtNum(n){ return I18N.number(n); }",
     cut(s01, "  function esc(s){", "  // Markdown info strings that are not"),
     cut(s02, "  function typeHTML(text, lang){", "  // `key` (the function's `fnKey`) is optional"),
     cut(s02, "  function glossaryForPath(path){", "  // Artifact lives in out_dir"),
@@ -214,6 +227,12 @@ return function(H)
     "out.extNotHere = lookup('ext', 'dkjson', { fnKey: 'lua/b.lua#M.help' });",
     "out.check = lookup('check', 'layer-violation');",
     "out.checkOwn = lookup('check', 'repo-own');",
+    "out.checkOld = lookup('check', 'old-check');",
+    "I18N.configure({ locale: 'de' });",
+    "out.checkDe = lookup('check', 'layer-violation');",
+    "out.fnDe = lookup('fn', A);",
+    "out.cardDe = lookupCardHTML(lookup('req', 'gone.mod', { fnKey: A }));",
+    "I18N.configure({ locale: 'en' });",
     "out.tagPlain = lookup('tag', 'deprecated', {});",
     "out.tagDeprecated = lookup('tag', 'deprecated', { fnKey: 'lua/b.lua#M.help' });",
     "out.tagInternal = lookup('tag', 'internal', { fnKey: 'lua/b.lua#M.quiet' });",
@@ -421,10 +440,48 @@ return function(H)
   ok(got.extNotHere.unknown ~= nil, "ext: a file that does not require it is told so")
 
   -- check
-  eq(got.check.summary, "Edges against `layers`.", "check: what it compares")
-  eq(got.check.lines[1].text, "A decision.", "check: why it exists")
-  eq(got.check.rows.items[1].text, "{from} requires {to}", "check: what a finding reads like")
+  local i18n = require("docmap.core.i18n")
+  eq(
+    got.check.summary,
+    i18n.t("check.layer-violation.compares", nil, "en"),
+    "check: what it compares, from the catalog"
+  )
+  eq(
+    got.check.lines[1].text,
+    i18n.t("check.layer-violation.why", nil, "en"),
+    "check: why it exists"
+  )
+  eq(
+    got.check.rows.items[1].text,
+    i18n.t("finding.layer-violation", nil, "en"),
+    "check: what a finding reads like, from its key"
+  )
   eq(got.check.origin, "severity warn by default · 1 finding here", "check: grade and count")
+  eq(
+    got.checkOld.summary,
+    "Old words.",
+    "check: without catalog sentences the entry's English stands in"
+  )
+  eq(got.checkOld.lines[1].text, "Old why.", "check: and its reason")
+  eq(got.checkOld.rows.items[1].text, "old {x}", "check: and its templates")
+  -- The same cards in German: the sentences, the labels and the counts follow the active locale.
+  eq(
+    got.checkDe.summary,
+    i18n.t("check.layer-violation.compares", nil, "de"),
+    "check, German: what it compares"
+  )
+  eq(got.checkDe.lines[1].label, "Warum", "check, German: the label")
+  eq(
+    got.checkDe.origin,
+    "Schwere warn als Vorgabe · 1 Befund hier",
+    "check, German: grade and count"
+  )
+  eq(got.checkDe.kind, "Prüfung", "check, German: the kind")
+  eq(got.fnDe.lines[1].label, "Komplexität", "fn, German: a label")
+  ok(
+    got.cardDe:find("Nicht bekannt: nicht aufgelöst.", 1, true) ~= nil,
+    "card, German: the unknown line and its reason"
+  )
   ok(
     got.checkOwn.unknown:find("extra_checks", 1, true),
     "check: a check of the project's own has no explanation here, and the card says so"

@@ -213,7 +213,10 @@ return function(H)
   for code, messages in pairs(embedded.catalogs) do
     for key in pairs(messages) do
       ok(
-        key:match("^page%.") or key:match("^finding%.") or key:match("^report%."),
+        key:match("^page%.")
+          or key:match("^finding%.")
+          or key:match("^report%.")
+          or key:match("^check%."),
         ("embedded: %s carries a key the page does not read: %s"):format(code, key)
       )
     end

@@ -34,7 +34,7 @@ local i18n = require("docmap.core.i18n")
 local I18N_JS = require("docmap.core.render.html.i18n_js")
 
 ---The namespaces of the catalog the page reads. The editor's and the engine's texts stay out of the artifact.
-local PAGE_NAMESPACES = { "page.", "finding.", "report." }
+local PAGE_NAMESPACES = { "page.", "finding.", "report.", "check." }
 
 ---The locales the page offers: in its picker, and to a reader whose browser asks for one.
 ---

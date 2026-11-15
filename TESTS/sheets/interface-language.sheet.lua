@@ -88,6 +88,19 @@ return {
     },
     { shot = "de-light-hierarchy" },
 
+    -- The explanation card of a tab, from the catalog.
+    { hover = '.tab-btn[data-tab="hierarchy"]', note = "a dwell on the Hierarchy tab" },
+    {
+      wait = "(p => !!p && p.classList.contains('on'))(document.querySelector('.explainpop'))",
+      note = "its explanation card opens",
+    },
+    {
+      expect = "/^Der Abhängigkeitsgraph, von einem Modul aus/.test(document.querySelector('.explainpop').textContent)",
+      note = "and explains the tab in German",
+    },
+    { shot = "de-light-explain" },
+    { press = "Escape", note = "the card is put away" },
+
     -- The findings, said from their parameters.
     { click = '.tab-btn[data-tab="findings"]', note = "the Findings tab" },
     {
@@ -124,6 +137,19 @@ return {
     { hover = "h1" },
     { press = "Escape", note = "the explanation of the tab is put away" },
     { shot = "de-light-findings" },
+
+    -- The card of a check id: chrome and sentences from the catalog.
+    { click = '#findings .kw[data-kwkind="check"]', note = "a check id in the table" },
+    { wait = "document.getElementById('kwpop').classList.contains('on')", note = "its card opens" },
+    {
+      expect = "(p => p.querySelector('.kw-kind').textContent === 'Prüfung'"
+        .. " && p.querySelector('.kw-label').textContent === 'Warum'"
+        .. " && /Befunde? hier$/.test(p.querySelector('.kw-origin').textContent))"
+        .. "(document.getElementById('kwpop'))",
+      note = "kind, label and the count line are German",
+    },
+    { shot = "de-light-check-card" },
+    { press = "Escape", note = "the card is put away" },
     { scheme = "dark" },
     { shot = "de-dark-findings" },
     { click = '.tab-btn[data-tab="hierarchy"]' },

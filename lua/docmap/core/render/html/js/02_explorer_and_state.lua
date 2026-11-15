@@ -388,16 +388,15 @@ return [[
     if(!tag) return null;
     var card = {
       word: "@" + tag.name, summary: tag.summary,
-      origin: tag.origin === "luals" ? "LuaCATS annotation" : "this project's own convention",
+      origin: tag.origin === "luals" ? t("page.lookup.tag.luals") : t("page.lookup.tag.own"),
       // Only where the origin publishes one. A LuaLS link for `@todo` would
       // load, look authoritative and not contain the answer.
-      link: tag.url ? { href: tag.url, label: "LuaLS reference" } : null
+      link: tag.url ? { href: tag.url, label: t("page.lookup.tag.reference") } : null
     };
     var e = ctx.fnKey && own(fnByKey, ctx.fnKey) ? fnByKey[ctx.fnKey] : null;
     if(e && (key === "deprecated" || key === "internal")){
       if(!hasCallEdges(e.node)){
-        card.lines = [{ label: "Callers", text: "not known (the map has no call edges for " +
-          (e.node.language || "this language") + ")" }];
+        card.lines = [{ label: t("page.lookup.tag.callers"), text: noCallEdges(e.node.language) }];
       } else {
         var callers = callPeers(ctx.fnKey, true);
         // An internal function is meant to be called from its own module;
@@ -407,16 +406,16 @@ return [[
         }
         if(callers.length){
           card.rows = {
-            title: key === "deprecated" ? "Still called by" : "Called from outside its module by",
+            title: key === "deprecated" ? t("page.lookup.tag.still-called") : t("page.lookup.tag.called-outside"),
             items: callers.map(function(k){
               var c = fnByKey[k];
               return c ? { code: c.fn.name, text: c.node.module || c.node.path } : { code: k };
             })
           };
         } else {
-          card.lines = [{ label: "Callers", text: key === "deprecated"
-            ? "nothing in this tree calls it any more"
-            : "nothing outside its own module calls it" }];
+          card.lines = [{ label: t("page.lookup.tag.callers"), text: key === "deprecated"
+            ? t("page.lookup.tag.no-callers.deprecated")
+            : t("page.lookup.tag.no-callers.internal") }];
         }
       }
     }

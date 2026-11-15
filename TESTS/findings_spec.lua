@@ -142,9 +142,14 @@ return function(H)
       require("docmap.core.check_policy").CODES[name],
       ("checks[%s]: is a code the policy knows"):format(name)
     )
-    for _, field in ipairs({ "compares", "why" }) do
+    local compares, why = findings.explain(name, "en")
+    for field, text in pairs({ compares = compares, why = why }) do
       ok(
-        type(info[field]) == "string" and #info[field] > 20 and info[field]:sub(-1) == ".",
+        require("docmap.core.i18n").has("check." .. name .. "." .. field),
+        ("checks[%s]: check.%s.%s is in the catalog"):format(name, name, field)
+      )
+      ok(
+        type(text) == "string" and #text > 20 and text:sub(-1) == ".",
         ("checks[%s]: %s is a sentence"):format(name, field)
       )
     end
@@ -155,6 +160,14 @@ return function(H)
   end
   for name in pairs(require("docmap.core.check_policy").CODES) do
     ok(findings.CHECKS[name] ~= nil, ("checks: the policy code %s is explained"):format(name))
+  end
+  -- And the other way round: a `check.*` sentence of the catalog belongs to a check that exists.
+  for _, key in ipairs(require("docmap.core.i18n").keys("check.")) do
+    local name, field = key:match("^check%.(.+)%.(%a+)$")
+    ok(
+      name ~= nil and findings.CHECKS[name] ~= nil and (field == "compares" or field == "why"),
+      ("checks: the catalog explains a check that does not exist: %s"):format(key)
+    )
   end
 
   -- `variant` selects the sentence and is never itself printed.

@@ -419,9 +419,11 @@ return [[
   // from what that view computes.
   //
   // One card, one attribute: anything carrying `data-explain` gets it. The
-  // texts live in `EXPLAIN` keyed by the same value, in this file rather
-  // than in the markup, because several of them are two sentences and
-  // markup with prose in its attributes is markup nobody edits twice.
+  // texts are catalog messages (`page.explain.<value>`, docs/i18n.md),
+  // named in `EXPLAIN` by the same value rather than in the markup, because
+  // several of them are two sentences and markup with prose in its
+  // attributes is markup nobody edits twice. Read at the moment the card
+  // opens, so it speaks the language active then.
   //
   // **On the worry that a section means different things in different
   // tabs**: it was raised about "Drift findings", and that one turns out to
@@ -444,227 +446,64 @@ return [[
     // own `focusin` handler already argues against: a `title` never appears
     // on focus, so it left exactly the controls a keyboard user reaches as
     // the only ones with no explanation.
-    "view.tree":
-      "The same directory hierarchy as Modules, as a list you fold: a " +
-      "level is a column of rows instead of a row of boxes, so a level with " +
-      "two hundred modules stays readable. The filter keeps every match and " +
-      "the path to it.",
-    "view.treemap":
-      "Everything under the center as nested areas, sized by lines of code " +
-      "(or functions): where the weight of a wide level sits, at a glance. " +
-      "Click to zoom in.",
-    "view.rings":
-      "Every module on the ring of its shortest require chain from the entry: " +
-      "how deep the tree is and what is reachable at all. What the entry does " +
-      "not reach sits in a last, dashed ring, where the unreferenced-module " +
-      "findings are marked. Point at a box to see its chain.",
-    "view.layers":
-      "The tree in the bands its layering rules imply: a layer that may not " +
-      "require another sits below it. A require that breaks a rule is a red " +
-      "arrow, which is the layer-violation finding as a picture. Needs " +
-      "layers in .docmap.json.",
-    "view.routes":
-      "File-based routing as a tree: the Next.js app and pages directories, a " +
-      "box per segment, with the URL where a page or a handler makes it a " +
-      "route. Dynamic segments, route groups and slots are named as written. " +
-      "Routes registered by a call are in Analysis, under Endpoints.",
-    "hier.entry":
-      "The module the rings are counted from. The list holds the roots of the " +
-      "require graph (modules that require something and that nothing " +
-      "requires) with how many modules each reaches. Any module can be the " +
-      "entry: click its box twice, or search for it.",
-    "view.coupling":
-      "Every module as a dot: how many modules it requires across, how many " +
-      "require it up. The corners have names (hubs, tangles, pass-throughs, " +
-      "leaves) and say what would be expensive to change.",
-    "hier.tint":
-      "Tints the Modules boxes by one measure of everything below each box: " +
-      "the share of functions that are documented or tested, or how many FIX " +
-      "or TODO/HACK/PERF markers there are per 1,000 lines. A stronger tint means " +
-      "look here first. The value is printed on each box and the legend names the steps.",
-    "hier.shape":
-      "Compares the map of a commit with this one, or the maps of two commits, " +
-      "and marks the difference on the diagram: nodes that were added, places " +
-      "nodes were removed from, requires gained and lost. Nothing moves; what " +
-      "did not change is dimmed. Needs a server that can read git.",
-    "view.modules":
-      "The directory hierarchy itself — every module and namespace, nested " +
-      "the way the tree is. The one view with no direction, because " +
-      "containment has none; the slider hides the top N levels instead.",
-    "view.deps":
-      "The require graph: an arrow means this module requires that one. " +
-      "`+ external` adds the modules outside this map, each box naming the " +
-      "functions actually called through it.",
-    "view.calls":
-      "Function-level callers and callees, resolved from real call sites " +
-      "rather than guessed. A weak match is drawn dimmed rather than " +
-      "hidden — see the Findings tab for what could not be resolved.",
-    "view.modulecalls":
-      "The same call graph collapsed module to module, with each edge " +
-      "weighted by how many calls it carries. Answers which modules lean on " +
-      "each other, where Calls answers which functions do.",
-    "view.types":
-      "How `@class` and `@alias` declarations reference each other through " +
-      "their fields. Needs LuaLS enrichment (`:DocMap full`) — without it " +
-      "this is empty rather than wrong.",
-    "view.inheritance":
-      "Only `@class Child : Parent` edges, drawn apart from Types because " +
-      "inheritance is a different claim than collaboration and reading both " +
-      "in one picture hides which is which.",
+    "view.tree": "page.explain.view.tree",
+    "view.treemap": "page.explain.view.treemap",
+    "view.rings": "page.explain.view.rings",
+    "view.layers": "page.explain.view.layers",
+    "view.routes": "page.explain.view.routes",
+    "hier.entry": "page.explain.hier.entry",
+    "view.coupling": "page.explain.view.coupling",
+    "hier.tint": "page.explain.hier.tint",
+    "hier.shape": "page.explain.hier.shape",
+    "view.modules": "page.explain.view.modules",
+    "view.deps": "page.explain.view.deps",
+    "view.calls": "page.explain.view.calls",
+    "view.modulecalls": "page.explain.view.modulecalls",
+    "view.types": "page.explain.view.types",
+    "view.inheritance": "page.explain.view.inheritance",
 
     // ── The tools inside Analysis ────────────────────────────────────
     //
     // Written from what each panel computes, per this table's own rule.
     // The `.plugin-gated` ones say what they need, because an empty panel
     // that cannot say why is the failure this whole card exists against.
-    "atool.test":
-      "Which functions a test suite mentions by name, per module, worst " +
-      "first. A floor rather than a verdict: a name found under the tests " +
-      "directory counts, and a function exercised only indirectly does not.",
-    "atool.doc":
-      "Which functions carry a summary and fully documented parameters, per " +
-      "module, worst first. `@internal` functions are excluded — this is a " +
-      "question about the published surface, not about helpers.",
-    "atool.annotations":
-      "Which annotation tags this tree actually uses, counted per function. " +
-      "Generated, so unlike a hand-written inventory it cannot go stale.",
-    "atool.api":
-      "Every function this tree publishes, with its documentation state and " +
-      "how many other modules here call it — the question asked every time a " +
-      "module is extracted into its own plugin.",
-    "atool.deps":
-      "Fan-in and fan-out per module: how many modules it requires, and how " +
-      "many require it. The second number is the one that decides how " +
-      "expensive a rename is.",
-    "atool.complexity":
-      "Cyclomatic complexity per function, counted over its own subtree " +
-      "including nested closures. A ranking of where the branching is, not " +
-      "a threshold anything fails.",
-    "atool.duplicates":
-      "Functions whose parse-tree *shape* is identical, ignoring names and " +
-      "literals — the one kind of drift the require graph cannot see, since " +
-      "two modules that each grew their own `read(path)` do not require " +
-      "each other.",
-    "atool.lazy":
-      "The Plugins question inverted: which plugins load on each event, " +
-      "filetype, command and key, and which are paid for at startup " +
-      "regardless. Answers what typing a command actually costs, and why " +
-      "something is not loaded yet.",
-    "atool.plugins":
-      "Every lazy.nvim-shaped plugin spec in the tree. Matters when this is " +
-      "pointed at a Neovim *config* rather than a plugin, where most files " +
-      "are specs with no function in them and are invisible to every other " +
-      "panel.",
-    "atool.bindings":
-      "Keymaps, user commands and autocommands registered in this tree. The " +
-      "`vim.*` APIs are recognised unconditionally; a config binding through " +
-      "its own wrapper needs `opts.bindings.wrappers` to declare it.",
-    "atool.tools":
-      "The CLI tools this repository declares it wants, from its own " +
-      "`docs/install.json`. Declared only — a static page has no host to ask " +
-      "whether any of them is installed here.",
-    "atool.telemetry":
-      "Call counts collected by runtime-analysis.nvim inside a real Neovim " +
-      "session, joined onto this map. Needs `:DocMap serve`: counts change " +
-      "between runs, so they are never baked into the committed page.",
-    "atool.loaded":
-      "A loaded-versus-declared comparison from a saved runtime-analysis " +
-      "snapshot. Needs `:DocMap serve` and a named snapshot — the difference " +
-      "is a property of one live session, never of a live aggregate.",
-    "atool.startup":
-      "Where startup time went, as a flamegraph: width is total time, depth " +
-      "is require nesting. Measured by runtime-analysis.nvim and written by " +
-      "`:RATelemetry flamegraph`, then baked into this page — unlike " +
-      "Telemetry and Loaded it needs no `:DocMap serve`, because startup " +
-      "happens once per session rather than accumulating.",
-    "atool.checklist":
-      "Hand-verified facts, each cited to the file it was read off. The " +
-      "ledger is baked into this page; the changed-since-verified verdict " +
-      "needs git, so it fills in under `:DocMap serve`.",
-    "atool.hooks":
-      "Functions named like a React hook (`^use[A-Z]`, the convention " +
-      "eslint-plugin-react-hooks itself relies on). Only JavaScript, " +
-      "TypeScript and TSX files are checked for this.",
-    "atool.decorators":
-      "Which decorators a Python tree uses, how often, and on which functions. " +
-      "Only Python files are checked for this.",
-    "atool.rust":
-      "Which types implement which traits, and where `unsafe` lives: `unsafe fn` " +
-      "and functions holding `unsafe` blocks. Only Rust files are checked for this.",
-    "atool.docs":
-      "Every Markdown file in the tree and how often the rest of the " +
-      "documentation points at it — which pages are load-bearing, and which " +
-      "nothing links to.",
-    "atool.endpoints":
-      "HTTP routes registered in the source, Express/Fastify/Koa-shaped. An " +
-      "ecosystem convention rather than a language feature, so a tree " +
-      "without one is empty here and that is a real answer.",
+    "atool.test": "page.explain.atool.test",
+    "atool.doc": "page.explain.atool.doc",
+    "atool.annotations": "page.explain.atool.annotations",
+    "atool.api": "page.explain.atool.api",
+    "atool.deps": "page.explain.atool.deps",
+    "atool.complexity": "page.explain.atool.complexity",
+    "atool.duplicates": "page.explain.atool.duplicates",
+    "atool.lazy": "page.explain.atool.lazy",
+    "atool.plugins": "page.explain.atool.plugins",
+    "atool.bindings": "page.explain.atool.bindings",
+    "atool.tools": "page.explain.atool.tools",
+    "atool.telemetry": "page.explain.atool.telemetry",
+    "atool.loaded": "page.explain.atool.loaded",
+    "atool.startup": "page.explain.atool.startup",
+    "atool.checklist": "page.explain.atool.checklist",
+    "atool.hooks": "page.explain.atool.hooks",
+    "atool.decorators": "page.explain.atool.decorators",
+    "atool.rust": "page.explain.atool.rust",
+    "atool.docs": "page.explain.atool.docs",
+    "atool.endpoints": "page.explain.atool.endpoints",
 
-    "tab.hierarchy":
-      "The dependency graph, drawn from one module outward. Boxes are modules " +
-      "and namespaces, arrows are requires and calls; the slider decides how " +
-      "far from the centre it reaches. Hovering a box lights it and its " +
-      "neighbours; the first click holds that, so you can read it and follow " +
-      "the edges without the pointer. Click the same box again to root the " +
-      "graph there — or double-click, which is the same two clicks at once. " +
-      "Escape, a click on empty space, or a click on another box lets go. " +
-      "The path above the graph shows where you are, every level a way back. " +
-      "The *Classic clicks* pill decides what that second click does: root " +
-      "here, or open in the Tree. The one view that exports as an SVG.",
-    "tab.index":
-      "Flat lists of everything the map found, for when you know the name and " +
-      "not the place. Three ways of listing the same repository — as a tree, " +
-      "as functions, as modules.",
-    "tab.analysis":
-      "Aggregate numbers over the whole tree: how much is tested, how much is " +
-      "documented, where dependencies concentrate. A palette of tools sharing " +
-      "one panel, not a single report.",
-    "tab.compare":
-      "Two or more modules side by side, on the same rows, so a difference is " +
-      "a difference in a column rather than something to remember between " +
-      "scrolls.",
-    "tab.features":
-      "This repository's own `docs/FEATURES/` files, read as an index — name, " +
-      "summary and metadata. Never the prose that follows them, which stays " +
-      "in the file it was written in.",
-    "tab.quicks":
-      "The verdicts: what is notable about this tree stated in sentences, " +
-      "good and bad, each with the count it is based on. Computed by the " +
-      "engine, not by this page.",
-    "tab.notes":
-      "Everything the authors left behind. Annotations on functions " +
-      "(`---@todo`, `---@bug`) and marker comments in the source " +
-      "(`-- TODO:`, `// FIXME:`) — two lists, because one is attached to a " +
-      "signature and the other to a line.",
-    "tab.history":
-      "This repository's git history, and what each commit did to the map. " +
-      "Computed on demand from git, so it needs a host that can run it — a " +
-      "map opened as a file says so instead of guessing.",
+    "tab.hierarchy": "page.explain.tab.hierarchy",
+    "tab.index": "page.explain.tab.index",
+    "tab.analysis": "page.explain.tab.analysis",
+    "tab.compare": "page.explain.tab.compare",
+    "tab.features": "page.explain.tab.features",
+    "tab.quicks": "page.explain.tab.quicks",
+    "tab.notes": "page.explain.tab.notes",
+    "tab.history": "page.explain.tab.history",
 
-    "sub.tree":
-      "The module tree as the scan walked it, with each node's own detail " +
-      "beside it. The default place to start reading a repository you do not " +
-      "know.",
-    "sub.functions":
-      "Every documented function in the map, alphabetically, with its " +
-      "signature and where it lives.",
-    "sub.modules":
-      "Every module and namespace, alphabetically. The same set the tree " +
-      "shows, without the nesting.",
-    "feat.theme":
-      "One feature file of this repository. The first is what the project " +
-      "exists for, the second the overview, the rest one theme each.",
-    "sub.features.all":
-      "The index of every feature file, above the ones promoted to a tab of " +
-      "their own.",
+    "sub.tree": "page.explain.sub.tree",
+    "sub.functions": "page.explain.sub.functions",
+    "sub.modules": "page.explain.sub.modules",
+    "feat.theme": "page.explain.feat.theme",
+    "sub.features.all": "page.explain.sub.features.all",
 
-    "tab.findings":
-      "Where the drift checks report. Each row is one check disagreeing " +
-      "with the code — a doc reference to something that no longer exists, " +
-      "an example that does not parse, a binding declared twice. The same " +
-      "list that fails CI and lands on GitHub as SARIF. Its count stays in " +
-      "the header rather than moving in here, because a number behind a " +
-      "click is a number nobody reads.",
+    "tab.findings": "page.explain.tab.findings",
   };
 
   var explainpop = null;
@@ -681,7 +520,8 @@ return [[
   }
 
   function explainOpen(el){
-    var text = EXPLAIN[el.dataset.explain];
+    var key = own(EXPLAIN, el.dataset.explain) ? EXPLAIN[el.dataset.explain] : null;
+    var text = key ? t(key) : null;
     if(!text) return;
     if(!explainpop){
       explainpop = document.createElement("div");

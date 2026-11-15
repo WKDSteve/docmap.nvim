@@ -643,7 +643,9 @@ return [[
     var h = '<div class="kw-word">' + esc(card.word) +
       (card.kind ? '<span class="kw-kind">' + esc(card.kind) + '</span>' : '') + '</div>';
     if(card.summary) h += '<div class="kw-sum">' + prose(card.summary) + '</div>';
-    if(card.unknown) h += '<div class="kw-unknown">Not known: ' + prose(card.unknown) + '</div>';
+    if(card.unknown){
+      h += '<div class="kw-unknown">' + prose(t("page.lookup.unknown", { reason: card.unknown })) + '</div>';
+    }
     if(card.note) h += '<div class="kw-note">' + esc(card.note) + '</div>';
     (card.lines || []).forEach(function(l){
       h += '<div class="kw-line"><span class="kw-label">' + esc(l.label) + '</span> ' +
@@ -658,11 +660,11 @@ return [[
       shown.forEach(function(r){
         h += '<li>' + (r.code ? '<code>' + esc(r.code) + '</code> ' : '') +
           (r.text ? prose(lookupClip(r.text)) : '') +
-          (r.count ? ' <span class="kw-n">' + r.count + '×</span>' : '') + '</li>';
+          (r.count ? ' <span class="kw-n">' + fmtNum(r.count) + '×</span>' : '') + '</li>';
       });
       h += '</ul>';
       if(total > shown.length){
-        h += '<div class="kw-more">… and ' + (total - shown.length) + ' more</div>';
+        h += '<div class="kw-more">' + esc(t("page.lookup.more", { count: fmtNum(total - shown.length) })) + '</div>';
       }
     }
     if(card.origin) h += '<div class="kw-origin">' + esc(card.origin) + '</div>';
@@ -710,20 +712,25 @@ return [[
     return out;
   }
 
-  function lookupPlural(n, word){ return n + " " + word + (n === 1 ? "" : "s"); }
+  // "not known (the map has no call edges for Lua)": the language is the
+  // map's own name for it, the subject; without one the sentence says so.
+  function noCallEdges(language){
+    return language ? t("page.lookup.no-call-edges", { language: language })
+      : t("page.lookup.no-call-edges.unnamed");
+  }
 
   // A call in a snippet that resolves in the tree: what the callee is, where
   // it lives, and the way there.
   lookupRegister("call", function(key){
     var e = own(fnByKey, key) ? fnByKey[key] : null;
     if(!e){
-      return { word: key.replace(/^.*#/, ""), kind: "call",
-        unknown: "the map has an edge to this function and no entry for it." };
+      return { word: key.replace(/^.*#/, ""), kind: t("page.lookup.kind.call"),
+        unknown: t("page.lookup.call.no-entry") };
     }
     return {
-      word: e.fn.signature || e.fn.name, kind: "call",
+      word: e.fn.signature || e.fn.name, kind: t("page.lookup.kind.call"),
       summary: e.fn.summary || null,
-      unknown: e.fn.summary ? null : "it has no summary line.",
+      unknown: e.fn.summary ? null : t("page.lookup.call.no-summary"),
       origin: e.node.module || e.node.path,
       nav: { label: (e.node.module || e.node.path) + ":" + e.fn.line, to: { tab: "tree", id: e.node.id } }
     };
@@ -733,23 +740,27 @@ return [[
   // about it, where the reader is looking at it.
   lookupRegister("fn", function(key){
     var e = own(fnByKey, key) ? fnByKey[key] : null;
-    if(!e) return { word: key.replace(/^.*#/, ""), kind: "function", unknown: "the map has no such function." };
+    if(!e){
+      return { word: key.replace(/^.*#/, ""), kind: t("page.lookup.kind.function"), unknown: t("page.lookup.fn.none") };
+    }
     var edges = hasCallEdges(e.node);
     var inN = callPeers(key, true).length, outN = callPeers(key, false).length;
-    var noEdges = "not known (the map has no call edges for " + (e.node.language || "this language") + ")";
+    var noEdges = noCallEdges(e.node.language);
     return {
-      word: e.fn.name, kind: "function",
+      word: e.fn.name, kind: t("page.lookup.kind.function"),
       lines: [
-        { label: "Complexity", text: e.fn.complexity === undefined
-          ? "not known (the map predates it)" : e.fn.complexity + " (cyclomatic)" },
-        { label: "Called by", text: edges ? lookupPlural(inN, "function") + " of this tree" : noEdges },
-        { label: "Calls", text: edges ? lookupPlural(outN, "function") + " of this tree" : noEdges },
-        { label: "Tests", text: e.fn.tested === undefined
-          ? "not known (the map predates it)"
-          : (e.fn.tested ? "a spec names it" : "no spec names it") }
+        { label: t("page.lookup.fn.complexity"), text: e.fn.complexity === undefined
+          ? t("page.lookup.predates") : t("page.lookup.fn.complexity.value", { value: fmtNum(e.fn.complexity) }) },
+        { label: t("page.lookup.fn.called-by"), text: edges
+          ? t("page.lookup.fn.functions", { count: inN }) : noEdges },
+        { label: t("page.lookup.fn.calls"), text: edges
+          ? t("page.lookup.fn.functions", { count: outN }) : noEdges },
+        { label: t("page.lookup.fn.tests"), text: e.fn.tested === undefined
+          ? t("page.lookup.predates")
+          : (e.fn.tested ? t("page.lookup.fn.tested") : t("page.lookup.fn.untested")) }
       ],
       nav: (inN || outN)
-        ? { label: "Callers and callees", to: { tab: "hierarchy", view: "calls", center: e.node.id, fn: key, dir: "both" } }
+        ? { label: t("page.lookup.fn.nav"), to: { tab: "hierarchy", view: "calls", center: e.node.id, fn: key, dir: "both" } }
         : null
     };
   });
@@ -768,21 +779,21 @@ return [[
   lookupRegister("type", function(key){
     var c = own(classByName, key) ? classByName[key] : null;
     if(!c){
-      return { word: key, kind: "type", unknown: hasTypeDetail()
-        ? "no `@class` or `@alias` of this name is declared in the tree."
-        : "this map carries no class details. They are read through `lua-language-server` when the map is generated with `--full`." };
+      return { word: key, kind: t("page.lookup.kind.type"), unknown: hasTypeDetail()
+        ? t("page.lookup.type.undeclared")
+        : t("page.lookup.type.no-details") };
     }
     var info = c.info, fields = info.fields || [];
     var parents = (info.extends || []).join(", ");
     return {
       word: info.name, kind: info.kind + (parents ? " : " + parents : ""),
       summary: info.desc || null,
-      note: (!fields.length && info.kind === "class") ? "No fields declared." : null,
-      rows: { title: "Fields", items: fields.map(function(f){
+      note: (!fields.length && info.kind === "class") ? t("page.lookup.type.no-fields") : null,
+      rows: { title: t("page.lookup.type.fields"), items: fields.map(function(f){
         return { code: f.name, text: f.view + (f.desc ? " — " + f.desc : "") };
       }) },
       origin: info.file,
-      nav: { label: "Types view", to: { tab: "hierarchy", view: "types", center: c.nodeId, fn: null } }
+      nav: { label: t("page.lookup.type.nav"), to: { tab: "hierarchy", view: "types", center: c.nodeId, fn: null } }
     };
   });
 
@@ -819,10 +830,9 @@ return [[
     var items = externalRows(module, node);
     return {
       word: module, kind: kind,
-      note: items.length ? null
-        : "Required here, and no call into it that the map can see.",
-      rows: { title: node ? "This file calls" : "This tree calls", items: items },
-      origin: "external: outside this map"
+      note: items.length ? null : t("page.lookup.ext.no-calls"),
+      rows: { title: node ? t("page.lookup.ext.file-calls") : t("page.lookup.ext.tree-calls"), items: items },
+      origin: t("page.lookup.ext.origin")
     };
   }
 
@@ -856,10 +866,10 @@ return [[
   lookupRegister("ext", function(key, ctx){
     var node = nodeOfCtx(ctx);
     if(node && !isExternalOf(node, key)){
-      return { word: key, kind: "external module",
-        unknown: "the map records no external require of this name for this file." };
+      return { word: key, kind: t("page.lookup.kind.external"),
+        unknown: t("page.lookup.ext.not-here") };
     }
-    return externalCard(key, node, "external module");
+    return externalCard(key, node, t("page.lookup.kind.external"));
   });
 
   // A `require`/`import` path: three answers that look the same in the source.
@@ -871,18 +881,16 @@ return [[
     if(!target) target = moduleNode(key);
     if(target){
       return {
-        word: key, kind: "require",
+        word: key, kind: t("page.lookup.kind.require"),
         summary: target.summary || null,
-        unknown: target.summary ? null : "the module has no summary line.",
-        origin: "in this tree: " + target.path,
+        unknown: target.summary ? null : t("page.lookup.req.no-summary"),
+        origin: t("page.lookup.req.in-tree", { path: target.path }),
         nav: { label: target.module || target.path, to: { tab: "tree", id: target.id } }
       };
     }
-    if(isExternalOf(node, key)) return externalCard(key, node, "require");
-    return { word: key, kind: "require",
-      unknown: underOwnPrefix(key)
-        ? "unresolved. The name is under this tree's own prefix and no file of the tree declares it."
-        : "unresolved. It is neither a module of this tree nor an external require the map recorded for this file; the name may be built at run time." };
+    if(isExternalOf(node, key)) return externalCard(key, node, t("page.lookup.kind.require"));
+    return { word: key, kind: t("page.lookup.kind.require"),
+      unknown: underOwnPrefix(key) ? t("page.lookup.req.own-prefix") : t("page.lookup.req.unresolved") };
   });
 
   // A check id in a findings view: what the check compares and why it exists.
@@ -900,16 +908,24 @@ return [[
     var c = checkEntry(key);
     var n = FIND.filter(function(f){ return f.check === key; }).length;
     if(!c){
-      return { word: key, kind: "check",
-        unknown: "this page has no explanation for the check. It is one of the project's own `extra_checks`, or the page predates the catalogue.",
-        origin: lookupPlural(n, "finding") + " here" };
+      return { word: key, kind: t("page.lookup.kind.check"),
+        unknown: t("page.lookup.check.unknown"),
+        origin: t("page.lookup.check.here", { count: n }) };
+    }
+    // The sentences in the reader's language, from the catalog; the English
+    // ones the entry carries stand in for a page older than `check.*`.
+    var compares = I18N.has("check." + c.name + ".compares") ? t("check." + c.name + ".compares") : c.compares;
+    var why = I18N.has("check." + c.name + ".why") ? t("check." + c.name + ".why") : c.why;
+    var keys = c.keys || [], templates = c.templates || [];
+    if(keys.length === templates.length){
+      templates = keys.map(function(k, i){ return I18N.has("finding." + k) ? t("finding." + k) : templates[i]; });
     }
     return {
-      word: c.name, kind: "check",
-      summary: c.compares,
-      lines: [{ label: "Why", text: c.why }],
-      rows: { title: "A finding reads", items: (c.templates || []).map(function(t){ return { text: t }; }) },
-      origin: "severity " + c.severity + " by default · " + lookupPlural(n, "finding") + " here"
+      word: c.name, kind: t("page.lookup.kind.check"),
+      summary: compares,
+      lines: [{ label: t("page.lookup.check.why"), text: why }],
+      rows: { title: t("page.lookup.check.reads"), items: templates.map(function(s){ return { text: s }; }) },
+      origin: t("page.lookup.check.origin", { severity: c.severity, count: n })
     };
   });
 
