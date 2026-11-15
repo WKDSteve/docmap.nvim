@@ -86,7 +86,35 @@ return {
       expect = fits(".tabs") .. " && " .. fits(".toolbar"),
       note = "tab bar and toolbar do not overflow",
     },
+    {
+      expect = "/^enthält/.test(document.querySelector('#hlegend .lg').textContent)"
+        .. " && /Rechtsklick für mehr/.test(document.getElementById('hlegend').textContent)",
+      note = "the legend under the diagram is German",
+    },
     { shot = "de-light-hierarchy" },
+
+    -- The Coupling plot: its corners, axes and bar, drawn by the script.
+    {
+      expect = "(location.hash = '#tab=hierarchy&view=coupling&lang=de', true)",
+      note = "the Coupling view",
+    },
+    {
+      wait = "document.querySelector('#halt .cq, #halt .hmsg') !== null",
+      note = "the plot (or its message) is drawn",
+    },
+    {
+      expect = "/^Fan-out nach rechts/.test(document.querySelector('#halt .hmuted').textContent)"
+        .. " && !/required by|fan-out across|No module/.test(document.getElementById('halt').textContent)",
+      note = "bar, corners and axes are German",
+    },
+    { hover = "h1" },
+    { press = "Escape", note = "the explanation of the tab is put away" },
+    { shot = "de-light-coupling" },
+    {
+      expect = "(location.hash = '#tab=hierarchy&lang=de', true)",
+      note = "back to the Modules view",
+    },
+    { wait = "document.querySelector('#hstage .hnode') !== null" },
 
     -- The explanation card of a tab, from the catalog.
     { hover = '.tab-btn[data-tab="hierarchy"]', note = "a dwell on the Hierarchy tab" },

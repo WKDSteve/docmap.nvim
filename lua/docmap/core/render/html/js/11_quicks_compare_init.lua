@@ -710,26 +710,24 @@ return [[
     fetch("/api/shape/" + spec.replace("..", "/"))
       .then(function(r){
         if(!r.ok){
-          throw new Error("the host answered " + r.status +
-            (r.status === 404 ? ": it does not offer the shape comparison (/api/shape)" : ""));
+          throw new Error(t(r.status === 404 ? "page.shape.http.404" : "page.shape.http", { status: r.status }));
         }
         return r.json();
       })
       .then(function(d){
         if(!d || d.available !== true){
-          landed({ error: '<span class="sd-msg">' + esc((d && d.reason) || "the host gave no comparison") + '</span>' });
+          landed({ error: '<span class="sd-msg">' + esc((d && d.reason) || t("page.shape.no-answer")) + '</span>' });
           return;
         }
         landed(shapeIndex(d));
       })
       .catch(function(e){
-        explainFetchFailure(e, "the comparison").then(function(msg){ landed({ error: msg }); });
+        explainFetchFailure(e, t("page.shape.what")).then(function(msg){ landed({ error: msg }); });
       });
   }
 
   function shapeFileMessage(){
-    return '<span class="sd-msg">This page was opened from a file, so it cannot ask for the map of ' +
-      'another commit. Run <code>:DocMap serve</code> and open the URL it prints.</span>';
+    return '<span class="sd-msg">' + prose(t("page.shape.file")) + '</span>';
   }
 
   // The commit list, the one the History tab opens with. Taken from there
@@ -746,7 +744,7 @@ return [[
         if(state.tab === "hierarchy") syncShape(state);
       })
       .catch(function(e){
-        explainFetchFailure(e, "the comparison").then(function(msg){
+        explainFetchFailure(e, t("page.shape.what")).then(function(msg){
           shapeCommits = { error: msg };
           if(state.tab === "hierarchy") syncShape(state);
         });
@@ -784,7 +782,7 @@ return [[
     rows.slice(0, SHAPE_LIST).forEach(function(r){ h += '<li>' + r + '</li>'; });
     h += '</ul>';
     if(rows.length > SHAPE_LIST){
-      h += '<div class="sd-more">… and ' + (rows.length - SHAPE_LIST) + ' more</div>';
+      h += '<div class="sd-more">' + esc(t("page.shape.more", { count: fmtNum(rows.length - SHAPE_LIST) })) + '</div>';
     }
     return h + '</div>';
   }
@@ -799,72 +797,73 @@ return [[
 
   function shapeListHTML(d){
     var h = "";
-    h += shapeSection("Nodes added", "sd-plus", d.nodes_added.map(function(id){ return shapeNodeChip(id); }));
-    h += shapeSection("Nodes removed", "sd-minus", d.nodes_removed.map(function(n){
+    h += shapeSection(t("page.shape.nodes-added"), "sd-plus", d.nodes_added.map(function(id){ return shapeNodeChip(id); }));
+    h += shapeSection(t("page.shape.nodes-removed"), "sd-minus", d.nodes_removed.map(function(n){
       return '<span class="sd-gone">' + esc(n.name || n.id) + '</span>' +
-        (n.anchor ? ' <span class="sd-under">from ' + shapeNodeChip(n.anchor) + '</span>' : '');
+        (n.anchor ? ' <span class="sd-under">' + esc(t("page.shape.from")) + ' ' + shapeNodeChip(n.anchor) + '</span>' : '');
     }));
     var edgeRow = function(e){
       return shapeNodeChip(e.from) + ' → ' + shapeNodeChip(e.to) +
-        (e.changed ? ' <span class="sd-under">' + (e.deferred ? "now lazy" : "was lazy, now at load time") + '</span>'
-          : (e.deferred ? ' <span class="sd-under">lazy</span>' : ''));
+        (e.changed ? ' <span class="sd-under">' + esc(t(e.deferred ? "page.shape.now-lazy" : "page.shape.now-eager")) + '</span>'
+          : (e.deferred ? ' <span class="sd-under">' + esc(t("page.shape.lazy")) + '</span>' : ''));
     };
-    h += shapeSection("Requires gained", "sd-plus", d.deps_added.map(edgeRow));
-    h += shapeSection("Requires lost", "sd-minus", d.deps_removed.map(edgeRow));
-    h += shapeSection("Load-time cycles introduced", "sd-minus", d.cycles_added.map(function(c){ return esc(c); }));
-    h += shapeSection("Load-time cycles resolved", "sd-plus", d.cycles_removed.map(function(c){ return esc(c); }));
+    h += shapeSection(t("page.shape.requires-gained"), "sd-plus", d.deps_added.map(edgeRow));
+    h += shapeSection(t("page.shape.requires-lost"), "sd-minus", d.deps_removed.map(edgeRow));
+    h += shapeSection(t("page.shape.cycles-added"), "sd-minus", d.cycles_added.map(function(c){ return esc(c); }));
+    h += shapeSection(t("page.shape.cycles-removed"), "sd-plus", d.cycles_removed.map(function(c){ return esc(c); }));
     if(d.text.length){
-      h += '<details class="sd-text"><summary>The same change as text (<code>:DocMap diff</code>)</summary><pre>' +
+      h += '<details class="sd-text"><summary>' + prose(t("page.shape.as-text")) + '</summary><pre>' +
         esc(d.text.join("\n")) + '</pre></details>';
     }
     return h;
   }
 
-  function shapeCount(n, cls, sign, one, many){
-    return '<span class="sd-count ' + cls + (n ? "" : " sd-zero") + '">' + sign + n + ' ' +
-      (n === 1 ? one : many) + '</span>';
+  function shapeCount(n, cls, sign, key){
+    return '<span class="sd-count ' + cls + (n ? "" : " sd-zero") + '">' + esc(t(key, { sign: sign, count: n })) + '</span>';
   }
 
   function shapeBarHTML(s){
-    var h = '<span class="hctl-label" id="hshape-label">Compare maps</span>';
+    var h = '<span class="hctl-label" id="hshape-label">' + esc(t("page.shape.title")) + '</span>';
     if(shapeCommits && shapeCommits.error){
-      return h + shapeCommits.error + '<button type="button" id="hshape-end">Close</button>';
+      return h + shapeCommits.error + '<button type="button" id="hshape-end">' + esc(t("page.shape.close")) + '</button>';
     }
     var sides = s.cmp ? shapeSides(s.cmp) : { a: "", b: "" };
     var busy = shapeCommits === "loading" || shapeCommits === null;
-    h += '<label class="sd-pick">from <select id="hshape-a" aria-label="The older map"' + (busy ? " disabled" : "") + '>' +
-      shapeOptions(sides.a, busy ? "loading commits…" : "choose a commit…") + '</select></label>';
-    h += '<label class="sd-pick">to <select id="hshape-b" aria-label="The newer map"' + (busy ? " disabled" : "") + '>' +
-      shapeOptions(sides.b, "this map") + '</select></label>';
+    h += '<label class="sd-pick">' + esc(t("page.shape.pick.from")) + ' <select id="hshape-a" aria-label="' +
+      esc(t("page.shape.pick.from.aria")) + '"' + (busy ? " disabled" : "") + '>' +
+      shapeOptions(sides.a, t(busy ? "page.shape.pick.loading" : "page.shape.pick.choose")) + '</select></label>';
+    h += '<label class="sd-pick">' + esc(t("page.shape.pick.to")) + ' <select id="hshape-b" aria-label="' +
+      esc(t("page.shape.pick.to.aria")) + '"' + (busy ? " disabled" : "") + '>' +
+      shapeOptions(sides.b, t("page.shape.pick.this-map")) + '</select></label>';
 
     var d = s.cmp ? shapeOf(s.cmp) : null;
     if(d && d.loading){
-      h += '<span class="sd-msg">Comparing…</span>';
+      h += '<span class="sd-msg">' + esc(t("page.shape.comparing")) + '</span>';
     } else if(d && d.error){
       h += d.error;
     } else if(d){
       var none = !d.nodes_added.length && !d.nodes_removed.length &&
         !d.deps_added.length && !d.deps_removed.length;
       h += '<span class="sd-sum" role="status">' +
-        shapeCount(d.nodes_added.length, "sd-plus", "+", "node", "nodes") +
-        shapeCount(d.nodes_removed.length, "sd-minus", "−", "node", "nodes") +
+        shapeCount(d.nodes_added.length, "sd-plus", "+", "page.shape.count.nodes") +
+        shapeCount(d.nodes_removed.length, "sd-minus", "−", "page.shape.count.nodes") +
         (d.deps_comparable
-          ? shapeCount(d.deps_added.length, "sd-plus", "+", "require", "requires") +
-            shapeCount(d.deps_removed.length, "sd-minus", "−", "require", "requires")
+          ? shapeCount(d.deps_added.length, "sd-plus", "+", "page.shape.count.requires") +
+            shapeCount(d.deps_removed.length, "sd-minus", "−", "page.shape.count.requires")
           : '') +
         '</span>';
-      if(none && d.deps_comparable) h += '<span class="sd-msg">No node and no require differs between the two maps.</span>';
+      if(none && d.deps_comparable) h += '<span class="sd-msg">' + esc(t("page.shape.no-change")) + '</span>';
       if(!none || d.text.length){
         h += '<button type="button" id="hshape-list" aria-expanded="' + (shapeListOpen ? "true" : "false") +
-          '" aria-controls="hshape-body">Changes</button>';
+          '" aria-controls="hshape-body">' + esc(t("page.shape.changes")) + '</button>';
       }
     }
-    if(s.cmp || shapeOpen) h += '<button type="button" id="hshape-end">' + (s.cmp ? "End comparison" : "Close") + '</button>';
+    if(s.cmp || shapeOpen) h += '<button type="button" id="hshape-end">' + esc(t(s.cmp ? "page.shape.end" : "page.shape.close")) + '</button>';
     if(d && !d.loading && !d.error){
+      // The reasons are the host's sentences, in the language it answers in.
       d.reasons.forEach(function(r){ h += '<div class="sd-note">' + esc(r) + '</div>'; });
       if(d.after && !d.after.current){
-        h += '<div class="sd-note">Marked on the map this page shows. A change that names a node this map ' +
-          'does not have is in the list only.</div>';
+        h += '<div class="sd-note">' + esc(t("page.shape.marked-here")) + '</div>';
       }
       h += '<div id="hshape-body" class="sd-body"' + (shapeListOpen ? "" : " hidden") + '>' +
         (shapeListOpen ? shapeListHTML(d) : "") + '</div>';
@@ -898,8 +897,8 @@ return [[
         badge = document.createElement("span");
         badge.className = "sd-badge";
         badge.textContent = "−" + lost.length;
-        badge.title = lost.length + " node" + (lost.length === 1 ? "" : "s") + " removed from here: " +
-          lost.slice(0, 12).join(", ") + (lost.length > 12 ? ", …" : "");
+        badge.title = t("page.shape.lost-here", { count: lost.length,
+          names: lost.slice(0, 12).join(", ") + (lost.length > 12 ? ", …" : "") });
         el.appendChild(badge);
       }
     });
@@ -928,7 +927,7 @@ return [[
           p.dataset.from = e.from;
           p.dataset.to = e.to;
           var title = document.createElementNS(svgNS, "title");
-          title.textContent = "lost: " + shapeNodeName(e.from) + " no longer requires " + shapeNodeName(e.to);
+          title.textContent = t("page.shape.lost-edge", { from: shapeNodeName(e.from), to: shapeNodeName(e.to) });
           p.appendChild(title);
           svg.appendChild(p);
         });

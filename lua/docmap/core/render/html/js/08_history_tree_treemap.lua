@@ -301,9 +301,14 @@ return [[
 
   function treeBar(){
     if(haltBar.querySelector("#htq")) return;
+    // Drawn once and kept (the input keeps its caret): the texts carry their keys, and applyI18n says them
+    // again at a change of language.
     haltBar.innerHTML =
-      '<input id="htq" type="search" placeholder="Filter by name, module or summary" aria-label="Filter the tree">' +
-      '<button id="htopen" type="button">Expand all</button><button id="htclose" type="button">Collapse</button>' +
+      '<input id="htq" type="search" data-i18n-placeholder="page.tree.filter.placeholder"' +
+      ' data-i18n-aria-label="page.tree.filter.aria" placeholder="' + esc(t("page.tree.filter.placeholder")) +
+      '" aria-label="' + esc(t("page.tree.filter.aria")) + '">' +
+      '<button id="htopen" type="button" data-i18n="page.tree.expand">' + esc(t("page.tree.expand")) + '</button>' +
+      '<button id="htclose" type="button" data-i18n="page.tree.collapse">' + esc(t("page.tree.collapse")) + '</button>' +
       '<span id="htcount" class="hmuted"></span>';
     var input = haltBar.querySelector("#htq");
     input.addEventListener("input", function(){
@@ -345,7 +350,8 @@ return [[
       var open = id === centerId || !!m || !!treeOpen[id];
       shown++;
       var st = n.stats || {};
-      var nums = (st.lines ? st.lines + " lines" : "") + (st.functions ? " · " + st.functions + " fn" : "");
+      var nums = (st.lines ? t("page.tree.lines", { count: st.lines }) : "") +
+        (st.functions ? " · " + t("page.tree.fn", { count: st.functions }) : "");
       rows.push(
         '<div class="ht-row' + (isHidden(id) ? " dim" : "") + (m && m.hit[id] ? " hit" : "") +
           '" role="treeitem" tabindex="-1" data-id="' + esc(id) + '"' +
@@ -354,7 +360,7 @@ return [[
         '<span class="ht-tw">' + (kids.length ? (open ? "▾" : "▸") : "") + "</span>" +
         '<span class="ht-name">' + esc(n.name || id) + "</span>" +
         '<span class="ht-kind">' + esc(n.kind || "") + (kids.length ? " · " + kids.length : "") + "</span>" +
-        '<span class="ht-num">' + nums + "</span>" +
+        '<span class="ht-num">' + esc(nums) + "</span>" +
         (n.summary ? '<span class="ht-sum">' + prose(n.summary) + "</span>" : "") +
         "</div>"
       );
@@ -363,10 +369,10 @@ return [[
 
     haltBody.setAttribute("role", "tree");
     haltBody.innerHTML = rows.length ? rows.join("")
-      : '<p class="hmsg">Nothing under ' + esc(byId[centerId].name || centerId) + " matches “" + esc(q) + "”.</p>";
+      : '<p class="hmsg">' + esc(t("page.tree.filter.none", { name: byId[centerId].name || centerId, query: q })) + "</p>";
     var first = haltBody.querySelector(".ht-row");
     if(first) first.tabIndex = 0;
-    haltBar.querySelector("#htcount").textContent = q ? shown + " shown" : "";
+    haltBar.querySelector("#htcount").textContent = q ? t("page.tree.filter.shown", { count: fmtNum(shown) }) : "";
   }
 
   function treeToggle(id, open){
@@ -482,7 +488,7 @@ return [[
 
   // A tile's tooltip: name, weight and summary as plain text. esc, not
   // prose: a `title` attribute shows markup as markup.
-  function titleOf(n, id, v, unit){ return esc(n.name || id) + " · " + v + unit + (n.summary ? " — " + esc(n.summary) : ""); }
+  function titleOf(n, id, v, weight){ return esc(n.name || id) + " · " + esc(weight(v)) + (n.summary ? " — " + esc(n.summary) : ""); }
 
   function tmBox(cls, id, r, label, inner){
     return '<div class="' + cls + (isHidden(id) ? " dim" : "") + '" data-id="' + esc(id) + '" title="' + label +
@@ -492,20 +498,22 @@ return [[
 
   function drawTreemap(centerId){
     var metric = state.tm === "functions" ? "functions" : "lines";
-    var unit = metric === "lines" ? " lines" : " fn";
+    var unit = function(v){ return t(metric === "lines" ? "page.tree.lines" : "page.tree.fn", { count: v }); };
     haltBar.innerHTML =
-      '<span class="hmuted">Area</span><div class="hview-toggle">' +
-      '<button type="button" class="tm-metric' + (metric === "lines" ? " active" : "") + '" data-tm="lines">Lines</button>' +
-      '<button type="button" class="tm-metric' + (metric === "functions" ? " active" : "") + '" data-tm="functions">Functions</button></div>' +
-      '<span class="hmuted">click a group or tile to zoom in, a leaf opens in Tree · ▲ Up and the path go back</span>';
+      '<span class="hmuted">' + esc(t("page.treemap.area")) + '</span><div class="hview-toggle">' +
+      '<button type="button" class="tm-metric' + (metric === "lines" ? " active" : "") + '" data-tm="lines">' +
+      esc(t("page.treemap.lines")) + '</button>' +
+      '<button type="button" class="tm-metric' + (metric === "functions" ? " active" : "") + '" data-tm="functions">' +
+      esc(t("page.treemap.functions")) + '</button></div>' +
+      '<span class="hmuted">' + esc(t("page.treemap.hint")) + '</span>';
     haltBar.querySelectorAll(".tm-metric").forEach(function(b){
       b.addEventListener("click", function(){ navigate({ tm: b.dataset.tm === "functions" ? "functions" : null }); });
     });
 
     var kids = weighed(centerId, metric);
     if(!kids.length){
-      haltBody.innerHTML = '<p class="hmsg">Nothing under ' + esc(byId[centerId].name || centerId) +
-        " has any" + unit + " to weigh.</p>";
+      haltBody.innerHTML = '<p class="hmsg">' + esc(t(metric === "lines" ? "page.treemap.empty.lines" : "page.treemap.empty.functions",
+        { name: byId[centerId].name || centerId })) + "</p>";
       return;
     }
     var W = Math.max(haltBody.clientWidth - 10, 320);
@@ -519,7 +527,7 @@ return [[
       // One nested level where there is room for it: the groups of the
       // center and what each is made of. Deeper is a click away.
       if(sub.length && r.w > 60 && r.h > HEAD + 24){
-        var inner = '<div class="tm-head">' + name + " · " + r.it.v + unit + "</div>";
+        var inner = '<div class="tm-head">' + name + " · " + esc(unit(r.it.v)) + "</div>";
         squarify(sub, 2, HEAD, r.w - 6, r.h - HEAD - 4).forEach(function(c){
           var cn = byId[c.it.id];
           var cl = titleOf(cn, c.it.id, c.it.v, unit);
@@ -534,6 +542,14 @@ return [[
     haltBody.innerHTML = '<div class="tm" style="width:' + W + "px;height:" + H + 'px">' + html.join("") + "</div>";
   }
 
+  // A view as the path line names it, in lower case beside the module ("lua/app · module calls").
+  var PATH_VIEW = {
+    types: "page.path.view.types", inheritance: "page.path.view.inheritance", deps: "page.path.view.deps",
+    calls: "page.path.view.calls", modulecalls: "page.path.view.modulecalls", rings: "page.path.view.rings",
+    tree: "page.path.view.tree", treemap: "page.path.view.treemap", coupling: "page.path.view.coupling"
+  };
+  function viewName(view){ return PATH_VIEW[view] ? t(PATH_VIEW[view]) : view; }
+
   function drawAltView(view){
     var center = byId[hcenter];
     // No diagram is on screen any more: the next one is entered, not redrawn.
@@ -542,14 +558,10 @@ return [[
     halt.hidden = false;
     clearGraph();
     hgraphWrap.parentNode.querySelectorAll(".htrunc").forEach(function(el){ el.remove(); });
-    hlegendEl.innerHTML = view === "tree"
-      ? '<span class="lg">click a name to root the tree there · ▸ folds · arrows, Enter, Home and End work · right-click for more</span>'
-      : view === "coupling"
-      ? '<span class="lg">a dot is a module at or below the center · the numbers count the whole tree · ' +
-        'click or Enter opens it in the Tree tab · right-click for more</span>'
-      : '<span class="lg">area = ' + (state.tm === "functions" ? "functions" : "lines of code") +
-        ' · one level nested · right-click for more</span>';
-    hpathEl.textContent = (center.module || center.path) + " · " + view;
+    hlegendEl.innerHTML = '<span class="lg">' + esc(t(view === "tree" ? "page.legend.tree"
+      : view === "coupling" ? "page.legend.coupling"
+      : state.tm === "functions" ? "page.legend.treemap.functions" : "page.legend.treemap.lines")) + '</span>';
+    hpathEl.textContent = (center.module || center.path) + " · " + viewName(view);
     if(haltBar.dataset.view !== view) haltBar.innerHTML = "";
     haltBar.dataset.view = view;
     if(view === "tree") drawTree(hcenter);
@@ -643,7 +655,7 @@ return [[
     if(built.count === 0 || (isGraphView(view) && built.edges && built.edges.length === 0)){
       clearGraph();
       hpathEl.textContent = hidingRoot
-        ? (state.hideroot + " root level" + (state.hideroot === 1 ? "" : "s") + " hidden")
+        ? t("page.path.hidden-levels", { count: state.hideroot })
         : (center.module || center.path);
       hgraph.style.width = ""; hgraph.style.height = "";
       hstage.style.width = ""; hstage.style.height = "";
@@ -663,21 +675,22 @@ return [[
       return;
     }
 
-    var suffix = { types: " · types", inheritance: " · inheritance",
-                   deps: " · deps", calls: " · calls",
-                   modulecalls: " · module calls", rings: " · rings" }[view] || "";
+    var suffix = { types: 1, inheritance: 1, deps: 1, calls: 1, modulecalls: 1, rings: 1 }[view]
+      ? " · " + viewName(view) : "";
     // A view that names its own middle (the entry of the Rings) is about
     // that, not about the folder the Hierarchy happens to be centered on.
     if(isMapView(view) && built.centerKey && byId[built.centerKey]) center = byId[built.centerKey];
     var focusFn = view === "calls" && wantFn;
     if(hidingRoot){
-      hpathEl.textContent = state.hideroot + " root level" + (state.hideroot === 1 ? "" : "s") +
-        " hidden — " + (built.layers[0] ? built.layers[0].length : 0) + " subtree" +
-        ((built.layers[0] && built.layers[0].length === 1) ? "" : "s") + " shown";
+      var subtrees = built.layers[0] ? built.layers[0].length : 0;
+      hpathEl.textContent = t("page.path.hidden-levels", { count: state.hideroot }) + " — " +
+        t("page.path.subtrees-shown", { count: subtrees });
     } else {
-      hpathEl.textContent = (focusFn ? wantFn.split("#")[1] + "  in  " : "") +
-        (center.module || center.path) + suffix +
-        (isGraphView(view) ? "  ·  " + (state.dir || "out") + ", depth " + (depth === 0 ? "∞" : depth) : "");
+      var where = (center.module || center.path) + suffix +
+        (isGraphView(view) ? "  ·  " + t("page.path.dir-depth", {
+          dir: t({ "in": "page.path.dir.in", both: "page.path.dir.both" }[state.dir] || "page.path.dir.out"),
+          depth: depth === 0 ? "∞" : depth }) : "");
+      hpathEl.textContent = focusFn ? t("page.path.fn-in", { fn: wantFn.split("#")[1], where: where }) : where;
     }
     // A view of the whole tree has no center to name.
     if(built.path) hpathEl.textContent = built.path;
@@ -858,9 +871,8 @@ return [[
     if(autoCentered){
       var auto = document.createElement("div");
       auto.className = "htrunc hauto";
-      auto.textContent = "Started on " + (center.module || center.name) + ", the node with the most " +
-        { deps: "requires", calls: "calls", modulecalls: "module calls" }[view] +
-        " — the root has none of its own. Click a box or search to re-center.";
+      auto.textContent = t({ deps: "page.path.auto.deps", calls: "page.path.auto.calls",
+        modulecalls: "page.path.auto.modulecalls" }[view] || "page.path.auto.deps", { name: center.module || center.name });
       hgraphWrap.parentNode.insertBefore(auto, hgraphWrap.nextSibling);
     }
 
@@ -870,7 +882,7 @@ return [[
     if(built.truncated){
       var note = document.createElement("div");
       note.className = "htrunc";
-      note.textContent = built.truncNote || "Showing the first " + MAX_HNODES + " boxes — narrow the depth, or double-click a box to re-center on a smaller neighbourhood.";
+      note.textContent = built.truncNote || t("page.path.truncated", { count: fmtNum(MAX_HNODES) });
       hgraphWrap.parentNode.insertBefore(note, hgraphWrap.nextSibling);
     }
   }

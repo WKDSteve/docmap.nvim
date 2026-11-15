@@ -102,7 +102,7 @@ return [[
           from: id, to: key,
           cls: "hedge hedge-dep external",
           marker: "dep",
-          label: "requires " + mod + " (outside this map)"
+          label: t("page.edge.require.external", { module: mod })
         });
       });
     });
@@ -121,7 +121,7 @@ return [[
         from: e.from, to: e.to,
         cls: "hedge hedge-dep" + (e.deferred ? " deferred" : ""),
         marker: "dep",
-        label: (e.deferred ? "lazy require " : "require ") + e.to_module + ":" + e.line
+        label: t(e.deferred ? "page.edge.require.lazy" : "page.edge.require", { module: e.to_module, line: e.line })
       });
     });
     built.edges = edges;
@@ -158,7 +158,7 @@ return [[
         from: a, to: b,
         cls: "hedge hedge-call" + (e.confidence === "heuristic" ? " weak" : ""),
         marker: "call",
-        label: (e.confidence === "heuristic" ? "guessed call, line " : "call, line ") + e.line
+        label: t(e.confidence === "heuristic" ? "page.edge.call.guessed" : "page.edge.call", { line: e.line })
       });
     });
     built.edges = edges;
@@ -233,7 +233,7 @@ return [[
           from: id, to: key,
           cls: "hedge hedge-call external",
           marker: "call",
-          label: weight + " call" + (weight === 1 ? "" : "s") + " to " + mod + " (outside this map)",
+          label: t("page.edge.calls.external", { count: weight, module: mod }),
           weight: weight
         });
       });
@@ -307,16 +307,16 @@ return [[
       }
 
       var baseTitle = link
-        ? mod + " — open " + link.title + " in its own map"
-        : mod + " — required here but not part of this map";
+        ? t("page.box.external.linked", { module: mod, title: link.title })
+        : t("page.box.external", { module: mod });
       var title = callLines.length ? baseTitle + "\n" + callLines.join("\n") : baseTitle;
 
       return {
         cls: "hnode k-external" + (link ? " linked" : ""),
         title: title,
         html: '<div class="hnm">' + esc(mod) + '</div>' +
-              '<div class="hkind">external' + (link ? " ↗" : "") +
-              (callTotal ? "  ·  " + callTotal + " call" + (callTotal === 1 ? "" : "s") : "") +
+              '<div class="hkind">' + esc(t("page.box.external.kind")) + (link ? " ↗" : "") +
+              (callTotal ? "  ·  " + esc(t("page.box.external.calls", { count: callTotal })) : "") +
               '</div>',
         nodeId: null, recenter: null, externalHtml: link && link.html
       };
@@ -331,7 +331,7 @@ return [[
       var sub = cls.info.kind;
       if(view === "inheritance"){
         var ps = cls.info.extends || [];
-        sub = ps.length ? ": " + ps.join(", ") : "base";
+        sub = ps.length ? ": " + ps.join(", ") : t("page.box.class.base");
       }
       return {
         cls: "hnode t-" + cls.info.kind,
@@ -472,17 +472,18 @@ return [[
   // long string, and two adjacent closing square brackets terminate it —
   // which is exactly what an array of arrays ends with. The rest of the
   // script then parses as Lua source. Avoid that pair anywhere in here.
+  // `text` is the key of the entry's words.
   function sw(mod, text){ return { sw: mod, text: text }; }
   var LEGEND = {
-    modules: [ sw("", "contains"), sw("type", "type reference") ],
-    routes:  [ sw("", "segment contains segment") ],
-    types:   [ sw("type", "field references class") ],
-    inheritance: [ sw("ext", "inherits from (arrow points at the base class)") ],
-    deps:    [ sw("dep", "requires at load time"),
-               sw("dep deferred", "lazy require (inside a function)") ],
-    depsExt: [ sw("dep external", "requires something outside this map") ],
-    calls:   [ sw("call", "calls"),
-               sw("call weak", "guessed call (--calls-heuristic)") ]
+    modules: [ sw("", "page.legend.contains"), sw("type", "page.legend.type-reference") ],
+    routes:  [ sw("", "page.legend.segment-contains") ],
+    types:   [ sw("type", "page.legend.field-references") ],
+    inheritance: [ sw("ext", "page.legend.inherits") ],
+    deps:    [ sw("dep", "page.legend.requires"),
+               sw("dep deferred", "page.legend.requires-lazy") ],
+    depsExt: [ sw("dep external", "page.legend.requires-external") ],
+    calls:   [ sw("call", "page.legend.calls"),
+               sw("call weak", "page.legend.calls-guessed") ]
   };
 
   function drawLegend(view){
@@ -490,56 +491,34 @@ return [[
     var entries = (LEGEND[view] || []).slice();
     if(view === "deps" && state.ext) entries = entries.concat(LEGEND.depsExt);
     var items = entries.map(function(it){
-      return '<span class="lg"><span class="sw ' + it.sw + '"></span>' + esc(it.text) + '</span>';
+      return '<span class="lg"><span class="sw ' + it.sw + '"></span>' + esc(t(it.text)) + '</span>';
     });
     items = items.concat(tintLegend());
     if(view === "routes") items = items.concat(routeLegend());
-    items.push('<span class="lg">wheel zooms · shift+wheel pans · ' +
-      (isGraphView(view) ? 'zoom past the edge changes depth' : 'zoom right in to open a module') +
-      ' · right-click for more</span>');
+    items.push('<span class="lg">' + esc(t(isGraphView(view) ? "page.legend.gestures.graph" : "page.legend.gestures.map")) +
+      '</span>');
     hlegendEl.innerHTML = items.join("");
   }
 
   function emptyMessage(view, center){
+    function msg(key, params){ return '<p class="hmsg">' + prose(t(key, params)) + '</p>'; }
+    var name = { name: center ? center.name : "" };
     if(view === "types"){
-      return typeEdges.length
-        ? '<p class="hmsg">' + esc(center.name) + ' has no <code>@class</code>/<code>@alias</code> of its own — pick a module with type definitions, or switch back to Modules.</p>'
-        : '<p class="hmsg">No type data in this map — regenerate with <code>:DocMap full</code> (or <code>--full</code>) to include lua-language-server class/alias detail.</p>';
+      return typeEdges.length ? msg("page.empty.types.none-here", name) : msg("page.empty.types.no-data");
     }
     if(view === "inheritance"){
-      if(!typeEdges.length && !extendsEdges.length){
-        return '<p class="hmsg">No type data in this map — regenerate with <code>:DocMap full</code> (or <code>--full</code>) to include lua-language-server class detail.</p>';
-      }
-      return extendsEdges.length
-        ? '<p class="hmsg">None of ' + esc(center.name) + '’s classes take part in an inheritance relation (<code>---@class Child : Parent</code>).</p>'
-        : '<p class="hmsg">No class in this map declares a parent — nothing to draw an inheritance tree from.</p>';
+      if(!typeEdges.length && !extendsEdges.length) return msg("page.empty.inheritance.no-data");
+      return extendsEdges.length ? msg("page.empty.inheritance.none-here", name) : msg("page.empty.inheritance.none");
     }
-    if(view === "deps"){
-      return '<p class="hmsg">' + esc(center.name) + ' neither requires nor is required by anything in this map.</p>';
-    }
+    if(view === "deps") return msg("page.empty.deps", name);
     if(view === "calls"){
-      return (center.functions || []).length
-        ? '<p class="hmsg">None of ' + esc(center.name) + '’s functions call — or are called by — anything the scanner could resolve. Dynamic dispatch is invisible to it; see the module README.</p>'
-        : '<p class="hmsg">' + esc(center.name) + ' declares no functions.</p>';
+      return (center.functions || []).length ? msg("page.empty.calls", name) : msg("page.empty.calls.no-functions", name);
     }
-    if(view === "modulecalls"){
-      return '<p class="hmsg">' + esc(center.name) + ' has no resolved call edges to or from another module — either it doesn’t call across module boundaries, or nothing else calls into it.</p>';
-    }
-    if(view === "routes"){
-      return '<p class="hmsg">No file-based routes in this map. The view draws the Next.js conventions: an ' +
-        '<code>app</code> directory with <code>page</code> or <code>route</code> files, or a <code>pages</code> ' +
-        'directory with <code>_app</code> or files that import <code>next</code>. Routes registered by a call ' +
-        '(<code>app.get("/path", handler)</code>) are in the Analysis tab, under Endpoints.</p>';
-    }
-    if(view === "layers"){
-      return '<p class="hmsg">No layers are declared for this map. A rule in <code>.docmap.json</code> such as ' +
-        '<code>"layers": [{ "from": "app.core", "to": "app.ui" }]</code> (the core may not require the UI) ' +
-        'gives the tree bands, and this view draws them with every require that breaks a rule.</p>';
-    }
-    if(view === "rings"){
-      return '<p class="hmsg">This map has no module to start from, so there is no distance to measure.</p>';
-    }
-    return '<p class="hmsg">Nothing to draw here.</p>';
+    if(view === "modulecalls") return msg("page.empty.modulecalls", name);
+    if(view === "routes") return msg("page.empty.routes");
+    if(view === "layers") return msg("page.empty.layers");
+    if(view === "rings") return msg("page.empty.rings");
+    return msg("page.empty.nothing");
   }
 
   function clearGraph(){

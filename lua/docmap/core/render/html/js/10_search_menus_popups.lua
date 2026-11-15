@@ -238,7 +238,8 @@ return [[
       return;
     }
 
-    var h = ['<span class="lb-label">Languages</span>'];
+    // Drawn at load and kept: the labels carry their keys for applyI18n.
+    var h = [i18nSpan("lb-label", "page.langbar.label")];
     info.order.forEach(function(name){
       var on = !activeLangs || activeLangs[name];
       h.push('<button type="button" class="lb-chip' + (on ? " on" : "") +
@@ -246,7 +247,8 @@ return [[
         esc(name) + '<span class="lb-n">' + info.counts[name] + '</span></button>');
     });
     if(activeLangs){
-      h.push('<button type="button" class="lb-clear" data-lang-clear="1">show all</button>');
+      h.push('<button type="button" class="lb-clear" data-lang-clear="1" data-i18n="page.langbar.clear">' +
+        esc(t("page.langbar.clear")) + '</button>');
     }
     langBars.forEach(function(bar){
       if(!bar) return;
@@ -448,60 +450,60 @@ return [[
 
   function ctxClose(){ ctx.classList.remove("open"); ctxItems = []; ctxHi = -1; }
 
-  function buildMenu(t){
-    var n = byId[t.nodeId];
+  function buildMenu(tg){
+    var n = byId[tg.nodeId];
     var items = [];
-    var fnEntry = t.fnKey ? fnByKey[t.fnKey] : null;
+    var fnEntry = tg.fnKey ? fnByKey[tg.fnKey] : null;
 
-    items.push({ label: "Show in tree", run: function(){ navigate({ tab: "tree", id: t.nodeId }); } });
+    items.push({ label: t("page.menu.show-in-tree"), run: function(){ navigate({ tab: "tree", id: tg.nodeId }); } });
     items.push({ sep: true });
 
-    items.push({ label: "Hierarchy", hint: "structure",
-      run: function(){ navigate({ tab: "hierarchy", view: "modules", center: t.nodeId, fn: null }); } });
+    items.push({ label: t("page.menu.hierarchy"), hint: t("page.menu.hierarchy.hint"),
+      run: function(){ navigate({ tab: "hierarchy", view: "modules", center: tg.nodeId, fn: null }); } });
 
     var hasDeps = ((n.requires || []).length + (n.required_by || []).length) > 0;
-    items.push({ label: "Dependencies — needs", hint: (n.requires || []).length || "0",
+    items.push({ label: t("page.menu.deps.out"), hint: (n.requires || []).length || "0",
       disabled: !(n.requires || []).length,
-      run: function(){ navigate({ tab: "hierarchy", view: "deps", center: t.nodeId, dir: "out", fn: null }); } });
-    items.push({ label: "Dependencies — needed by", hint: (n.required_by || []).length || "0",
+      run: function(){ navigate({ tab: "hierarchy", view: "deps", center: tg.nodeId, dir: "out", fn: null }); } });
+    items.push({ label: t("page.menu.deps.in"), hint: (n.required_by || []).length || "0",
       disabled: !(n.required_by || []).length,
-      run: function(){ navigate({ tab: "hierarchy", view: "deps", center: t.nodeId, dir: "in", fn: null }); } });
-    items.push({ label: "Dependencies — both ways", disabled: !hasDeps,
-      run: function(){ navigate({ tab: "hierarchy", view: "deps", center: t.nodeId, dir: "both", fn: null }); } });
+      run: function(){ navigate({ tab: "hierarchy", view: "deps", center: tg.nodeId, dir: "in", fn: null }); } });
+    items.push({ label: t("page.menu.deps.both"), disabled: !hasDeps,
+      run: function(){ navigate({ tab: "hierarchy", view: "deps", center: tg.nodeId, dir: "both", fn: null }); } });
 
     // Counts come from the same adjacency the view walks, so a menu entry is
     // only offered when it leads somewhere — an enabled item that opens an
     // empty diagram teaches people to distrust the menu.
-    var outN = fnEntry ? (callOut[t.fnKey] || []).length
+    var outN = fnEntry ? (callOut[tg.fnKey] || []).length
       : (n.functions || []).reduce(function(a, f){ return a + (callOut[fnKey(n.id, f.name)] || []).length; }, 0);
-    var inN = fnEntry ? (callIn[t.fnKey] || []).length
+    var inN = fnEntry ? (callIn[tg.fnKey] || []).length
       : (n.functions || []).reduce(function(a, f){ return a + (callIn[fnKey(n.id, f.name)] || []).length; }, 0);
 
     items.push({ sep: true });
-    items.push({ label: fnEntry ? "Calls — callees" : "Calls — what it calls", hint: outN || "0",
+    items.push({ label: t(fnEntry ? "page.menu.calls.out.fn" : "page.menu.calls.out"), hint: outN || "0",
       disabled: !outN,
-      run: function(){ navigate({ tab: "hierarchy", view: "calls", center: t.nodeId, fn: t.fnKey || null, dir: "out" }); } });
-    items.push({ label: fnEntry ? "Calls — callers" : "Calls — what calls it", hint: inN || "0",
+      run: function(){ navigate({ tab: "hierarchy", view: "calls", center: tg.nodeId, fn: tg.fnKey || null, dir: "out" }); } });
+    items.push({ label: t(fnEntry ? "page.menu.calls.in.fn" : "page.menu.calls.in"), hint: inN || "0",
       disabled: !inN,
-      run: function(){ navigate({ tab: "hierarchy", view: "calls", center: t.nodeId, fn: t.fnKey || null, dir: "in" }); } });
-    items.push({ label: "Calls — both ways", disabled: !(outN || inN),
-      run: function(){ navigate({ tab: "hierarchy", view: "calls", center: t.nodeId, fn: t.fnKey || null, dir: "both" }); } });
+      run: function(){ navigate({ tab: "hierarchy", view: "calls", center: tg.nodeId, fn: tg.fnKey || null, dir: "in" }); } });
+    items.push({ label: t("page.menu.calls.both"), disabled: !(outN || inN),
+      run: function(){ navigate({ tab: "hierarchy", view: "calls", center: tg.nodeId, fn: tg.fnKey || null, dir: "both" }); } });
 
-    items.push({ label: "Types", disabled: !(n.types_detail || []).length,
-      run: function(){ navigate({ tab: "hierarchy", view: "types", center: t.nodeId, fn: null }); } });
+    items.push({ label: t("page.menu.types"), disabled: !(n.types_detail || []).length,
+      run: function(){ navigate({ tab: "hierarchy", view: "types", center: tg.nodeId, fn: null }); } });
 
     // Enabled only when this node actually owns a class that inherits or is
     // inherited from — the view would otherwise open on its own empty state,
     // and "greyed out with a reason" beats "opens and says nothing here".
     var inhN = (n.types_detail || []).filter(function(ty){ return inInheritance[ty.name]; }).length;
-    items.push({ label: "Inheritance", hint: inhN || "0", disabled: !inhN,
-      run: function(){ navigate({ tab: "hierarchy", view: "inheritance", center: t.nodeId, fn: null }); } });
+    items.push({ label: t("page.menu.inheritance"), hint: inhN || "0", disabled: !inhN,
+      run: function(){ navigate({ tab: "hierarchy", view: "inheritance", center: tg.nodeId, fn: null }); } });
 
     items.push({ sep: true });
     if(n.source){
       var u = srcUrl(n.source);
       var frag = fnEntry ? "#L" + fnEntry.fn.line : "";
-      items.push({ label: u ? "Open source ↗" : "Open source",
+      items.push({ label: t(u ? "page.menu.source.remote" : "page.menu.source"),
         run: function(){ window.open(u ? u + frag : rel(n.source), u ? "_blank" : "_self"); } });
       // Open it in an editor — only when something is embedding this page.
       // A browser cannot start an editor, so in a plain tab this item would
@@ -511,7 +513,7 @@ return [[
       // message leaves the item doing what it appears to do — nothing —
       // rather than lying about it.
       if(window.parent !== window){
-        items.push({ label: "Open in editor", run: function(){
+        items.push({ label: t("page.menu.editor"), run: function(){
           try {
             window.parent.postMessage({
               source: "docmap", kind: "open-file",
@@ -523,25 +525,25 @@ return [[
       }
     }
     if(n.readme){
-      items.push({ label: "Open README", run: function(){ window.open(rel(n.readme), "_self"); } });
+      items.push({ label: t("page.menu.readme"), run: function(){ window.open(rel(n.readme), "_self"); } });
     }
 
     // Only offered when the menu was opened on an actual Hierarchy box
-    // (`t.hkey`, set by describeTarget only in that branch) — right-clicking
+    // (`tg.hkey`, set by describeTarget only in that branch) — right-clicking
     // this same node's tree row or a reference in a detail pane has nothing
     // to dim, since neither one has a box on screen.
-    if(t.hkey){
+    if(tg.hkey){
       items.push({ sep: true });
       items.push({
-        label: isHidden(t.hkey) ? "Show this box" : "Dim this box",
-        hint: "hierarchy",
-        run: function(){ toggleHidden(t.hkey); }
+        label: t(isHidden(tg.hkey) ? "page.menu.box.show" : "page.menu.box.dim"),
+        hint: t("page.menu.box.hint"),
+        run: function(){ toggleHidden(tg.hkey); }
       });
     }
 
     items.push({ sep: true });
-    items.push({ label: "Copy module path", run: function(){ copy(n.module || n.path); } });
-    items.push({ label: "Copy link to this view", run: function(){
+    items.push({ label: t("page.menu.copy-path"), run: function(){ copy(n.module || n.path); } });
+    items.push({ label: t("page.menu.copy-link"), run: function(){
       copy(location.origin + location.pathname + serializeState(state));
     } });
 
@@ -929,11 +931,7 @@ return [[
   // trigger keeps the message as its title afterwards, so the same link does
   // not invite the same click again.
   function godboltTooLong(el, len){
-    var msg = "Too large for godbolt.org: this would be a " +
-      Math.round(len / 1024) + " KB URL and their front end rejects anything " +
-      "over 8 KB with a 414. Open a single function instead — those fit. " +
-      "A Compiler Explorer you run yourself has no such limit; the Compare " +
-      "tab is where you point this page at one.";
+    var msg = t("page.godbolt.too-long", { kb: Math.round(len / 1024) });
     el.classList.add("godi-off");
     el.title = msg;
     var note = el.parentNode && el.parentNode.querySelector(".godi-note");

@@ -84,6 +84,7 @@ return function(H)
     "var haltBody = { addEventListener: function(){} }, haltBar = {};",
     "var document = { getElementById: function(){ return { addEventListener: function(){} }; } };",
     "function esc(s){ return s; } function navigate(){}",
+    H.page_i18n_js(),
     slice,
     "var out = {};",
     '["doc", "test", "fix", "debt"].forEach(function(mode){',

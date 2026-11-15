@@ -130,6 +130,37 @@ function H.html_source()
   return table.concat(parts, "\n")
 end
 
+--- The catalog runtime of the page and the helpers its slices say texts with (`t`, `fmtNum`, `fmtDay`,
+--- `fmtMoment`, `prose`, `bold`, `i18nSpan`), as JavaScript for a spec that evaluates one slice in `node`.
+--- English, the way the page opens. `prose` and the rest are taken from the page's own script, so they cannot
+--- drift from it; they call `esc`, which the spec defines with its other stubs.
+---@return string
+function H.page_i18n_js()
+  local first = require("docmap.core.render.html.js.01_marks_and_dimming")
+  local function fn(name)
+    local a = assert(first:find("  function " .. name .. "(", 1, true), "01: function " .. name)
+    local b = assert(first:find("\n  }\n", a, true), "01: the end of " .. name)
+    return first:sub(a, b + 3)
+  end
+  return table.concat({
+    require("docmap.core.render.html.i18n_js"),
+    "var I18N = docmapI18n(" .. vim.json.encode(
+      require("docmap.core.i18n").for_page(
+        { "page.", "finding.", "report.", "check." },
+        { en = true }
+      )
+    ) .. ");",
+    "var appliedLocale = 'en';",
+    "function t(key, params){ return I18N.t(key, params); }",
+    "function fmtNum(n){ return I18N.number(n); }",
+    "function fmtDay(day){ return I18N.date(day); }",
+    "function fmtMoment(seconds){ return I18N.dateTime(seconds); }",
+    fn("prose"),
+    fn("bold"),
+    fn("i18nSpan"),
+  }, "\n")
+end
+
 ---@param list any[]
 ---@return table<any, true>
 local function set_of(list)

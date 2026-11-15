@@ -71,10 +71,91 @@ return function(H)
       from = '  // Doxygen\'s "File Members"',
       task = "i18n-page-tree-index-notes-quicks (the Index tab)",
     },
+    {
+      slice = "04_directed_views_and_notes",
+      from = "  function addExternals(built, maxDepth){",
+      to = "  // Notes tab: Doxygen",
+      task = "i18n-page-hierarchy-views (edges, boxes, legends, empty diagrams)",
+    },
+    {
+      slice = "08_history_tree_treemap",
+      from = "  // Tree and Treemap: the Hierarchy",
+      task = "i18n-page-hierarchy-views (Tree, Treemap, the path line and notes)",
+    },
+    {
+      slice = "10b_maps",
+      from = "  var TINT_MODES = {",
+      task = "i18n-page-hierarchy-views (tint, Coupling, Rings, Layers, Routes)",
+    },
+    {
+      slice = "10_search_menus_popups",
+      from = "  function renderLangBar(){",
+      to = "  // Copy link",
+      task = "i18n-page-hierarchy-views (the language legend)",
+    },
+    {
+      slice = "10_search_menus_popups",
+      from = "  // Context menu",
+      to = "  // clipboard.writeText is unavailable",
+      task = "i18n-page-hierarchy-views (the context menu)",
+    },
+    {
+      slice = "10_search_menus_popups",
+      from = "  function godboltTooLong(el, len){",
+      to = '    el.classList.add("godi-off");',
+      calls = 1,
+      task = "i18n-page-hierarchy-views (the refusal of an over-long Compiler Explorer link)",
+    },
+    {
+      slice = "11_quicks_compare_init",
+      from = "  // Shape diff: two maps",
+      task = "i18n-page-hierarchy-views (the map comparison)",
+    },
   }
 
   -- Literals a region keeps although they read as text. Keyed by slice, then by the literal; the value says why.
+  local KEYS = "a key name of KeyboardEvent.key, compared, never shown"
   local DATA = {
+    ["04_directed_views_and_notes"] = {
+      ["hedge hedge-dep external"] = "class names of an edge",
+      ["hedge hedge-dep"] = "class names of an edge",
+      ["hedge hedge-call"] = "class names of an edge",
+      ["hedge hedge-call external"] = "class names of an edge",
+      ["dep deferred"] = "class names of a legend swatch",
+      ["dep external"] = "class names of a legend swatch",
+      ["call weak"] = "class names of a legend swatch",
+    },
+    ["08_history_tree_treemap"] = {
+      ["ArrowDown"] = KEYS,
+      ["ArrowUp"] = KEYS,
+      ["ArrowRight"] = KEYS,
+      ["ArrowLeft"] = KEYS,
+      ["Home"] = KEYS,
+      ["End"] = KEYS,
+      ["Enter"] = KEYS,
+      ["tm-tile tm-solo"] = "class names of a treemap tile",
+      ["htrunc hauto"] = "class names of the note under a diagram",
+    },
+    ["10b_maps"] = {
+      ["ArrowDown"] = KEYS,
+      ["ArrowUp"] = KEYS,
+      ["ArrowRight"] = KEYS,
+      ["ArrowLeft"] = KEYS,
+      ["Home"] = KEYS,
+      ["End"] = KEYS,
+      ["Enter"] = KEYS,
+      ["hedge hedge-dep hedge-quiet"] = "class names of an edge",
+      ["hedge hedge-viol"] = "class names of an edge",
+      ["htrunc hauto hring-note"] = "class names of the note under the Rings",
+      ["htrunc hauto hmap-note"] = "class names of the note under the Layers",
+      ["App Router"] = "the name Next.js gives the router, not a word of the page",
+      ["Pages Router"] = "the name Next.js gives the router, not a word of the page",
+      ["Next.js "] = "a product name before the router's name",
+      ["hnode rt-"] = "class names of a route box",
+    },
+    ["11_quicks_compare_init"] = {
+      ["hedge hedge-dep sd-del"] = "class names of a lost edge",
+    },
     ["05_features_help_index"] = {
       ["sigpop explainpop"] = "two class names of the card's element",
       ["Escape"] = "a key name of KeyboardEvent.key, compared, never shown",
@@ -172,9 +253,11 @@ return function(H)
     if a and b then
       local part = src:sub(a, b - 1)
       -- t() calls, and keys named for one (`EXPLAIN` lists keys and says them in one place).
-      local calls = select(2, part:gsub("%f[%w_.]t%(", "")) + select(2, part:gsub('"page%.', ""))
+      local calls = select(2, part:gsub("%f[%w_.]t%(", ""))
+        + select(2, part:gsub('"page%.', ""))
+        + select(2, part:gsub("i18nSpan%(", ""))
       ok(
-        calls >= 3,
+        calls >= (region.calls or 3),
         ("%s: the region says its texts through t() (%d calls)"):format(region.slice, calls)
       )
       for _, lit in ipairs(literals(part)) do

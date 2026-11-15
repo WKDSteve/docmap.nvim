@@ -336,7 +336,7 @@ return function(H)
     "a page that cannot fetch says so in place"
   )
   has(
-    'explainFetchFailure(e, "the comparison")',
+    'explainFetchFailure(e, t("page.shape.what"))',
     "a host that does not answer is explained like History's"
   )
   has(
@@ -381,16 +381,7 @@ return function(H)
     "  return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]; }); }",
     "function own(o, k){ return !!o && Object.prototype.hasOwnProperty.call(o, k); }",
     -- The runtime of the catalog with what the page embeds, and the page's helpers around it.
-    require("docmap.core.render.html.i18n_js"),
-    "var I18N = docmapI18n(" .. vim.json.encode(
-      require("docmap.core.i18n").for_page(
-        { "page.", "finding.", "report.", "check." },
-        { en = true }
-      )
-    ) .. ");",
-    "function t(key, params){ return I18N.t(key, params); }",
-    "function fmtNum(n){ return I18N.number(n); }",
-    "function fmtDay(day){ return I18N.date(day); }",
+    H.page_i18n_js(),
     "function historyAvailable(){ return location.protocol === 'http:'; }",
     "function explainFetchFailure(){ return { then: function(){} }; }",
     "function edgePath(){ return ''; }",

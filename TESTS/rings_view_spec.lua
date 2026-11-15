@@ -126,6 +126,7 @@ return function(H)
   }, "\n")
   local program = table.concat({
     page,
+    H.page_i18n_js(),
     slice,
     "var out = {};",
     -- A folder at the root, an entry its own child requires back, a chain two deep, a module only a lazy

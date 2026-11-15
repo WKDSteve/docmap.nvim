@@ -290,7 +290,13 @@ return function(H)
     "the payload carries the derivation"
   )
   has('if(view === "layers"){', "a map without rules gets a message of its own")
-  has("No layers are declared for this map.", "which says what is missing")
+  has('msg("page.empty.layers")', "which says what is missing")
+  H.ok(
+    require("docmap.core.i18n")
+      .t("page.empty.layers", nil, "en")
+      :find("No layers are declared for this map.", 1, true),
+    "layers: the message names what is missing"
+  )
   has(
     'edges.push({ from: v.from, to: v.to, cls: "hedge hedge-viol", marker: "viol", top: true,',
     "a broken require is an edge of its own class, over the boxes"
@@ -356,6 +362,7 @@ return function(H)
     "    addEventListener: function(){} }; },",
     "  createTextNode: function(t){ return { text: t }; } };",
     "function esc(s){ return s; } function navigate(){} function isHidden(){ return false; }",
+    H.page_i18n_js(),
     slice,
     "var out = {};",
     "out.none = layoutLayers().count;",

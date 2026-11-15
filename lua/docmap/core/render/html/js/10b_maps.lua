@@ -33,18 +33,21 @@ return [[
   // steps, the tooltip gives the counts, and the steps differ in lightness,
   // which survives every form of colour blindness.
   // =====================================================================
+  // `name` names the mode in the legend and the tooltip, `tip` is the sentence of a box's counts.
   var TINT_MODES = {
-    doc:  { name: "documented", share: true, unit: "documented" },
-    test: { name: "tested", share: true, unit: "tested" },
-    fix:  { name: "FIX markers", share: false, unit: "FIX" },
-    debt: { name: "TODO, HACK and PERF markers", share: false, unit: "TODO/HACK/PERF" }
+    doc:  { name: "page.tint.doc", share: true, tip: "page.tint.tip.doc" },
+    test: { name: "page.tint.test", share: true, tip: "page.tint.tip.test" },
+    fix:  { name: "page.tint.fix", share: false, tip: "page.tint.tip.fix" },
+    debt: { name: "page.tint.debt", share: false, tip: "page.tint.tip.debt" }
   };
   // The stated thresholds. A share below the bound of a step lands in it;
   // a density (markers per 1,000 lines) above it does.
   var TINT_SHARE_STEPS = [ 0.8, 0.6, 0.4, 0.2 ];
   var TINT_DENSITY_STEPS = [ 0, 1, 3, 6 ];
-  var TINT_SHARE_LABELS = [ "80% and more", "60–79%", "40–59%", "20–39%", "under 20%" ];
-  var TINT_DENSITY_LABELS = [ "none", "under 1", "1 to 3", "3 to 6", "6 and more" ];
+  var TINT_SHARE_LABELS = [ "page.tint.share.0", "page.tint.share.1", "page.tint.share.2", "page.tint.share.3",
+    "page.tint.share.4" ];
+  var TINT_DENSITY_LABELS = [ "page.tint.density.0", "page.tint.density.1", "page.tint.density.2",
+    "page.tint.density.3", "page.tint.density.4" ];
 
   function tintMode(){
     return (state.tab === "hierarchy" && (state.view || "modules") === "modules" && TINT_MODES[state.tint])
@@ -84,22 +87,22 @@ return [[
   // nothing to measure), the short value printed on the box and the sentence
   // of the tooltip.
   function tintOf(id, mode){
-    var t = tintTotals(id), spec = TINT_MODES[mode];
+    var tot = tintTotals(id), spec = TINT_MODES[mode];
     if(spec.share){
-      var have = mode === "doc" ? t.doc : t.test;
-      var total = mode === "doc" ? t.pub : t.fns;
-      if(!total) return { level: null, text: "–", tip: "no functions to measure" };
+      var have = mode === "doc" ? tot.doc : tot.test;
+      var total = mode === "doc" ? tot.pub : tot.fns;
+      if(!total) return { level: null, text: "–", tip: t("page.tint.tip.no-functions") };
       var share = have / total, level = 4;
       for(var i = 0; i < TINT_SHARE_STEPS.length; i++){
         if(share >= TINT_SHARE_STEPS[i]){ level = i; break; }
       }
       var pct = Math.floor(share * 100);
       return { level: level, text: pct + "%",
-               tip: have + " of " + total + " functions " + spec.unit + " (" + pct + "%)" };
+               tip: t(spec.tip, { have: have, total: total, percent: pct }) };
     }
-    var count = mode === "fix" ? t.fix : t.debt;
+    var count = mode === "fix" ? tot.fix : tot.debt;
     var lines = ((byId[id] || {}).stats || {}).lines || 0;
-    if(!lines) return { level: null, text: "–", tip: "no lines to measure" };
+    if(!lines) return { level: null, text: "–", tip: t("page.tint.tip.no-lines") };
     var per = count * 1000 / lines, lvl = 0;
     if(count > 0){
       lvl = 1;
@@ -108,8 +111,7 @@ return [[
       }
     }
     return { level: lvl, text: String(count),
-             tip: count + " " + spec.unit + " marker" + (count === 1 ? "" : "s") + " in " + lines +
-                  " lines (" + per.toFixed(1) + " per 1,000)" };
+             tip: t(spec.tip, { count: count, lines: lines, per: per.toFixed(1) }) };
   }
 
   // Paints the current tint onto the boxes `reconcile()` just wrote. Called
@@ -138,7 +140,7 @@ return [[
       badge.className = "htv";
       badge.textContent = r.text;
       el.appendChild(badge);
-      el.title = (el._spec ? el._spec.title : el.title) + "\n" + TINT_MODES[mode].name + ": " + r.tip;
+      el.title = (el._spec ? el._spec.title : el.title) + "\n" + t(TINT_MODES[mode].name) + ": " + r.tip;
     });
   }
 
@@ -149,14 +151,15 @@ return [[
     if(!mode) return [];
     var spec = TINT_MODES[mode];
     var labels = spec.share ? TINT_SHARE_LABELS : TINT_DENSITY_LABELS;
-    var items = ['<span class="lg lg-tint"><b>Tint: ' + esc(spec.name) +
-      (spec.share ? " (share of the functions below a box)" : " per 1,000 lines") + "</b></span>"];
-    labels.forEach(function(text, i){
+    var items = ['<span class="lg lg-tint"><b>' +
+      esc(t(spec.share ? "page.tint.legend.share" : "page.tint.legend.density", { name: t(spec.name) })) +
+      "</b></span>"];
+    labels.forEach(function(key, i){
       items.push('<span class="lg lg-tint"><span class="bx' + (i ? " tint-" + i : "") + '"></span>' +
-        esc(text) + "</span>");
+        esc(t(key)) + "</span>");
     });
-    items.push('<span class="lg lg-tint"><span class="bx tint-na"></span>nothing to measure</span>');
-    items.push('<span class="lg lg-tint">stronger tint = look here first · the value is on each box, the counts in its tooltip</span>');
+    items.push('<span class="lg lg-tint"><span class="bx tint-na"></span>' + esc(t("page.tint.legend.na")) + '</span>');
+    items.push('<span class="lg lg-tint">' + esc(t("page.tint.legend.hint")) + '</span>');
     return items;
   }
 
@@ -166,8 +169,9 @@ return [[
     if(!mode) return "";
     var spec = TINT_MODES[mode];
     var labels = spec.share ? TINT_SHARE_LABELS : TINT_DENSITY_LABELS;
-    return "Tint: " + spec.name + (spec.share ? "" : " per 1,000 lines") + " — weakest to strongest tint: " +
-      labels.join(" · ") + " · dashed: nothing to measure";
+    // In the reader's language, like everything else the export copies from the screen.
+    return t(spec.share ? "page.tint.export.share" : "page.tint.export.density", {
+      name: t(spec.name), steps: labels.map(function(key){ return t(key); }).join(" · ") });
   }
 
   // The colour and the opacity of one step, read off the stylesheet so the
@@ -209,11 +213,12 @@ return [[
   // like Tree and Treemap: it is not a diagram to zoom or to lay out again.
   // =====================================================================
   var COUPLING_HIGH = 5;
+  // Keys: the label of the corner, one module of it, and what puts a module there.
   var COUPLING_CORNERS = {
-    hub: { label: "Hubs", one: "hub", hint: "many require it, it requires few" },
-    tangle: { label: "Tangles", one: "tangle", hint: "many require it, it requires many" },
-    pass: { label: "Pass-throughs", one: "pass-through", hint: "few require it, it requires many" },
-    leaf: { label: "Leaves", one: "leaf", hint: "few either way" }
+    hub: { label: "page.coupling.hub", one: "page.coupling.hub.one", hint: "page.coupling.hub.hint" },
+    tangle: { label: "page.coupling.tangle", one: "page.coupling.tangle.one", hint: "page.coupling.tangle.hint" },
+    pass: { label: "page.coupling.pass", one: "page.coupling.pass.one", hint: "page.coupling.pass.hint" },
+    leaf: { label: "page.coupling.leaf", one: "page.coupling.leaf.one", hint: "page.coupling.leaf.hint" }
   };
 
   function couplingCorner(fanIn, fanOut){
@@ -281,15 +286,14 @@ return [[
   }
 
   function couplingText(r){
-    return r.name + " · required by " + r.fanIn + " · requires " + r.fanOut + " · " +
-      COUPLING_CORNERS[r.corner].one;
+    return t("page.coupling.dot", { name: r.name, fanIn: r.fanIn, fanOut: r.fanOut,
+      corner: t(COUPLING_CORNERS[r.corner].one) });
   }
 
   function couplingReadout(r){
     var el = document.getElementById("cq-read");
     if(!el) return;
-    el.textContent = r ? couplingText(r)
-      : "point at a module, or move through them with the arrow keys · Enter opens it";
+    el.textContent = r ? couplingText(r) : t("page.coupling.readout");
   }
 
   var couplingShown = [];
@@ -297,13 +301,12 @@ return [[
     var rows = couplingRows(centerId);
     couplingShown = rows;
     haltBar.innerHTML =
-      '<span class="hmuted">fan-out across, fan-in up · the lines are at ' + COUPLING_HIGH +
-      ': a module is a hub, tangle or pass-through from ' + COUPLING_HIGH + ' on</span>' +
+      '<span class="hmuted">' + esc(t("page.coupling.bar", { high: COUPLING_HIGH })) + '</span>' +
       '<span class="cq-read" id="cq-read" aria-live="polite"></span>';
     haltBody.removeAttribute("role");
     if(!rows.length){
-      haltBody.innerHTML = '<p class="hmsg">No module at or under ' +
-        esc(byId[centerId].name || centerId) + ' requires another or is required by one.</p>';
+      haltBody.innerHTML = '<p class="hmsg">' +
+        esc(t("page.coupling.empty", { name: byId[centerId].name || centerId })) + '</p>';
       couplingReadout(null);
       return;
     }
@@ -314,7 +317,7 @@ return [[
       Math.round(W * 0.72)), 320);
     var L = couplingLayout(rows, W, H);
     var s = ['<svg class="cq" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H +
-      '" role="group" aria-label="Coupling: ' + rows.length + ' modules by fan-in and fan-out">'];
+      '" role="group" aria-label="' + esc(t("page.coupling.aria", { count: rows.length })) + '">'];
 
     // The two lines, and the four corners they make.
     var tx = L.x(COUPLING_HIGH), ty = L.y(COUPLING_HIGH);
@@ -327,7 +330,7 @@ return [[
     function corner(key, cx, cy, anchor){
       var c = COUPLING_CORNERS[key];
       s.push('<text class="cq-corner" x="' + cx + '" y="' + cy + '" text-anchor="' + anchor + '">' +
-        c.label + ' <tspan class="cq-n">' + count[key] + '</tspan><title>' + c.hint + '</title></text>');
+        esc(t(c.label)) + ' <tspan class="cq-n">' + count[key] + '</tspan><title>' + esc(t(c.hint)) + '</title></text>');
     }
     corner("hub", L.left + 6, L.top + 12, "start");
     corner("tangle", L.right - 6, L.top + 12, "end");
@@ -345,9 +348,9 @@ return [[
       s.push('<text class="cq-tick" x="' + (L.left - 6) + '" y="' + py + '" text-anchor="end">' + t + '</text>');
     });
     s.push('<text class="cq-label" x="' + ((L.left + L.right) / 2) + '" y="' + (L.bottom + 29) +
-      '" text-anchor="middle">modules it requires (fan-out)</text>');
+      '" text-anchor="middle">' + esc(t("page.coupling.axis.out")) + '</text>');
     s.push('<text class="cq-label" transform="translate(12 ' + ((L.top + L.bottom) / 2) +
-      ') rotate(-90)" text-anchor="middle">modules that require it (fan-in)</text>');
+      ') rotate(-90)" text-anchor="middle">' + esc(t("page.coupling.axis.in")) + '</text>');
 
     L.dots.forEach(function(d, i){
       var r = d.row;
@@ -567,7 +570,12 @@ return [[
       " L" + (bx - dx * t).toFixed(1) + "," + (by - dy * t).toFixed(1);
   }
 
-  function ringPlural(n, one){ return n + " " + one + (n === 1 ? "" : "s"); }
+  // A count with its noun ("3 modules"), as a whole phrase of the catalog that a sentence takes as a parameter.
+  var COUNT_WORDS = {
+    module: "page.n.module", require: "page.n.require", rule: "page.n.rule", layer: "page.n.layer",
+    band: "page.n.band", route: "page.n.route", routeTree: "page.n.route-tree"
+  };
+  function ringPlural(n, one){ return t(COUNT_WORDS[one], { count: n }); }
 
   // The whole view for `drawHierarchy`: the same shape every layout returns,
   // plus positions of its own and what only this view draws.
@@ -635,7 +643,7 @@ return [[
       if(positions[id] === undefined || positions[e.from] === undefined) return;
       edges.push({ from: e.from, to: id, cls: "hedge hedge-dep hedge-quiet" + (e.deferred ? " deferred" : ""),
                    marker: "dep",
-                   label: (e.deferred ? "lazy require " : "require ") + e.to_module + ":" + e.line });
+                   label: t(e.deferred ? "page.edge.require.lazy" : "page.edge.require", { module: e.to_module, line: e.line }) });
     });
 
     // Pointing at a box lights its chain back to the entry and what is first
@@ -654,14 +662,16 @@ return [[
       return names.join(" → ");
     }
     function why(id){
-      if(id === entry) return "the entry: the rings count the requires from here";
+      if(id === entry) return t("page.rings.why.entry");
       var d = walk.dist[id];
-      if(d !== undefined) return ringPlural(d, "require") + " from the entry: " + chain(id);
-      if(unref[id]) return "not reachable from " + ringName(entry) + ": nothing in this map requires it (unreferenced-module)";
+      if(d !== undefined) return t("page.rings.why.reached", { requires: ringPlural(d, "require"), chain: chain(id) });
+      if(unref[id]) return t("page.rings.why.unref", { entry: ringName(entry) });
       var by = (depIn[id] || []).map(function(e){ return ringName(e.from); });
-      if(!by.length) return "not reachable from " + ringName(entry) + ": nothing in this map requires it";
-      return "not reachable from " + ringName(entry) + ": required only by " + by.slice(0, 3).join(", ") +
-        (by.length > 3 ? " and " + (by.length - 3) + " more" : "") + ", which the entry does not reach either";
+      if(!by.length) return t("page.rings.why.unrequired", { entry: ringName(entry) });
+      var names = by.slice(0, 3).join(", ");
+      return by.length > 3
+        ? t("page.rings.why.only-by.more", { entry: ringName(entry), names: names, more: by.length - 3 })
+        : t("page.rings.why.only-by", { entry: ringName(entry), names: names });
     }
 
     ringShown = { entry: entry, picked: centerId === entry, total: total, reached: reached,
@@ -672,7 +682,7 @@ return [[
       positions: positions, extent: { w: Math.round(cx * 2), h: Math.round(cy * 2) },
       centerKey: entry, edgePath: ringEdge, neighbours: near, tip: why,
       edgeNear: function(key, from, to){ return to === key || !!near[key][to] && !!near[key][from] || from === key; },
-      truncNote: "Showing " + count + " of " + total + " modules: the unreachable ring and the deepest rings are cut first.",
+      truncNote: t("page.rings.truncated", { shown: count, total: total }),
       // The rings themselves, drawn below the edges and the boxes.
       decor: function(svg, svgNS){
         placed.bands.forEach(function(band, i){
@@ -697,11 +707,13 @@ return [[
           label.setAttribute("text-anchor", "middle");
           // A ring the cap cut says how much of it is drawn.
           var whole = out ? outsideCount : sizes[i];
-          var cut = bands[i].length < whole ? bands[i].length + " of " : "";
+          var modules = bands[i].length < whole
+            ? t("page.rings.label.cut", { shown: bands[i].length, modules: ringPlural(whole, "module") })
+            : ringPlural(whole, "module");
           label.textContent = out
-            ? "not reachable from " + ringName(entry) + " · " + cut + ringPlural(whole, "module") +
-              (unrefCount ? " · " + unrefCount + " unreferenced-module" : "")
-            : ringPlural(kinds[i], "require") + " away · " + cut + ringPlural(whole, "module");
+            ? t("page.rings.label.out", { entry: ringName(entry), modules: modules }) +
+              (unrefCount ? " · " + t("page.rings.label.unref", { count: unrefCount }) : "")
+            : t("page.rings.label.ring", { requires: ringPlural(kinds[i], "require"), modules: modules });
           svg.appendChild(label);
         });
       },
@@ -714,7 +726,9 @@ return [[
           var d = walk.dist[id];
           mapRename(el, id, (byId[IR.root] || {}).module);
           el.dataset.ring = d === undefined ? "out" : String(d);
-          var tag = id === entry ? "entry" : (d === undefined ? (unref[id] ? "unreferenced-module" : "not reachable") : "");
+          // `unreferenced-module` is the id of the check, kept as the report spells it.
+          var tag = id === entry ? t("page.rings.tag.entry")
+            : (d === undefined ? (unref[id] ? "unreferenced-module" : t("page.rings.tag.out")) : "");
           if(d === undefined) el.classList.add("ring-out");
           if(unref[id]) el.classList.add("ring-unref");
           if(tag){
@@ -744,7 +758,8 @@ return [[
     IR.nodes.forEach(function(n){ if(ringModule(n.id)) all++; });
     sel.innerHTML = ids.map(function(id){
       return '<option value="' + esc(id) + '"' + (id === ringShown.entry ? " selected" : "") + ">" +
-        esc(ringName(id)) + " · reaches " + ringDistances(id).order.length + " of " + all + "</option>";
+        esc(t("page.rings.entry.option", { name: ringName(id), reached: ringDistances(id).order.length, total: all })) +
+        "</option>";
     }).join("");
   }
 
@@ -755,25 +770,23 @@ return [[
     if(!s) return null;
     var box = document.createElement("div");
     box.className = "htrunc hauto hring-note";
-    var text = (s.picked ? "" : "Started at " + ringName(s.entry) + ", the entry of this map (the center is no module). ") +
-      ringName(s.entry) + " reaches " + s.reached + " of " + ringPlural(s.total, "module") + ", the farthest " +
-      ringPlural(s.depth, "require") + " away.";
+    var text = (s.picked ? "" : t("page.rings.note.started", { name: ringName(s.entry) }) + " ") +
+      t("page.rings.note.reaches", { name: ringName(s.entry), reached: s.reached,
+        modules: ringPlural(s.total, "module"), requires: ringPlural(s.depth, "require") });
     if(s.outside){
-      text += " " + ringPlural(s.outside, "module") + " " + (s.outside === 1 ? "is" : "are") +
-        " not reachable from it";
-      if(!s.unref) text += ".";
-      else if(s.outside === 1) text += " and carries the unreferenced-module finding: nothing requires it.";
-      else if(s.unref === s.outside) text += ", and all of them carry the unreferenced-module finding: nothing requires them.";
-      else text += ": " + s.unref + " carr" + (s.unref === 1 ? "ies" : "y") +
-        " the unreferenced-module finding (nothing requires " + (s.unref === 1 ? "it" : "them") +
-        "), the others are required only by unreachable modules or are exempt from that check.";
+      // One sentence per case, each with its plural: the count of the unreachable modules decides the verb.
+      var unreachable = { count: s.outside };
+      if(!s.unref) text += " " + t("page.rings.note.out", unreachable);
+      else if(s.outside === 1) text += " " + t("page.rings.note.out.unref-one");
+      else if(s.unref === s.outside) text += " " + t("page.rings.note.out.unref-all", unreachable);
+      else text += " " + t("page.rings.note.out.unref-some", { count: s.outside, unref: t("page.rings.note.unref", { count: s.unref }) });
     }
     box.appendChild(document.createTextNode(text + " "));
     if(s.unref){
       var b = document.createElement("button");
       b.type = "button";
       b.id = "hring-findings";
-      b.textContent = "Show the findings";
+      b.textContent = t("page.map.show-findings");
       b.addEventListener("click", function(){ navigate({ tab: "findings" }); });
       box.appendChild(b);
     }
@@ -812,8 +825,9 @@ return [[
 
   function layerViolationText(L, v){
     var rule = (L.rules || [])[v.rule - 1] || {};
-    return ringName(v.from) + " requires " + ringName(v.to) + ", but " + v.from_layer +
-      " must not reach into " + v.to_layer + (rule.why ? " (" + rule.why + ")" : "");
+    var params = { from: ringName(v.from), to: ringName(v.to), fromLayer: v.from_layer, toLayer: v.to_layer,
+                   why: rule.why };
+    return t(rule.why ? "page.layers.violation.why" : "page.layers.violation", params);
   }
 
   var layerShown = null;
@@ -897,7 +911,7 @@ return [[
       if(broken[e.from + " " + e.to]) return;
       edges.push({ from: e.from, to: e.to,
                    cls: "hedge hedge-dep hedge-quiet" + (e.deferred ? " deferred" : ""), marker: "dep",
-                   label: (e.deferred ? "lazy require " : "require ") + e.to_module + ":" + e.line });
+                   label: t(e.deferred ? "page.edge.require.lazy" : "page.edge.require", { module: e.to_module, line: e.line }) });
     });
     brokenList.forEach(function(v){
       if(positions[v.from] === undefined || positions[v.to] === undefined) return;
@@ -935,9 +949,8 @@ return [[
     return {
       layers: [Object.keys(positions)], included: included, count: count, truncated: truncated, edges: edges,
       positions: positions, extent: { w: W, h: H }, edgePath: ringEdge,
-      path: ringPlural(layerShown.rules, "rule") + " · layers",
-      truncNote: "Showing " + count + " of " + total + " modules: a layer shows its first " + per +
-        ", the ones in a broken rule first.",
+      path: t("page.layers.path", { rules: ringPlural(layerShown.rules, "rule") }),
+      truncNote: t("page.layers.truncated", { shown: count, total: total, per: per }),
       decor: function(svg, svgNS){
         rows.forEach(function(row){
           rect(svg, svgNS, "hband" + (row.band === null ? " hband-loose" : ""), PAD, row.y, W - 2 * PAD, row.bh, 10);
@@ -949,15 +962,15 @@ return [[
       overlay: function(svg, svgNS){
         rows.forEach(function(row){
           label(svg, svgNS, "hband-name", PAD + 12, row.y + 16, row.band === null
-            ? "named by no rule · " + ringPlural(loose.length, "module")
-            : "band " + (row.band + 1) + " of " + L.bands +
-              (row.band === 0 ? " · the base" : " · a rule forbids a band below to require it"));
+            ? t("page.layers.band.loose", { modules: ringPlural(loose.length, "module") })
+            : t(row.band === 0 ? "page.layers.band.base" : "page.layers.band.above", { n: row.band + 1, total: L.bands }));
         });
         frames.forEach(function(u){
           if(u.id === null) return;
           label(svg, svgNS, "hunit-name", u.x + LAYER_PAD, u.y + 19,
-            u.id + " · " + (u.shown.length < u.all.length ? u.shown.length + " of " : "") +
-            ringPlural(u.all.length, "module") + (u.siblings ? " · siblings" : ""));
+            u.id + " · " + (u.shown.length < u.all.length
+              ? t("page.rings.label.cut", { shown: u.shown.length, modules: ringPlural(u.all.length, "module") })
+              : ringPlural(u.all.length, "module")) + (u.siblings ? " · " + t("page.layers.siblings") : ""));
         });
       },
       paint: function(){
@@ -968,13 +981,13 @@ return [[
           mapRename(el, id, unitOf[id]);
           el.dataset.layer = unitOf[id] || "";
           out.forEach(function(v){ tips = tips.concat(v.texts); });
-          into.forEach(function(v){ tips.push("required against a rule by " + ringName(v.from)); });
+          into.forEach(function(v){ tips.push(t("page.layers.tip.against", { name: ringName(v.from) })); });
           if(out.length){
             el.classList.add("lv-from");
-            tag = "breaks a rule · " + ringPlural(out.length, "require");
-          } else if(shared[id]) tag = "shared target";
+            tag = t("page.layers.tag.breaks", { requires: ringPlural(out.length, "require") });
+          } else if(shared[id]) tag = t("page.layers.tag.shared");
           if(into.length) el.classList.add("lv-to");
-          if(shared[id]) tips.push("a rule's allow list exempts it as a target");
+          if(shared[id]) tips.push(t("page.layers.tip.shared"));
           if(tag){
             var sm = el.querySelector(".hsm");
             if(sm) sm.remove();
@@ -994,22 +1007,19 @@ return [[
     if(!s) return null;
     var box = document.createElement("div");
     box.className = "htrunc hauto hmap-note";
-    var text = ringPlural(s.rules, "rule") + " put " + ringPlural(s.layered, "module") + " into " +
-      ringPlural(s.layers, "layer") + " on " + ringPlural(s.bands, "band") + ". " +
-      (s.loose ? ringPlural(s.loose, "module") + " " + (s.loose === 1 ? "is" : "are") + " named by no rule. " : "") +
-      (s.broken ? ringPlural(s.broken, "require") + " break" + (s.broken === 1 ? "s" : "") + " a rule (the red arrow" +
-                  (s.broken === 1 ? "" : "s") + ")."
-                : "No require breaks a rule.");
+    var text = t("page.layers.note.put", { rules: ringPlural(s.rules, "rule"), modules: ringPlural(s.layered, "module"),
+        layers: ringPlural(s.layers, "layer"), bands: ringPlural(s.bands, "band") }) + " " +
+      (s.loose ? t("page.layers.note.loose", { count: s.loose }) + " " : "") +
+      (s.broken ? t("page.layers.note.broken", { count: s.broken }) : t("page.layers.note.unbroken"));
     s.loops.forEach(function(group){
-      text += " No order holds among " + group.join(", ") +
-        ": they forbid each other in a circle, so they share a band.";
+      text += " " + t("page.layers.note.loop", { layers: group.join(", ") });
     });
     box.appendChild(document.createTextNode(text + " "));
     if(s.broken){
       var b = document.createElement("button");
       b.type = "button";
       b.id = "hmap-findings";
-      b.textContent = "Show the findings";
+      b.textContent = t("page.map.show-findings");
       b.addEventListener("click", function(){ navigate({ tab: "findings" }); });
       box.appendChild(b);
     }
@@ -1037,15 +1047,16 @@ return [[
   // are drawn side by side.
   // =====================================================================
   var ROUTE_KINDS = {
-    root: "route root",
-    static: "segment",
-    dynamic: "dynamic segment",
-    catchall: "catch-all segment",
-    optional: "optional catch-all",
-    group: "group · not in the URL",
-    slot: "slot · not in the URL",
-    intercept: "intercepts a route"
+    root: "page.routes.kind.root",
+    static: "page.routes.kind.static",
+    dynamic: "page.routes.kind.dynamic",
+    catchall: "page.routes.kind.catchall",
+    optional: "page.routes.kind.optional",
+    group: "page.routes.kind.group",
+    slot: "page.routes.kind.slot",
+    intercept: "page.routes.kind.intercept"
   };
+  // The names Next.js gives its two routers, not words of this page.
   var ROUTERS = { app: "App Router", pages: "Pages Router" };
 
   // Every segment of every route tree by its key, built once: the trees do
@@ -1092,18 +1103,19 @@ return [[
     if(n.kind === "root"){
       line = ROUTERS[top.router] + " · " + ringPlural(top.routes, "route");
     } else if(n.url){
-      line = n.url + (n.handler ? " · handler" : "");
+      line = n.url + (n.handler ? " · " + t("page.routes.handler") : "");
     } else {
-      line = ROUTE_KINDS[n.kind] + (files.length && n.kind === "static" ? " · " + files.join(", ") : "");
+      line = t(ROUTE_KINDS[n.kind]) + (files.length && n.kind === "static" ? " · " + files.join(", ") : "");
     }
     var tip = [ n.dir ];
-    if(n.url) tip.push((n.handler ? "request handler at " : "page at ") + n.url);
-    else if(n.kind !== "root") tip.push("no route of its own: " +
-      (files.length ? "it holds " + files.join(", ") : "it only groups what is below it"));
-    if(n.kind !== "static" && n.kind !== "root") tip.push(ROUTE_KINDS[n.kind]);
+    if(n.url) tip.push(t(n.handler ? "page.routes.tip.handler" : "page.routes.tip.page", { url: n.url }));
+    else if(n.kind !== "root") tip.push(files.length
+      ? t("page.routes.tip.holds", { files: files.join(", ") })
+      : t("page.routes.tip.groups"));
+    if(n.kind !== "static" && n.kind !== "root") tip.push(t(ROUTE_KINDS[n.kind]));
     if(n.kind === "root") tip.push(top.framework === "next"
       ? "Next.js " + ROUTERS[top.router]
-      : "the shape of a Next.js route directory; no file in it imports next");
+      : t("page.routes.tip.no-next"));
     files.forEach(function(role){ tip.push(role + ": " + n.files[role]); });
     var open = n.files.page || n.files.route || n.files[files[0] ] || n.node || null;
     return {
@@ -1147,32 +1159,33 @@ return [[
       // A forest has no middle to highlight; the view still opens on its
       // first tree, not on whatever corner the last diagram was scrolled to.
       scrollKey: seeds[0].key,
-      path: at ? at.dir + " · " + (at.url ? at.url + " · " : "") + "routes"
-               : ringPlural(index.roots.length, "route tree") + " · " + ringPlural(total, "route")
+      path: at ? at.dir + " · " + (at.url ? at.url + " · " : "") + t("page.routes.path")
+               : ringPlural(index.roots.length, "routeTree") + " · " + ringPlural(total, "route")
     };
   }
 
   function routeLegend(){
     return [
-      '<span class="lg"><span class="bx rt-route"></span>a route: a page or a handler answers at its URL</span>',
-      '<span class="lg"><span class="bx"></span>no route of its own (a layout, a group, a slot)</span>',
-      '<span class="lg">[x] dynamic · [...x] catch-all · (x) group and @x slot are not in the URL</span>'
+      '<span class="lg"><span class="bx rt-route"></span>' + esc(t("page.legend.routes.route")) + '</span>',
+      '<span class="lg"><span class="bx"></span>' + esc(t("page.legend.routes.none")) + '</span>',
+      '<span class="lg">' + esc(t("page.legend.routes.syntax")) + '</span>'
     ];
   }
 
   function mapLegend(view){
+    function lg(swatch, key){ return '<span class="lg">' + swatch + esc(t(key)) + '</span>'; }
     if(view === "layers"){
-      return '<span class="lg"><span class="sw viol"></span>a require that breaks a rule</span>' +
-        '<span class="lg"><span class="bx lv-from"></span>the module that requires against a rule</span>' +
-        '<span class="lg"><span class="sw dep"></span>any other require (shown for the box you point at)</span>' +
-        '<span class="lg">a band is above another because a rule forbids the lower one to require it</span>' +
-        '<span class="lg">wheel zooms · shift+wheel pans · click pins a box, a second click opens it in the Tree tab · right-click for more</span>';
+      return lg('<span class="sw viol"></span>', "page.legend.layers.viol") +
+        lg('<span class="bx lv-from"></span>', "page.legend.layers.from") +
+        lg('<span class="sw dep"></span>', "page.legend.layers.other") +
+        lg("", "page.legend.layers.bands") +
+        lg("", "page.legend.layers.gestures");
     }
-    return '<span class="lg"><span class="bx ring-entry"></span>the entry</span>' +
-      '<span class="lg"><span class="bx ring-out"></span>not reachable from the entry</span>' +
-      '<span class="lg"><span class="bx ring-out ring-unref"></span>… and an unreferenced-module finding</span>' +
-      '<span class="lg"><span class="sw dep"></span>the require that first reaches a module (shown for the box you point at)</span>' +
-      '<span class="lg">wheel zooms · shift+wheel pans · click pins a box, a second click makes it the entry · right-click for more</span>';
+    return lg('<span class="bx ring-entry"></span>', "page.legend.rings.entry") +
+      lg('<span class="bx ring-out"></span>', "page.legend.rings.out") +
+      lg('<span class="bx ring-out ring-unref"></span>', "page.legend.rings.unref") +
+      lg('<span class="sw dep"></span>', "page.legend.rings.first") +
+      lg("", "page.legend.rings.gestures");
   }
 
   document.getElementById("hentry").addEventListener("change", function(ev){

@@ -25,10 +25,7 @@ return function(H)
   has('else if(view === "coupling") drawCoupling(hcenter);', "drawAltView hands it off")
   has('"view.coupling":', "the view explains itself")
   has("var COUPLING_HIGH = 5;", "the threshold is one stated number")
-  has(
-    "': a module is a hub, tangle or pass-through from ' + COUPLING_HIGH + ' on</span>'",
-    "the bar says where the lines are"
-  )
+  has('t("page.coupling.bar", { high: COUPLING_HIGH })', "the bar says where the lines are")
   has(
     'if(dot && byId[dot.dataset.id]) navigate({ tab: "tree", id: dot.dataset.id });',
     "a click opens the module"
@@ -71,6 +68,7 @@ return function(H)
     "var haltBody = { addEventListener: function(){} }, haltBar = {};",
     "var document = { getElementById: function(){ return { addEventListener: function(){} }; } };",
     "function esc(s){ return s; } function navigate(){} function isHidden(){ return false; }",
+    H.page_i18n_js(),
     slice,
     "var out = {};",
     "out.corners = [couplingCorner(5, 4), couplingCorner(5, 5), couplingCorner(4, 5), couplingCorner(4, 4),",

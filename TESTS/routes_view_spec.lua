@@ -354,7 +354,13 @@ return function(H)
     'routes = require("docmap.core.endpoints").file_routes(ir),',
     "the payload carries the route trees"
   )
-  has("No file-based routes in this map.", "a map without routes says what the view reads")
+  has('msg("page.empty.routes")', "a map without routes says what the view reads")
+  H.ok(
+    require("docmap.core.i18n")
+      .t("page.empty.routes", nil, "en")
+      :find("No file-based routes in this map.", 1, true),
+    "routes: the message names the conventions it reads"
+  )
   has(
     '<a href="#tab=hierarchy&view=routes">the Routes view of the Hierarchy</a> draws them.',
     "the Endpoints panel points at the view"
@@ -388,6 +394,7 @@ return function(H)
     "var haltBody = { addEventListener: function(){} }, haltBar = {};",
     "var document = { getElementById: function(){ return { addEventListener: function(){} }; } };",
     "function esc(s){ return String(s).replace(/</g, '&lt;'); } function navigate(){} function isHidden(){ return false; }",
+    H.page_i18n_js(),
     slice,
     "var out = {};",
     "out.none = layoutRoutes('src').count;",
