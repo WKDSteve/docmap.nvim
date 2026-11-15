@@ -213,7 +213,10 @@ return {
     },
     { hover = "h1" },
     { press = "Escape", note = "the explanation of the tab is put away" },
-    { expect = "(document.getElementById('detail').scrollIntoView(), true)", note = "the pane in view" },
+    {
+      expect = "(document.getElementById('detail').scrollIntoView(), true)",
+      note = "the pane in view",
+    },
     { shot = "de-light-detail" },
 
     -- Notes and Index: drawn once per language.

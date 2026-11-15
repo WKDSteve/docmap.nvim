@@ -126,8 +126,20 @@ return function(H)
   -- true.
   -- ---------------------------------------------------------------------
   ok(src:find("var tip = ceIsLocal()", 1, true) ~= nil, "warning: two texts, chosen by host")
+  -- The texts live in the catalog (docs/i18n.md); the page names the two pairs of keys.
+  local i18n = require("docmap.core.i18n")
   ok(
-    src:find("Nothing leaves your machine, because that ", 1, true) ~= nil,
+    src:find('"page.godbolt.local.body"', 1, true) ~= nil
+      and src:find('"page.godbolt.remote.body"', 1, true) ~= nil,
+    "warning: the page says one of two texts"
+  )
+  ok(
+    i18n
+      .t("page.godbolt.local.body", { base = "x" }, "en")
+      :find("Nothing leaves your machine, because that ", 1, true)
+        ~= nil
+      and i18n.t("page.godbolt.remote.title", nil, "en"):find("leaves your machine", 1, true)
+        ~= nil,
     "warning: ...and the local one says the opposite of the remote one"
   )
 end
