@@ -190,7 +190,7 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
 .k-module .nm{color:var(--mod)} .k-namespace .nm{color:var(--ns)} .k-file .nm{color:var(--file)}
 .sm{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
 .badges{display:flex;gap:4px;flex:none}
-.bd{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;padding:1px 5px;
+.bd{font-size:9.5px;padding:1px 5px;
   border-radius:4px;border:1px solid var(--line);color:var(--muted)}
 .bd.rd{color:var(--accent);border-color:var(--accent)}
 .bd.dep{color:var(--error);border-color:var(--error)}
@@ -209,7 +209,7 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
 .prose{white-space:pre-wrap;font-size:13px;color:var(--ink);
   background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:13px 15px;
   margin-bottom:18px;overflow-x:auto}
-.sec{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+.sec{font-size:11.5px;color:var(--muted);
   margin:18px 0 7px;font-weight:600}
 .lst{list-style:none;margin:0;padding:0}
 .lst li{font-family:var(--mono);font-size:12.5px;padding:2px 0;color:var(--muted)}
@@ -236,9 +236,9 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
    for why this never touches the Tree tab's detail pane. Same shape as
    `.fn-ex`'s code block, a distinct class since the content is source, not
    an authored `@example`. */
-.fn-snip-label{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;
+.fn-snip-label{font-size:11.5px;
   color:var(--muted);margin-top:10px}
-.fn-snip-label .bd{text-transform:none;letter-spacing:0;margin-left:6px}
+.fn-snip-label .bd{margin-left:6px}
 .fn-snip{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;background:var(--accent-soft);
   border-radius:6px;padding:8px 10px;margin-top:4px;overflow-x:auto}
 /* An authored fenced block. Same shape again as `.fn-ex`/`.fn-snip` — a
@@ -276,7 +276,7 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
    rest of this page avoids. */
 .langbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
   padding:6px 10px;border-bottom:1px solid var(--line)}
-.lb-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.lb-label{font-size:11px;color:var(--muted)}
 .lb-chip{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:11px;
   border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
 .lb-chip.on{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
@@ -308,12 +308,11 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
 /* The parts a card of the lookup layer may have beyond word and summary. One
    card, bounded: rows are cut by the script and the omitted amount stated
    (.kw-more), the box itself scrolls before it outgrows half the window. */
-.kw-kind{font-family:system-ui,sans-serif;font-size:10.5px;color:var(--muted);margin-left:8px;
-  text-transform:uppercase;letter-spacing:.04em}
+.kw-kind{font-family:system-ui,sans-serif;font-size:10.5px;color:var(--muted);margin-left:8px}
 .kw-unknown{font-size:12px;line-height:1.45;color:var(--muted);font-style:italic}
 .kw-line{font-size:12px;line-height:1.45;margin-top:4px}
-.kw-label{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
-.kw-rows-title{font-size:10.5px;margin-top:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.kw-label{color:var(--muted);font-size:10.5px;margin-right:4px}
+.kw-rows-title{font-size:10.5px;margin-top:8px;color:var(--muted)}
 .kw-rows{list-style:none;margin:3px 0 0;padding:0;font-size:11.5px;line-height:1.5}
 .kw-rows li{overflow-wrap:anywhere}
 .kw-rows code,.kw-sum code,.kw-line code,.kw-unknown code{font-family:var(--mono);font-size:11px}
@@ -331,8 +330,7 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
 /* The browser default link blue is unreadable on the dark card. */
 .kw-ref a{color:var(--accent);text-decoration:none}
 .kw-ref a:hover,.kw-ref a:focus{text-decoration:underline}
-.kw-origin{font-size:10.5px;margin-top:6px;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.04em}
+.kw-origin{font-size:10.5px;margin-top:6px;color:var(--muted)}
 /* Decorated keywords stay unobtrusive until pointed at: a snippet where
    every keyword is coloured is syntax highlighting, which this page turned
    down on purpose. A dotted underline says "there is an answer here" and
@@ -371,8 +369,8 @@ li:hover>.sigi,tr:hover .sigi{opacity:.8}
    compete with the deprecation banner for the reader's eye, and this is a
    much quieter fact. */
 .fn-overloads{margin:6px 0 0 0;padding-left:10px;border-left:2px solid var(--line)}
-.fn-ov-label{font-size:10.5px;color:var(--muted);text-transform:uppercase;
-  letter-spacing:.04em;margin-bottom:2px}
+.fn-ov-label{font-size:10.5px;color:var(--muted);
+  margin-bottom:2px}
 .fn-ov-sig{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
 .fn-ov-raw{font-family:var(--mono);font-size:11.5px;color:var(--muted);font-style:italic}
 code{font-family:var(--mono);font-size:.92em;background:var(--accent-soft);
@@ -384,9 +382,13 @@ code{font-family:var(--mono);font-size:.92em;background:var(--accent-soft);
 #findings{padding:0}
 #findings table{border-collapse:collapse;width:100%;font-size:12.5px}
 #findings th{text-align:left;padding:6px 9px;border-bottom:1px solid var(--line);
-  color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
+  color:var(--muted);font-weight:600;font-size:11.5px}
 #findings td{padding:5px 9px;border-bottom:1px solid var(--line);vertical-align:top}
 #findings td.msg{font-family:var(--mono);font-size:11.5px;word-break:break-word}
+/* The one rule that changes case: a severity is the grade as the report
+   spells it (error, warn, info), the subject and never catalog text. Catalog
+   text carries its own case (docs/i18n.md); TESTS/i18n_page_spec.lua fails on
+   any other text-transform here. */
 .sev{font-weight:650;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em}
 .sev.error{color:var(--error)} .sev.warn{color:var(--warn)} .sev.info{color:var(--info)}
 details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
@@ -405,8 +407,8 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
    The Notes tab now has two halves that answer different questions --
    annotations on functions, markers on lines -- and a reader who cannot
    see the seam reads the second half as more of the first. */
-#view-notes h3.ngroup{margin-top:34px;font-size:11px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);
+#view-notes h3.ngroup{margin-top:34px;font-size:11px;
+  color:var(--muted);border-bottom:1px solid var(--line);
   padding-bottom:6px}
 #view-notes h3.ngroup:first-child{margin-top:0}
 /* The spelling the author actually typed, when it differs from the
@@ -496,8 +498,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
    nothing feature-tab-specific needed there. */
 [id^="view-feature-"]{padding:22px 26px 60px}
 .feat-tab-wrap{max-width:760px}
-.feat-tab-theme{font-size:11.5px;color:var(--muted);text-transform:uppercase;
-  letter-spacing:.05em}
+.feat-tab-theme{font-size:11.5px;color:var(--muted)}
 .feat-tab-name{margin:2px 0 0;font-size:19px;font-weight:600;color:var(--ink)}
 .feat-tab-name[data-node]{cursor:pointer;color:var(--accent)}
 .feat-tab-name[data-node]:hover{text-decoration:underline}
@@ -535,7 +536,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .crow .cmeta{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:1px}
 .hist-approx{color:var(--warn);font-size:11.5px;border:1px solid var(--warn);
   border-radius:5px;padding:5px 8px;margin:0 0 12px}
-.hist-sec{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+.hist-sec{font-size:11.5px;color:var(--muted);
   margin:18px 0 7px;font-weight:600}
 .hist-fn{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-weight:600}
 .hist-callers{list-style:none;margin:2px 0 8px;padding:0 0 0 14px}
@@ -604,7 +605,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .antable th.ansort:hover{color:var(--ink)}
 .antable th.ansort.active{color:var(--accent)}
 .antable th{text-align:left;font-weight:600;color:var(--muted);font-size:11.5px;
-  text-transform:uppercase;letter-spacing:.03em;padding:4px 8px;border-bottom:1px solid var(--line);
+  padding:4px 8px;border-bottom:1px solid var(--line);
   background:var(--panel);position:sticky;top:0}
 .antable td{padding:5px 8px;border-bottom:1px dashed var(--line);font-family:var(--mono)}
 .dupview{display:flex;gap:4px;margin:8px 0}
@@ -636,7 +637,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
   border:1px solid var(--line);color:var(--accent);cursor:pointer;text-decoration:none}
 .ixjump a:hover{border-color:var(--accent);background:var(--accent-soft)}
 .ixlist li{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:3px 0}
-.ixtag{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+.ixtag{font-size:9.5px;color:var(--muted);
   border:1px solid var(--line);border-radius:4px;padding:0 4px}
 .ixtag.dep{color:var(--error);border-color:var(--error)}
 .ixtag.tested{color:var(--accent);border-color:var(--accent)}
@@ -679,7 +680,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
   border:1px solid var(--line);border-radius:8px;padding:8px 6px;
   box-shadow:0 2px 8px rgba(0,0,0,.14)}
 .hrootslider.on{display:flex}
-.hrootslider-label{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;
+.hrootslider-label{font-size:9.5px;
   color:var(--muted);white-space:nowrap;margin-bottom:1px}
 .hroot-btn{width:22px;height:22px;padding:0;border:1px solid var(--line);
   border-radius:5px;background:var(--bg);color:var(--ink);font-size:14px;
@@ -821,7 +822,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
    number on this toolbar (`#hzoomlabel`) *is* a percentage. Direction and
    view-switcher groups need no such label; their own button text
    ("← In", "Out →", "Modules") already says what they do. */
-.hctl-label{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+.hctl-label{font-size:11.5px;
   color:var(--muted);align-self:center}
 .hview-toggle{display:flex;gap:0;border:1px solid var(--line);border-radius:7px;overflow:hidden}
 .hview-toggle button{border:none;border-radius:0;padding:4px 10px;font-size:12.5px}
@@ -837,18 +838,18 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 .hview-toggle button.plugin-gated::after{content:"\1F50C";font-size:9.5px;margin-left:3px;opacity:.85}
 .hview-toggle button.plugin-gated.active{background:var(--ext);color:var(--bg);font-weight:600}
 .anview-group{display:flex;align-items:stretch;border-left:1px solid var(--line)}
-.anview-group-label{align-self:center;padding:0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.anview-group-label{align-self:center;padding:0 8px;font-size:11px;color:var(--muted)}
 .anview-group-label+button{border-left:1px solid var(--line)}
 .hnode.t-class .hnm{color:var(--mod)}
 .hnode.t-alias .hnm{color:var(--ns)}
-.hnode .hkind{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:1px}
+.hnode .hkind{font-size:9.5px;color:var(--muted);margin-top:1px}
 /* --- Stats grid + module-scope symbols in the detail pane --------------- */
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px;
   margin-bottom:6px}
 .stat{border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--panel)}
 .stat b{display:block;font-size:15px;font-weight:650;font-family:var(--mono)}
 .stat span{font-size:10.5px;color:var(--muted)}
-.sec .sub{text-transform:none;letter-spacing:0;font-weight:400;font-size:10.5px}
+.sec .sub{font-weight:400;font-size:10.5px}
 .lst.syms li{padding:4px 0;color:var(--ink)}
 .sdet{color:var(--muted);font-size:11.5px;font-family:var(--mono)}
 .bd.sk-table{color:var(--mod);border-color:var(--mod)}
@@ -859,7 +860,7 @@ details>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 /* --- Quicks ------------------------------------------------------------- */
 .qk-wrap{padding:18px 24px;max-width:1100px}
 .qk-col{margin-bottom:22px}
-.qk-h{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+.qk-h{font-size:12.5px;color:var(--muted);
   margin-bottom:9px}
 .qk{border:1px solid var(--line);border-left-width:3px;border-radius:8px;background:var(--panel);
   padding:11px 14px;margin-bottom:8px}
@@ -1016,7 +1017,7 @@ li:hover>.marki,tr:hover .marki{opacity:.8}
 .sd-body{flex-basis:100%;max-height:40vh;overflow-y:auto;border-top:1px solid var(--line);padding-top:8px}
 .sd-body[hidden]{display:none}
 .sd-sec{margin-bottom:10px}
-.sd-sec-t{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.sd-sec-t{font-size:11px;font-weight:600}
 .sd-sec ul{list-style:none;margin:4px 0 0;padding:0;font-family:var(--mono);font-size:12px;line-height:1.7}
 .sd-n,.sd-under,.sd-more{color:var(--muted);font-weight:400}
 .sd-gone{color:var(--muted);text-decoration:line-through}

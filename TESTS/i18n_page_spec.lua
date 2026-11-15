@@ -156,6 +156,29 @@ return function(H)
   ok(texts >= 80, "the walk saw the texts of the chrome (got " .. texts .. ")")
   ok(attrs >= 20, "and its tooltips and labels (got " .. attrs .. ")")
 
+  -- ── No case change in the stylesheet ─────────────────────────────────────
+  -- Catalog text carries its own case (docs/i18n.md, "What is translated"): `text-transform` would upper-case a
+  -- German or a Turkish label by English rules. The severity is the one exception, the subject as the report
+  -- spells it.
+  local css = require("docmap.core.render.html.css")
+  local SUBJECT_CASE = { [".sev"] = true }
+  local transforms = 0
+  for selector, decls in css:gsub("/%*.-%*/", ""):gmatch("([^{}]+){([^{}]*)}") do
+    local value = decls:match("text%-transform%s*:%s*([%w-]+)")
+    if value then
+      transforms = transforms + 1
+      selector = vim.trim(selector)
+      ok(
+        SUBJECT_CASE[selector] ~= nil,
+        ("the stylesheet changes the case of %s (text-transform:%s): write the label in its case in the catalog"):format(
+          selector,
+          value
+        )
+      )
+    end
+  end
+  eq(transforms, 1, "the walk over the stylesheet found the one rule it allows")
+
   -- ── Keys of the script, and no dead text ─────────────────────────────────
   local src = H.html_source()
   for key in src:gmatch('"(page%.[%w_.-]*[%w_-])"') do
