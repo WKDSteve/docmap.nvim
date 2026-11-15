@@ -242,7 +242,19 @@ function GATES.standalone()
     if artifact then
       artifact:close()
     end
-    local marker = text:match("‹missing:[^›]*›")
+    -- A marker with a real key in it. The page carries this repository's own documents, and `docs/i18n.md`
+    -- shows the marker as an example (`‹missing:key›`): a key starts with one of the catalog's namespaces.
+    local marker
+    for key in text:gmatch("‹missing:([%w_.-]+)›") do
+      local namespace = key:match("^(%l+)%.")
+      if
+        namespace
+        and ({ finding = 1, report = 1, check = 1, editor = 1, health = 1, cli = 1, page = 1 })[namespace]
+      then
+        marker = "‹missing:" .. key .. "›"
+        break
+      end
+    end
     -- A finding without its template is the check's own name in angle brackets and its parameters: at the
     -- head of a table cell in overview.md, at the head of a `message` in the data of the page.
     local bare = name == "overview.md" and text:match("| <([%l][%l%-%.]+)>[ |]")
