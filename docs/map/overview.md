@@ -3,7 +3,7 @@
 > **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**7 modules** · 8 namespaces · 155 helper files
+**8 modules** · 8 namespaces · 156 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
@@ -18,6 +18,7 @@ flowchart LR
   nlua_docmap_bindings_usrcmds["usrcmdsbr/smallThe user commands: `:DocMap` and…/small"]
   nlua_docmap_config["configbr/smallResolving a full `Docmap.Opts` for a…/small"]
   nlua_docmap_core["core"]
+  nlua_docmap_core_i18n["i18nbr/smallThe interface catalog: one JSON file per…/small"]
   nlua_docmap_core_lang["lang"]
   nlua_docmap_core_render["render"]
   nlua_docmap_editor["editor"]
@@ -29,6 +30,7 @@ flowchart LR
   nlua_docmap_bindings --> nlua_docmap_bindings_usrcmds
   nlua_docmap --> nlua_docmap_config
   nlua_docmap --> nlua_docmap_core
+  nlua_docmap_core --> nlua_docmap_core_i18n
   nlua_docmap_core --> nlua_docmap_core_lang
   nlua_docmap_core --> nlua_docmap_core_render
   nlua_docmap --> nlua_docmap_editor
@@ -78,6 +80,7 @@ flowchart LR
   nlua_docmap_core_findings_lua["docmap.core.findings"]
   nlua_docmap_core_functions_lua["docmap.core.functions"]
   nlua_docmap_core_history_lua["docmap.core.history"]
+  nlua_docmap_core_i18n["docmap.core.i18n"]
   nlua_docmap_core_json_lua["docmap.core.json"]
   nlua_docmap_core_lang["lang"]
   nlua_docmap_core_lang_registry_lua["docmap.core.lang_registry"]
@@ -121,6 +124,7 @@ flowchart LR
   nlua_docmap_bindings_diagnostics_lua --> nlua_docmap_core_findings_lua
   nlua_docmap_bindings_docs_lua --> nlua_docmap_bindings_autocmds_lua
   nlua_docmap_bindings_docs_lua --> nlua_docmap_editor_browse
+  nlua_docmap_bindings_keymaps_lua --> nlua_docmap_core_i18n
   nlua_docmap_bindings_progress_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_bindings_progress_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_config_DEFAULTS_lua
@@ -135,6 +139,7 @@ flowchart LR
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_find_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_findings_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_history_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_i18n
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_telemetry_join_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_core_telemetry_self_lua
@@ -143,6 +148,7 @@ flowchart LR
   nlua_docmap_bindings_usrcmds --> nlua_docmap_editor_pick_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_editor_registry_lua
   nlua_docmap_bindings_usrcmds --> nlua_docmap_editor_serve_lua
+  nlua_docmap_config_file_lua --> nlua_docmap_core_i18n
   nlua_docmap_config_file_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_annotate_lua --> nlua_docmap_core_check_lua
   nlua_docmap_core_annotate_lua --> nlua_docmap_core_safe_fs_lua
@@ -167,6 +173,7 @@ flowchart LR
   nlua_docmap_core_check_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_scopes_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_core_check_policy_lua --> nlua_docmap_core_i18n
   nlua_docmap_core_checklist_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_churn_lua --> nlua_docmap_core_telemetry_join_lua
   nlua_docmap_core_cli_lua --> nlua_docmap_core_artifact_lua
@@ -175,6 +182,7 @@ flowchart LR
   nlua_docmap_core_cli_lua --> nlua_docmap_core_diff_lua
   nlua_docmap_core_cli_lua --> nlua_docmap_core_doccoverage_lua
   nlua_docmap_core_cli_lua --> nlua_docmap_core_findings_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_i18n
   nlua_docmap_core_cli_lua --> nlua_docmap_core_lang_registry_lua
   nlua_docmap_core_cli_lua --> nlua_docmap_core_render
   nlua_docmap_core_cli_lua --> nlua_docmap_core_safe_fs_lua
@@ -194,6 +202,7 @@ flowchart LR
   nlua_docmap_core_endpoint_coverage_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_core_features_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_find_lua --> nlua_docmap_core_check_lua
+  nlua_docmap_core_findings_lua --> nlua_docmap_core_i18n
   nlua_docmap_core_functions_lua --> nlua_docmap_core_bindings_lua
   nlua_docmap_core_functions_lua --> nlua_docmap_core_calls_lua
   nlua_docmap_core_functions_lua --> nlua_docmap_core_deps_lua
@@ -216,6 +225,7 @@ flowchart LR
   nlua_docmap_core_render --> nlua_docmap_core_docs_lua
   nlua_docmap_core_render --> nlua_docmap_core_endpoints_lua
   nlua_docmap_core_render --> nlua_docmap_core_findings_lua
+  nlua_docmap_core_render --> nlua_docmap_core_i18n
   nlua_docmap_core_render --> nlua_docmap_core_json_lua
   nlua_docmap_core_render --> nlua_docmap_core_lang_registry_lua
   nlua_docmap_core_render --> nlua_docmap_core_layers_lua
@@ -249,6 +259,7 @@ flowchart LR
   nlua_docmap_editor_browse --> nlua_docmap_core_deps_lua
   nlua_docmap_editor_browse --> nlua_docmap_core_endpoint_coverage_lua
   nlua_docmap_editor_browse --> nlua_docmap_core_history_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_i18n
   nlua_docmap_editor_browse --> nlua_docmap_core_lang_registry_lua
   nlua_docmap_editor_browse --> nlua_docmap_core_loaded_diff_lua
   nlua_docmap_editor_browse --> nlua_docmap_core_rules_join_lua
@@ -264,12 +275,15 @@ flowchart LR
   nlua_docmap_editor_callhierarchy_lua --> nlua_docmap_core_telemetry_join_lua
   nlua_docmap_editor_command_lua --> nlua_docmap_bindings_usrcmds
   nlua_docmap_editor_command_lua --> nlua_docmap_core_find_lua
+  nlua_docmap_editor_health_lua --> nlua_docmap_core_i18n
   nlua_docmap_editor_health_lua --> nlua_docmap_core_lang_registry_lua
   nlua_docmap_editor_health_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_editor_health_lua --> nlua_docmap_core_safe_out_dir_lua
   nlua_docmap_editor_health_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_editor_pick_lua --> nlua_docmap_core_i18n
   nlua_docmap_editor_pick_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_editor_registry_lua --> nlua_docmap_bindings_diagnostics_lua
+  nlua_docmap_editor_registry_lua --> nlua_docmap_core_i18n
   nlua_docmap_editor_registry_lua --> nlua_docmap_core_render
   nlua_docmap_editor_registry_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_editor_registry_lua --> nlua_docmap_core_telemetry_join_lua
@@ -295,6 +309,7 @@ flowchart LR
 | &nbsp;&nbsp;`docmap.bindings.usrcmds` | The user commands: `:DocMap` and `:DocBrowse` — registration, argument dispatch and completion. | 7 | [README](../../lua/docmap/bindings/usrcmds/README.md) · [src](../../lua/docmap/bindings/usrcmds/init.lua) |
 | `docmap.config` | Resolving a full `Docmap.Opts` for a repository: the defaults in [`DEFAULTS.lua`](../../lua/docmap/config/DEFAULTS.lua), what can be derived from `root`, and the merge rule every… | 7 | [README](../../lua/docmap/config/README.md) · [src](../../lua/docmap/config/init.lua) |
 | `core` |  |  | [README](../../lua/docmap/core/README.md) |
+| &nbsp;&nbsp;`docmap.core.i18n` | The interface catalog: one JSON file per locale, and the Lua `t(key, params)` that reads it. | 19 | [src](../../lua/docmap/core/i18n/init.lua) |
 | &nbsp;&nbsp;`lang` |  |  |  |
 | &nbsp;&nbsp;&nbsp;&nbsp;`glossary` |  |  |  |
 | &nbsp;&nbsp;`render` |  |  |  |
