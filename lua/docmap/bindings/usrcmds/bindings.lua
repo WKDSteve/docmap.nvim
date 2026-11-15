@@ -24,6 +24,7 @@
 --- in `opts.bindings.wrappers`. An empty result for a file that visibly
 --- binds keys almost always means the wrapper is not declared.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -106,12 +107,7 @@ function M.run(ctx)
   end
 
   if #all == 0 then
-    ctx.notify.info(
-      "No keymaps, user commands or autocmds found. The vim.* APIs are always "
-        .. "recognized; a config binding through its own helper (map(...), "
-        .. "usercmd.create(...)) must declare it in opts.bindings.wrappers — "
-        .. "see :help docmap-bindings."
-    )
+    ctx.notify.info(i18n.t("editor.bindings.none"))
     return
   end
 
@@ -150,13 +146,13 @@ function M.run(ctx)
   list.qf(items, "docmap bindings")
 
   ctx.notify.info(
-    ("%d keymap(s), %d command(s), %d autocmd(s) across %d file(s)%s"):format(
-      counts.keymap,
-      counts.usercmd,
-      counts.autocmd,
-      nfiles,
-      ndup > 0 and ("  ·  %d bound more than once"):format(ndup) or ""
-    )
+    i18n.t(ndup > 0 and "editor.bindings.summary-duplicates" or "editor.bindings.summary", {
+      keymaps = ("%d"):format(counts.keymap),
+      commands = ("%d"):format(counts.usercmd),
+      autocmds = ("%d"):format(counts.autocmd),
+      files = nfiles,
+      duplicates = ndup,
+    })
   )
 end
 

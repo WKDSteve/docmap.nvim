@@ -20,6 +20,8 @@
 --- all that was wanted; `:DocMapAll full` / `:DocMapAllFull` opts back into
 --- the old always-enriched behavior explicitly.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---@param ctx Docmap.Bindings.Ctx
@@ -27,7 +29,7 @@ local M = {}
 function M.run(ctx, full)
   local cfg = ctx.generate_all
   if not cfg or not cfg.projects or #cfg.projects == 0 then
-    ctx.notify.warn("opts.generate_all.projects is not configured -- nothing to generate for")
+    ctx.notify.warn(i18n.t("editor.generate-all.not-configured"))
     return
   end
 
@@ -36,9 +38,9 @@ function M.run(ctx, full)
   local progress = require("docmap.bindings.progress").create(ctx, "generating maps", total)
 
   ctx.notify.info(
-    ("Generating %d project map(s) asynchronously%s..."):format(
-      total,
-      full and " (full: LuaLS enrichment)" or ""
+    i18n.t(
+      full and "editor.generate-all.started-full" or "editor.generate-all.started",
+      { count = total }
     )
   )
   docmap.generate_all.run(cfg.projects, {
@@ -62,9 +64,11 @@ function M.run(ctx, full)
       end
 
       if #failed > 0 then
-        ctx.notify.error("Finished with errors:\n\n" .. table.concat(failed, "\n\n"))
+        ctx.notify.error(
+          i18n.t("editor.generate-all.failed", { errors = table.concat(failed, "\n\n") })
+        )
       else
-        ctx.notify.info(("All %d project map(s) generated"):format(total))
+        ctx.notify.info(i18n.t("editor.generate-all.done", { count = total }))
       end
     end,
   })
@@ -98,7 +102,7 @@ function M.autoload(cfg, notify)
     return
   end
 
-  notify.info(("Generating %d project map(s) that do not exist yet..."):format(#missing))
+  notify.info(i18n.t("editor.generate-all.autoload-started", { count = #missing }))
   require("docmap").generate_all.run(missing, {
     on_done = function(results)
       ---@type string[]
@@ -109,9 +113,11 @@ function M.autoload(cfg, notify)
         end
       end
       if #failed > 0 then
-        notify.error("Autoload finished with errors:\n\n" .. table.concat(failed, "\n\n"))
+        notify.error(
+          i18n.t("editor.generate-all.autoload-failed", { errors = table.concat(failed, "\n\n") })
+        )
       else
-        notify.info(("Autoload: generated %d missing project map(s)"):format(#missing))
+        notify.info(i18n.t("editor.generate-all.autoload-done", { count = #missing }))
       end
     end,
   })

@@ -42,6 +42,7 @@
 --- with a synchronous flush on `VimLeavePre`, because the debounce timer is
 --- exactly the thing that does not survive quitting.
 
+local i18n = require("docmap.core.i18n")
 local debounce = require("lib.nvim.debounce")
 local mkdirp = require("lib.nvim.fs.mkdirp")
 local trail = require("docmap.editor.browse.trail")
@@ -374,10 +375,10 @@ end
 function M.save_named(root, name)
   name = vim.trim(name or "")
   if name == "" then
-    return false, "a trail needs a name"
+    return false, i18n.t("editor.browse.trail.needs-name")
   end
   if trail.count(root) == 0 then
-    return false, "nothing pinned to save"
+    return false, i18n.t("editor.browse.trail.nothing-to-save")
   end
   entry(root).saved[name] = trail.snapshot(root)
   dirty[root] = true

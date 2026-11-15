@@ -6,6 +6,8 @@
 --- click it" requires an origin, and an origin requires a server. See
 --- `editor/serve.lua` for the security and lifecycle rules that come with it.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---@param ctx Docmap.Bindings.Ctx
@@ -16,14 +18,14 @@ function M.run(ctx, arg)
 
   if sub == "stop" then
     if serve.stop() then
-      ctx.notify.info("Map server stopped.")
+      ctx.notify.info(i18n.t("editor.serve.stopped"))
     else
-      ctx.notify.info("No map server was running.")
+      ctx.notify.info(i18n.t("editor.serve.not-running"))
     end
     return
   end
   if sub ~= "" then
-    ctx.notify.warn(("Unknown serve argument '%s' (expected nothing or 'stop')."):format(sub))
+    ctx.notify.warn(i18n.t("editor.serve.unknown-argument", { argument = sub }))
     return
   end
 
@@ -32,7 +34,7 @@ function M.run(ctx, arg)
   local before = serve.info()
   local url, err = serve.start(ctx.cfg)
   if not url then
-    ctx.notify.warn("Could not start the map server: " .. tostring(err))
+    ctx.notify.warn(i18n.t("editor.serve.start-failed", { error = tostring(err) }))
     return
   end
 
@@ -45,14 +47,16 @@ function M.run(ctx, arg)
   -- as a broken map rather than as the wrong repository.
   local state
   if not before then
-    state = "Map server listening at %s for %s"
+    state = "listening"
   elseif (before.root or ""):gsub("\\", "/"):gsub("/+$", "") == root then
-    state = "Map server already running at %s for %s"
+    state = "already-running"
   else
-    state = "Map server moved to %s for %s (it was serving another repository)"
+    state = "moved"
   end
 
-  ctx.notify.info(state:format(url, repo) .. "  (:" .. ctx.command_name .. " serve stop to close)")
+  ctx.notify.info(
+    i18n.t("editor.serve.state." .. state, { url = url, repo = repo, command = ctx.command_name })
+  )
 end
 
 return M

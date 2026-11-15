@@ -16,6 +16,7 @@
 
 local notify = require("lib.nvim.notify").create("[docmap]")
 local autocmd = require("lib.nvim.bindings.autocmd")
+local i18n = require("docmap.core.i18n")
 
 local M = {}
 
@@ -82,7 +83,7 @@ local function notify_watchers(entry)
     local ok, err = pcall(cb, entry.ir, entry.findings)
     if not ok then
       vim.schedule(function()
-        notify.warn("on_change subscriber errored: " .. tostring(err))
+        notify.warn(i18n.t("editor.on-change.subscriber-errored", { error = tostring(err) }))
       end)
     end
   end

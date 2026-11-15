@@ -32,6 +32,7 @@
 --- causes out loud because the user asked for telemetry there; here they would
 --- be an answer to a question nobody asked.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -84,11 +85,13 @@ function M.run(ctx, arg)
     }, { cwd = ctx.cfg.root, text = true })
     :wait()
   if dproc.code ~= 0 then
-    ctx.notify.warn(("Cannot diff against %s: %s"):format(ref, vim.trim(dproc.stderr or "")))
+    ctx.notify.warn(
+      i18n.t("editor.impact.cannot-diff", { ref = ref, error = vim.trim(dproc.stderr or "") })
+    )
     return
   end
   if vim.trim(dproc.stdout or "") == "" then
-    ctx.notify.info(("Nothing changed since %s (outside %s)."):format(ref, out_dir))
+    ctx.notify.info(i18n.t("editor.impact.unchanged", { ref = ref, out_dir = out_dir }))
     return
   end
 
@@ -123,39 +126,34 @@ function M.run(ctx, arg)
 
   if #result.touched == 0 then
     ctx.notify.info(
-      ("%d file(s) changed since %s, but no scanned function was touched."):format(
-        #result.files,
-        ref
-      )
+      i18n.t("editor.impact.no-function-touched", { files = #result.files, ref = ref })
     )
   else
     -- How many of the touched functions telemetry could speak for at all.
     -- Without it the ranking would be read as a claim about every row, and
     -- the rows it cannot speak for are at the bottom looking like cold code
     -- rather than like unmeasured code. Counted rather than implied.
-    local measured = ""
+    local measured
     if reach then
-      local n = 0
+      measured = 0
       for _, t in ipairs(result.touched) do
         if reach[t.node .. "#" .. t.fn] then
-          n = n + 1
+          measured = measured + 1
         end
       end
-      measured = ("  ·  %d of them measured, ranked by your sessions"):format(n)
     end
 
-    ctx.notify.info(
-      ("%d function(s) touched · %d caller module(s) · %d impacted transitively%s%s"):format(
-        #result.touched,
-        #result.calling_modules,
-        #result.impacted_modules,
-        -- Said out loud rather than implied: an approximated span means the
-        -- attribution over-reaches into the gaps between functions, and a
-        -- reader deserves to know which kind of answer this is.
-        result.approximate and "  (spans approximated — pre-line_end artifact)" or "",
-        measured
-      )
-    )
+    -- Said out loud rather than implied: an approximated span means the
+    -- attribution over-reaches into the gaps between functions, and a
+    -- reader deserves to know which kind of answer this is.
+    local variant = (result.approximate and "-approximate" or "")
+      .. (measured and "-measured" or "")
+    ctx.notify.info(i18n.t("editor.impact.summary" .. variant, {
+      touched = #result.touched,
+      callers = #result.calling_modules,
+      impacted = #result.impacted_modules,
+      measured = measured,
+    }))
   end
   vim.cmd("copen")
 end

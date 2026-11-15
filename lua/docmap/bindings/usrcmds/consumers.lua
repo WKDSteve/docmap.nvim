@@ -13,6 +13,8 @@
 --- repositories live instead would take minutes and would still only cover
 --- the ones present on this machine.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---@param ctx Docmap.Bindings.Ctx
@@ -26,7 +28,7 @@ function M.run(ctx, arg)
   dir = (dir:gsub("\\", "/"):gsub("/+$", ""))
 
   if vim.fn.isdirectory(dir) == 0 then
-    ctx.notify.warn("Not a directory: " .. dir)
+    ctx.notify.warn(i18n.t("editor.consumers.not-a-directory", { dir = dir }))
     return
   end
 
@@ -34,9 +36,7 @@ function M.run(ctx, arg)
   local maps, skipped = consumers.load(dir, root)
 
   if #maps == 0 then
-    ctx.notify.warn(
-      ("No committed maps found under %s (looked for */docs/map/module_map.json)"):format(dir)
-    )
+    ctx.notify.warn(i18n.t("editor.consumers.no-maps", { dir = dir }))
     return
   end
 
@@ -55,14 +55,12 @@ function M.run(ctx, arg)
   vim.bo[buf].swapfile = false
   pcall(vim.api.nvim_buf_set_name, buf, "docmap-consumers.md")
 
-  ctx.notify.info(
-    ("%d used externally, %d internally, %d referenced by nobody (%d maps)"):format(
-      index.counts.external,
-      index.counts.internal,
-      index.counts.unreferenced,
-      index.maps
-    )
-  )
+  ctx.notify.info(i18n.t("editor.consumers.summary", {
+    external = ("%d"):format(index.counts.external),
+    internal = ("%d"):format(index.counts.internal),
+    unreferenced = ("%d"):format(index.counts.unreferenced),
+    maps = ("%d"):format(index.maps),
+  }))
 end
 
 return M

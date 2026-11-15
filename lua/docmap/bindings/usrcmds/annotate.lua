@@ -9,6 +9,7 @@
 --- it to `<path>.annot.lua` next to the original instead, for review before
 --- merging it in by hand.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 local progress = require("docmap.bindings.progress")
 
@@ -34,7 +35,7 @@ local function parse_flags(arg)
     elseif token == "--dry-run" then
       force_dry_run = true
     elseif token ~= "" then
-      return nil, "Unknown flag: " .. token .. " (expected --write, --sidecar or --dry-run)"
+      return nil, i18n.t("editor.annotate.unknown-flag", { flag = token })
     end
   end
   if force_dry_run then
@@ -100,7 +101,7 @@ function M.run(ctx, arg)
   local ir = ctx.handle.ir()
   local candidates = annotate.candidates(ir)
   if #candidates == 0 then
-    ctx.notify.info("Every file already declares ---@module. Nothing to annotate.")
+    ctx.notify.info(i18n.t("editor.annotate.nothing-to-do"))
     return
   end
 
@@ -130,12 +131,12 @@ function M.run(ctx, arg)
     if handle then
       handle:finish(("%d file(s) annotated"):format(#written))
     end
+    -- One sentence per outcome, not a sentence with two optional clauses: a translation has to be able to
+    -- move "failed" to wherever its grammar wants it.
+    local variant = (write_mode == "sidecar" and "sidecar" or "in-place")
+      .. (#failed > 0 and "-failed" or "")
     ctx.notify.info(
-      ("%d file(s) annotated (%s)%s. Run :DocMap to refresh the map."):format(
-        #written,
-        write_mode == "sidecar" and "sidecar *.annot.lua" or "written in place",
-        #failed > 0 and (", %d failed"):format(#failed) or ""
-      )
+      i18n.t("editor.annotate.done." .. variant, { count = #written, failed = #failed })
     )
   end
 
@@ -191,11 +192,7 @@ function M.run(ctx, arg)
         handle:finish(("%d file(s) missing ---@module"):format(#plans))
       end
       preview(plans)
-      ctx.notify.info(
-        ("%d file(s) missing ---@module — preview only. :DocMap annotate --write to apply, --sidecar for *.annot.lua files instead."):format(
-          #plans
-        )
-      )
+      ctx.notify.info(i18n.t("editor.annotate.preview", { count = #plans }))
       return
     end
 

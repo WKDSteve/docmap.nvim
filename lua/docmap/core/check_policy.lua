@@ -37,6 +37,8 @@
 --- would produce a list that no longer agrees with its own ordering, and two
 --- runs could disagree on which of two equal-ranked findings came first.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---Every check code this repository raises, as a set.
@@ -125,17 +127,13 @@ function M.validate(policy, notify)
     -- `extra_checks` codes legitimately land here, and calling a project's
     -- own check unknown would be telling it that its own code is a typo.
     notify.warn(
-      ("opts.checks: not a check docmap.nvim raises: %s  (an extra_checks code is fine here; a typo is not)"):format(
-        table.concat(unknown_code, ", ")
-      )
+      i18n.t("report.config.checks-unknown", { codes = table.concat(unknown_code, ", ") })
     )
   end
   if #bad_value > 0 then
     table.sort(bad_value)
     notify.warn(
-      ("opts.checks: expected false, or one of error/warn/info: %s"):format(
-        table.concat(bad_value, ", ")
-      )
+      i18n.t("report.config.checks-bad-value", { entries = table.concat(bad_value, ", ") })
     )
   end
 end

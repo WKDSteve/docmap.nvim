@@ -49,6 +49,8 @@
 --- either. That lookup is keyed by the label, which is safe because the
 --- labels are unique — measured, not assumed: 913 entries, 0 collisions.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 local soft_require = require("docmap.core.soft_require")
@@ -94,7 +96,10 @@ end
 ---@param notify table
 local function jump(entry, notify)
   if not entry or not entry.file then
-    notify.warn(("%s has no file to open"):format(entry and entry.text or "that"))
+    notify.warn(
+      entry and i18n.t("editor.pick.no-file", { entry = entry.text })
+        or i18n.t("editor.pick.no-file-unknown")
+    )
     return
   end
   vim.cmd.edit(vim.fn.fnameescape(entry.file))
@@ -112,7 +117,7 @@ function M.run(ctx)
   local ir = ctx.handle and ctx.handle.ir()
   if not ir or not ir.order or #ir.order == 0 then
     ctx.notify.warn(
-      "nothing scanned here yet — run :" .. (ctx.command_name or "DocMap") .. " first"
+      i18n.t("editor.pick.nothing-scanned", { command = ctx.command_name or "DocMap" })
     )
     return
   end
@@ -120,7 +125,7 @@ function M.run(ctx)
   local root = ctx.cfg.root:gsub("\\", "/"):gsub("/+$", "")
   local items = M.entries(ir, root)
   if #items == 0 then
-    ctx.notify.info("the map is empty — nothing to pick")
+    ctx.notify.info(i18n.t("editor.pick.empty"))
     return
   end
 

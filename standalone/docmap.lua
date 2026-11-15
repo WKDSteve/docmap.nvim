@@ -40,18 +40,11 @@ local root = (arg[1] or "."):gsub("\\", "/"):gsub("/+$", "")
 -- would have rewritten a user's `docs/map` on every fetch.
 --
 -- A flag in root position is the one probe that is safe against both
--- versions: an older binary rejects it immediately below, before doing any
+-- versions: an older binary rejects it with its usage line, before doing any
 -- work, and a newer one answers after its dependencies are on the path. So
 -- "this engine has no capabilities" and "this engine is too old" are a
 -- single observation, which is what a host actually needs.
 local capabilities_only = (root == "--capabilities")
-
-if not capabilities_only and root:sub(1, 1) == "-" then
-  io.stderr:write(
-    "standalone/docmap.lua: usage: lua standalone/docmap.lua <root> [--source=...] [--check] [--lenient]\n"
-  )
-  os.exit(2)
-end
 
 -- this file lives at <repo>/standalone/docmap.lua; its own repo root is
 -- always on package.path so `docmap.*` resolves regardless of the
@@ -157,6 +150,30 @@ ensure_soft("runtime-analysis.telemetry", "runtime-analysis.nvim")
 -- without it answers those routes with a reason and says so in `--capabilities` (`rules` is absent there), rather
 -- than refusing to start for a dependency only one tab of the app needs.
 ensure_soft("rules.settings", "rules.nvim")
+
+-- The language of everything below, decided before the first line is printed: the usage line, and the warnings
+-- `config.build` hands to `notify`. `--locale=`, then `$DOCMAP_LOCALE`, else English, and never `$LANG`: hosts
+-- and CI scripts read this output as text (`docs/i18n.md`, "Choosing a language"). The flag is looked for in
+-- every position, the root's included, and stays in `argv`: `core/cli.run` reads it again, which is idempotent.
+local i18n = require("docmap.core.i18n")
+do
+  ---@type string?
+  local locale_flag
+  for i = 1, #arg do
+    local a = arg[i]
+    if a:match("^%-%-locale=") then
+      locale_flag = a:sub(#"--locale=" + 1)
+    end
+  end
+  i18n.configure({ locale = i18n.resolve(locale_flag, os.getenv("DOCMAP_LOCALE")) })
+end
+
+-- Below the dependency search rather than above it since the usage line comes out of the catalog, which is
+-- only reachable once this repository's `lua/` is on the path. Still before any work is done.
+if not capabilities_only and root:sub(1, 1) == "-" then
+  io.stderr:write(i18n.t("cli.usage") .. "\n")
+  os.exit(2)
+end
 
 -- What a host asks before trusting this binary with anything else.
 --
@@ -320,7 +337,7 @@ end
 --- fake would be claiming a contract this file does not honour.
 local notify = {
   warn = function(msg)
-    io.stderr:write("docmap: " .. tostring(msg) .. "\n")
+    io.stderr:write(i18n.t("cli.warning", { message = tostring(msg) }) .. "\n")
   end,
 }
 

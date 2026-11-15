@@ -14,6 +14,7 @@
 --- current, which is the "is this ledger healthy" view rather than the "what
 --- do I do now" one.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -48,7 +49,7 @@ end
 ---@param ms integer
 ---@return string
 local function timed_out_msg(ms)
-  return ("git log did not finish within %ds"):format(math.floor(ms / 1000))
+  return i18n.t("editor.git-log.timed-out", { seconds = ("%d"):format(math.floor(ms / 1000)) })
 end
 
 ---Collect `path -> ISO commit dates` for every path in the repository.
@@ -96,7 +97,11 @@ local function commit_dates(cwd, out_dir, cb, cfg)
         local stderr = vim.trim(proc.stderr or "")
         -- A timeout kill surfaces as a non-zero exit with no stderr; keep the
         -- old wording for that case so the message stays recognisable.
-        cb(nil, stderr ~= "" and ("git log failed: " .. stderr) or timed_out_msg(timeout))
+        cb(
+          nil,
+          stderr ~= "" and i18n.t("editor.git-log.failed", { error = stderr })
+            or timed_out_msg(timeout)
+        )
         return
       end
       cb(require("docmap.core.checklist").parse_history(proc.stdout or ""), nil)
@@ -152,10 +157,7 @@ function M.run(ctx, arg)
   local ledger = ir.checklist
 
   if not ledger then
-    ctx.notify.info(
-      "No checklist in this repository. Create docs/CHECKLIST/*.md (or docs/CHECKLIST.md) "
-        .. "— see docs/checklist_format.md."
-    )
+    ctx.notify.info(i18n.t("editor.checklist.none"))
     return
   end
 
@@ -168,7 +170,7 @@ function M.run(ctx, arg)
       progress:finish(err or "history read")
     end
     if not dates then
-      ctx.notify.warn(err or "could not read history")
+      ctx.notify.warn(err or i18n.t("editor.checklist.history-unreadable"))
       return
     end
 
@@ -200,12 +202,10 @@ function M.run(ctx, arg)
     end
 
     if #items == 0 then
-      ctx.notify.info(
-        ("Checklist clean: %d item(s), %d verified against a citation, nothing stale."):format(
-          ledger.total,
-          ledger.cited
-        )
-      )
+      ctx.notify.info(i18n.t("editor.checklist.clean", {
+        total = ("%d"):format(ledger.total),
+        cited = ("%d"):format(ledger.cited),
+      }))
       return
     end
 
@@ -217,9 +217,11 @@ function M.run(ctx, arg)
         ledger.total
       )
     )
-    ctx.notify.info(
-      ("%d stale, %d unverified, of %d item(s)."):format(stale, unverified, ledger.total)
-    )
+    ctx.notify.info(i18n.t("editor.checklist.summary", {
+      stale = ("%d"):format(stale),
+      unverified = ("%d"):format(unverified),
+      total = ("%d"):format(ledger.total),
+    }))
   end, ctx.cfg)
 end
 

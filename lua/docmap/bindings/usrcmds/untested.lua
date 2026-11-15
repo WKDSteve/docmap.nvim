@@ -26,6 +26,7 @@
 ---
 --- So this reports, and never fails anything.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -35,9 +36,7 @@ function M.run(ctx)
   local join = require("docmap.core.telemetry_join")
   local namespace = join.namespace(ctx.cfg)
   if not namespace then
-    ctx.notify.info(
-      "No telemetry namespace for this tree — set opts.title (or opts.telemetry_namespace)."
-    )
+    ctx.notify.info(i18n.t("editor.untested.no-namespace"))
     return
   end
 
@@ -47,9 +46,7 @@ function M.run(ctx)
     -- for all three and naming which one would mean asking three further
     -- questions to find out: not installed, never enabled, nothing recorded.
     ctx.notify.info(
-      ("No telemetry recorded for %q — this needs runtime-analysis.nvim collecting "):format(
-        namespace
-      ) .. "in the sessions that ran this code. Nothing is wrong with the map."
+      i18n.t("editor.untested.no-telemetry", { namespace = ("%q"):format(namespace) })
     )
     return
   end
@@ -63,8 +60,7 @@ function M.run(ctx)
     -- which is a different fact and the more likely one on a tree that has
     -- just switched telemetry on.
     ctx.notify.info(
-      ("Nothing telemetry recorded for %q is missing from a spec — "):format(namespace)
-        .. "which is also what an unmatched or empty recording looks like."
+      i18n.t("editor.untested.nothing-missing", { namespace = ("%q"):format(namespace) })
     )
     return
   end
@@ -89,13 +85,11 @@ function M.run(ctx)
   list.qf(items, ("docmap untested: %s"):format(namespace))
 
   local top = rows[1]
-  ctx.notify.info(
-    ("%d function(s) ran on this machine with no spec naming them — most-run %s (%d calls)"):format(
-      #rows,
-      (top.module or top.id) .. "." .. top.fn,
-      top.calls
-    )
-  )
+  ctx.notify.info(i18n.t("editor.untested.summary", {
+    functions = #rows,
+    ["function"] = (top.module or top.id) .. "." .. top.fn,
+    calls = ("%d"):format(top.calls),
+  }))
 end
 
 return M

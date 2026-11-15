@@ -26,6 +26,8 @@
 --- a missing argument, or any typo, silently rewrote files instead of saying
 --- anything. Only a genuinely empty argument regenerates now.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 -- `Docmap.Bindings.Ctx` is declared in `bindings/@types`.
@@ -354,12 +356,10 @@ function M.setup(opts)
       -- Validate *before* resolving a root: an unknown verb must not install a
       -- handle (a full scan) for a tree the user never got to act on.
       if not (verb and ACTIONS[verb]) then
-        notify.warn(
-          ("Unknown action '%s'. Expected one of: %s  (or no argument to regenerate)."):format(
-            verb or action,
-            table.concat(action_names(), ", ")
-          )
-        )
+        notify.warn(i18n.t("editor.command.unknown-action", {
+          action = verb or action,
+          actions = table.concat(action_names(), ", "),
+        }))
         return
       end
     end

@@ -49,6 +49,7 @@ local map = require("lib.nvim.bindings.keymap")
 -- a segment when the tree was split, and a message prefix has no business
 -- tracking that.
 local notify = require("lib.nvim.notify").create("[DocBrowse]")
+local i18n = require("docmap.core.i18n")
 local source = require("docmap.editor.browse.source")
 local trail = require("docmap.editor.browse.trail")
 local trail_store = require("docmap.editor.browse.trail_store")
@@ -141,7 +142,7 @@ local function load_commits(st, on_ready)
       st.commits_loading = nil
       if not out then
         st.commits = {}
-        notify.warn("git log failed: " .. tostring(err))
+        notify.warn(i18n.t("editor.git-log.failed", { error = tostring(err) }))
         on_ready()
         return
       end
@@ -192,7 +193,7 @@ local function load_impact(st, sha, on_ready)
     (":(exclude)%s"):format(out_dir),
   }, function(diff_text, derr)
     if not diff_text then
-      notify.warn("git show failed: " .. tostring(derr))
+      notify.warn(i18n.t("editor.browse.git-show-failed", { error = tostring(derr) }))
       st.impact = nil
       on_ready()
       return
@@ -532,7 +533,7 @@ local function pin_current(st)
     return
   end
   if e.kind == "external" then
-    notify.warn("external requires have no node to return to")
+    notify.warn(i18n.t("editor.browse.pin.external"))
     return
   end
   -- Bound to a local rather than checked in place: it is the value the label
@@ -558,7 +559,12 @@ local function pin_current(st)
   })
 
   render(st)
-  notify.info(("%s — %d pinned"):format(verb, count))
+  notify.info(
+    i18n.t(
+      verb == "pinned" and "editor.browse.pin.added" or "editor.browse.pin.removed",
+      { count = ("%d"):format(count) }
+    )
+  )
 end
 
 ---`d` — unpin the entry under the cursor, in Trail mode.
@@ -574,7 +580,9 @@ local function unpin_current(st)
   local removed = trail.remove_at(st.root, e.pin_index)
   if removed then
     render(st)
-    notify.info(("unpinned — %d left"):format(trail.count(st.root)))
+    notify.info(
+      i18n.t("editor.browse.pin.dropped", { count = ("%d"):format(trail.count(st.root)) })
+    )
   end
 end
 
@@ -589,7 +597,7 @@ local function save_trail(st)
     return
   end
   if trail.count(st.root) == 0 then
-    notify.warn("nothing pinned to save")
+    notify.warn(i18n.t("editor.browse.trail.nothing-to-save"))
     return
   end
 
@@ -599,7 +607,10 @@ local function save_trail(st)
     on_submit = function(line)
       local ok, err = trail_store.save_named(st.root, line)
       if ok then
-        notify.info(("saved %q — %d pins"):format(vim.trim(line), trail.count(st.root)))
+        notify.info(i18n.t("editor.browse.trail.saved", {
+          name = ("%q"):format(vim.trim(line)),
+          count = ("%d"):format(trail.count(st.root)),
+        }))
       else
         notify.warn(tostring(err))
       end
@@ -615,7 +626,7 @@ local function load_trail(st)
   end
   local names = trail_store.names(st.root)
   if #names == 0 then
-    notify.info("no saved trails for this repository")
+    notify.info(i18n.t("editor.browse.trail.none-saved"))
     return
   end
 
@@ -636,13 +647,16 @@ local function load_trail(st)
       local _, added, skipped = trail_store.load_named(st.root, name)
       render(st)
       if added == 0 then
-        notify.info(("%q — every pin was already in the trail"):format(name))
+        notify.info(i18n.t("editor.browse.trail.already-loaded", { name = ("%q"):format(name) }))
       else
         notify.info(
-          ("loaded %q — %d added%s"):format(
-            name,
-            added,
-            skipped > 0 and (", %d already there"):format(skipped) or ""
+          i18n.t(
+            skipped > 0 and "editor.browse.trail.loaded-skipped" or "editor.browse.trail.loaded",
+            {
+              name = ("%q"):format(name),
+              added = ("%d"):format(added),
+              skipped = ("%d"):format(skipped),
+            }
           )
         )
       end
@@ -658,7 +672,7 @@ local function delete_trail(st)
   end
   local names = trail_store.names(st.root)
   if #names == 0 then
-    notify.info("no saved trails for this repository")
+    notify.info(i18n.t("editor.browse.trail.none-saved"))
     return
   end
 
@@ -672,7 +686,7 @@ local function delete_trail(st)
       -- reader is looking at, and a key that could clear them from behind a
       -- picker would be the one destructive surprise in this whole feature.
       if trail_store.delete_named(st.root, name) then
-        notify.info(("deleted saved trail %q"):format(name))
+        notify.info(i18n.t("editor.browse.trail.deleted", { name = ("%q"):format(name) }))
       end
     end,
   })
@@ -687,7 +701,7 @@ local function goto_source(st)
   local e = selected(st) or {}
   local rel = e.source or (st.ir.nodes[st.id] or {}).source
   if not rel then
-    notify.warn("nothing to open here")
+    notify.warn(i18n.t("editor.browse.nothing-to-open"))
     return
   end
   local line = e.line
@@ -717,7 +731,7 @@ local function to_quickfix(st)
   end
 
   if #items == 0 then
-    notify.warn("nothing in this list has a source location")
+    notify.warn(i18n.t("editor.browse.no-source-locations"))
     return
   end
 
@@ -742,7 +756,7 @@ local function impact_to_quickfix(st)
   local target = (entry and entry.id) or st.id
   local hull, direct = require("docmap.core.deps").impact(st.ir, target)
   if #hull == 0 then
-    notify.info("nothing depends on this — safe to change")
+    notify.info(i18n.t("editor.browse.no-dependents"))
     return
   end
 
@@ -781,12 +795,12 @@ end
 ---@param st table
 local function show_diff(st)
   if st.mode ~= "history" or not st.sha then
-    notify.warn("gD shows a commit's diff — open one in History mode (5) first")
+    notify.warn(i18n.t("editor.browse.diff.needs-commit"))
     return
   end
   local text = st.diff_text
   if not text or vim.trim(text) == "" then
-    notify.info("that commit changed nothing outside the generated map")
+    notify.info(i18n.t("editor.browse.diff.empty"))
     return
   end
 
@@ -838,7 +852,7 @@ local function open_in_browser(st, made)
       )
       return
     end
-    notify.warn("no generated page yet — run :DocMap first")
+    notify.warn(i18n.t("editor.browse.no-page"))
     return
   end
 
@@ -876,13 +890,13 @@ end
 local function send_request(st)
   local e = selected(st)
   if not e or e.kind ~= "endpoint" then
-    notify.warn("nothing to send here")
+    notify.warn(i18n.t("editor.browse.request.nothing-to-send"))
     return
   end
 
   local runtime_analysis = require("docmap.core.soft_require").probe("runtime-analysis")
   if not runtime_analysis then
-    notify.warn("runtime-analysis.nvim is not installed — see :help docmap-endpoints")
+    notify.warn(i18n.t("editor.browse.request.no-runtime-analysis"))
     return
   end
 
@@ -1098,11 +1112,11 @@ local function lookup(st)
   local line = vim.api.nvim_buf_get_lines(st.slots.detail.bufnr, pos[1] - 1, pos[1], false)[1] or ""
   local word, span = lk.word_at(line, pos[2])
   if not span then
-    notify.info("K explains code — the cursor is in prose")
+    notify.info(i18n.t("editor.browse.lookup.in-prose"))
     return
   end
   if not word then
-    notify.info("K explains code — the cursor is on punctuation")
+    notify.info(i18n.t("editor.browse.lookup.on-punctuation"))
     return
   end
 
@@ -1110,7 +1124,12 @@ local function lookup(st)
   local gl = lk.glossary_for(path)
   if not gl then
     notify.info(
-      ("no glossary for %s"):format(path and vim.fn.fnamemodify(path, ":e") or "this entry")
+      path
+          and i18n.t(
+            "editor.browse.lookup.no-glossary",
+            { extension = vim.fn.fnamemodify(path, ":e") }
+          )
+        or i18n.t("editor.browse.lookup.no-glossary-here")
     )
     return
   end
@@ -1119,7 +1138,7 @@ local function lookup(st)
   -- The three come back together or not at all, which no annotation can say:
   -- checking `entry` alone leaves `key` and `kind` optional for the call below.
   if not entry or not key or not kind then
-    notify.info(("no glossary entry for `%s`"):format(word))
+    notify.info(i18n.t("editor.browse.lookup.no-entry", { word = word }))
     return
   end
 
@@ -1558,7 +1577,7 @@ function M.open(opts)
 
   local ir, handle, hint = source.acquire(opts)
   if not ir then
-    notify.error(hint or "could not load the map")
+    notify.error(hint or i18n.t("editor.browse.load-failed"))
     return false
   end
 
@@ -1589,7 +1608,7 @@ function M.open(opts)
     if group then
       group.close()
     end
-    notify.error("could not mount the browser layout")
+    notify.error(i18n.t("editor.browse.mount-failed"))
     return false
   end
 
@@ -1611,7 +1630,7 @@ function M.open(opts)
     if found then
       center = found
     else
-      notify.warn(("no module matching '%s' — opening at the root"):format(opts.center))
+      notify.warn(i18n.t("editor.browse.center-not-found", { name = opts.center }))
     end
   end
 

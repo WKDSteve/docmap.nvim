@@ -7,6 +7,8 @@
 --- rendering path. Keeping both here means the fragment-vs-filesystem-path
 --- rule below is stated once.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---Build the opener for `ctx`.
@@ -40,7 +42,7 @@ function M.opener(cfg, notify, command_name, generate)
         )
         return false
       end
-      notify.warn("No map generated yet — run :" .. command_name .. " first.")
+      notify.warn(i18n.t("editor.open.no-map", { command = command_name }))
       return false
     end
 

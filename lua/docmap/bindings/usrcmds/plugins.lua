@@ -11,6 +11,7 @@
 --- with no function in sight. See `core/plugins.lua`'s header for what is
 --- and is not recognized.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -71,10 +72,7 @@ function M.run(ctx)
   end
 
   if #all == 0 then
-    ctx.notify.info(
-      "No lazy.nvim-shaped plugin specs found — see :help docmap-plugins "
-        .. "for what is recognized."
-    )
+    ctx.notify.info(i18n.t("editor.plugins.none"))
     return
   end
 
@@ -114,10 +112,9 @@ function M.run(ctx)
   list.qf(items, "docmap plugins")
 
   ctx.notify.info(
-    ("%d plugin spec(s) across %d file(s)%s"):format(
-      #all,
-      nfiles,
-      ndup > 0 and ("  ·  %d repo(s) declared more than once"):format(ndup) or ""
+    i18n.t(
+      ndup > 0 and "editor.plugins.summary-duplicates" or "editor.plugins.summary",
+      { specs = #all, files = nfiles, duplicates = ndup }
     )
   )
 end

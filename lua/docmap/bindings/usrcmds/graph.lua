@@ -10,6 +10,8 @@
 --- No rendering happens here. The page's navigable state is entirely in its URL
 --- fragment, so this is `open` with a hash — see `open.lua`.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---@param ctx Docmap.Bindings.Ctx
@@ -21,11 +23,11 @@ function M.run(ctx, arg)
   -- if-chain and land on the default action, which *regenerates the
   -- artifacts*. A missing argument now says so instead of writing files.
   if not kind or kind == "" then
-    ctx.notify.warn(("Usage: :%s graph {deps|calls} [module]"):format(ctx.command_name))
+    ctx.notify.warn(i18n.t("editor.graph.usage", { command = ctx.command_name }))
     return
   end
   if kind ~= "deps" and kind ~= "calls" then
-    ctx.notify.warn("Unknown graph: " .. kind .. " (expected deps or calls)")
+    ctx.notify.warn(i18n.t("editor.graph.unknown-kind", { kind = kind }))
     return
   end
 
@@ -34,7 +36,7 @@ function M.run(ctx, arg)
   if target ~= "" then
     local found = ctx.find_node(ir, target, ctx.cfg.lua_root or "lua")
     if not found then
-      ctx.notify.warn("No module matching '" .. target .. "' in the map.")
+      ctx.notify.warn(i18n.t("editor.module.no-match", { name = target }))
       return
     end
     center = found

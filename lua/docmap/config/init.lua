@@ -20,6 +20,8 @@
 
 local DEFAULTS = require("docmap.config.DEFAULTS")
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---Every real `Docmap.Opts` field name, for the unknown-key check in
@@ -368,7 +370,7 @@ function M.build(root, overrides, notify)
     end
     if #unknown > 0 then
       table.sort(unknown)
-      notify.warn(("opts: unrecognized key(s): %s"):format(table.concat(unknown, ", ")))
+      notify.warn(i18n.t("report.config.unknown-keys", { keys = table.concat(unknown, ", ") }))
     end
 
     -- `opts.checks`'s *keys* are check codes, not option names, so the loop

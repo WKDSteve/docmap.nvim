@@ -13,6 +13,7 @@
 --- *declared*, deferring "is it installed" to lib.nvim's own `:Lib deps
 --- show`, which already does that live.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -40,15 +41,12 @@ function M.run(ctx)
   local result = ir.tools
 
   if not result then
-    ctx.notify.info(
-      "No lib.nvim.deps manifest found (docs/install.json or docs/INSTALL.md), "
-        .. "or lib.nvim.deps is unavailable — see :help docmap-tools."
-    )
+    ctx.notify.info(i18n.t("editor.tools.no-manifest"))
     return
   end
 
   if #result.tools == 0 and #result.errors == 0 then
-    ctx.notify.info(("%s declares no tools."):format(result.source))
+    ctx.notify.info(i18n.t("editor.tools.none-declared", { source = result.source }))
     return
   end
 
@@ -70,18 +68,13 @@ function M.run(ctx)
 
   list.qf(items, "docmap tools")
 
-  ctx.notify.info(
-    ("%d tool(s) declared in %s%s"):format(
-      #result.tools,
-      result.source,
-      #result.errors > 0
-          and ("  ·  %d invalid entr%s"):format(
-            #result.errors,
-            #result.errors == 1 and "y" or "ies"
-          )
-        or ""
-    )
-  )
+  local variant = #result.errors == 0 and ""
+    or (#result.errors == 1 and "-invalid-one" or "-invalid-many")
+  ctx.notify.info(i18n.t("editor.tools.summary" .. variant, {
+    tools = #result.tools,
+    source = result.source,
+    invalid = #result.errors,
+  }))
 end
 
 return M

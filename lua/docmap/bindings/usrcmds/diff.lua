@@ -6,6 +6,8 @@
 --- retrieval; the comparison itself is `docmap.core.diff`, which is pure
 --- and therefore also usable from a CI job with no editor involved.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---@param ctx Docmap.Bindings.Ctx
@@ -24,7 +26,12 @@ function M.run(ctx, arg)
     })
     :wait()
   if proc.code ~= 0 then
-    ctx.notify.warn(("Cannot read %s at %s: %s"):format(rel, ref, vim.trim(proc.stderr or "")))
+    ctx.notify.warn(
+      i18n.t(
+        "editor.diff.cannot-read",
+        { file = rel, ref = ref, error = vim.trim(proc.stderr or "") }
+      )
+    )
     return
   end
 
@@ -35,7 +42,7 @@ function M.run(ctx, arg)
     luanil = { object = true, array = true },
   })
   if not ok_decode or type(doc) ~= "table" or type(doc.nodes) ~= "table" then
-    ctx.notify.warn(("The map at %s is not a readable docmap artifact."):format(ref))
+    ctx.notify.warn(i18n.t("editor.diff.not-an-artifact", { ref = ref }))
     return
   end
 
@@ -58,16 +65,14 @@ function M.run(ctx, arg)
   vim.bo[buf].modifiable = false
 
   if diff_mod.is_empty(result) then
-    ctx.notify.info(("Nothing structural changed since %s."):format(ref))
+    ctx.notify.info(i18n.t("editor.diff.unchanged", { ref = ref }))
   else
-    ctx.notify.info(
-      ("%d module(s), %d function(s), %d dependency change(s) since %s"):format(
-        #result.nodes_added + #result.nodes_removed,
-        #result.functions_added + #result.functions_removed,
-        #result.deps_added + #result.deps_removed,
-        ref
-      )
-    )
+    ctx.notify.info(i18n.t("editor.diff.summary", {
+      modules = #result.nodes_added + #result.nodes_removed,
+      functions = #result.functions_added + #result.functions_removed,
+      deps = #result.deps_added + #result.deps_removed,
+      ref = ref,
+    }))
   end
 end
 

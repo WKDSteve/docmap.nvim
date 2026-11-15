@@ -33,6 +33,8 @@
 --- float. Passing on it here is the same judgement that keeps `KEYS` beside
 --- its handlers rather than in this file.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---Apply `overrides` over `defaults`.
@@ -66,17 +68,15 @@ function M.resolve(defaults, overrides, notify)
   end
   if #unknown > 0 and notify then
     table.sort(unknown)
-    notify.warn(
-      ("opts.keys: no such action: %s  (known: %s)"):format(
-        table.concat(unknown, ", "),
-        table.concat(
-          vim.tbl_map(function(s)
-            return s.id
-          end, defaults),
-          ", "
-        )
-      )
-    )
+    notify.warn(i18n.t("editor.keys.unknown-action", {
+      unknown = table.concat(unknown, ", "),
+      known = table.concat(
+        vim.tbl_map(function(s)
+          return s.id
+        end, defaults),
+        ", "
+      ),
+    }))
   end
 
   local out = {}

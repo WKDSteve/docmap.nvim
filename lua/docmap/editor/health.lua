@@ -16,6 +16,7 @@
 
 local M = {}
 
+local i18n = require("docmap.core.i18n")
 local soft_require = require("docmap.core.soft_require")
 
 -- vim.health shim (start/ok/warn/error/info exist on all supported versions).
@@ -42,6 +43,17 @@ local function h_info(msg, advice)
     msg = msg .. "\n- ADVICE:\n  - " .. table.concat(advice, "\n  - ")
   end
   h_info_raw(msg)
+end
+
+---The advice under a report line: one catalog text, one list entry per line of it.
+---
+---One text rather than a key per line: the lines are one paragraph broken to fit the report, and a translation
+---has to be free to break it somewhere else.
+---@param key string
+---@param params table<string, any>?
+---@return string[]
+local function advice(key, params)
+  return vim.split(i18n.t(key, params), "\n", { plain = true })
 end
 
 local MIN_NVIM = { 0, 10, 0 }
@@ -120,22 +132,17 @@ M.languages_under = languages_under
 
 function M.check()
   -- Environment ------------------------------------------------------------
-  h_start("docmap.nvim: environment")
+  h_start(i18n.t("health.section.environment"))
 
   local v = vim.version()
-  local vstr = ("%d.%d.%d"):format(v.major, v.minor, v.patch)
+  local versions = {
+    version = ("%d.%d.%d"):format(v.major, v.minor, v.patch),
+    required = ("%d.%d.%d"):format(MIN_NVIM[1], MIN_NVIM[2], MIN_NVIM[3]),
+  }
   if version_ok(MIN_NVIM) then
-    h_ok(("Neovim %s (>= %d.%d.%d)"):format(vstr, MIN_NVIM[1], MIN_NVIM[2], MIN_NVIM[3]))
+    h_ok(i18n.t("health.nvim.ok", versions))
   else
-    h_warn(
-      ("Neovim %s is older than the required %d.%d.%d"):format(
-        vstr,
-        MIN_NVIM[1],
-        MIN_NVIM[2],
-        MIN_NVIM[3]
-      ),
-      { "The scanner uses vim.uv, vim.system and vim.treesitter." }
-    )
+    h_warn(i18n.t("health.nvim.too-old", versions), advice("health.nvim.too-old.advice"))
   end
 
   -- The Lua parser is not optional the way lua-language-server is: without it
@@ -147,16 +154,28 @@ function M.check()
     ok_parser = pcall(vim.treesitter.get_string_parser, "local M = {}", "lua")
   end
   if ok_parser then
-    h_ok("treesitter Lua parser available")
+    h_ok(i18n.t("health.parser.ok"))
   else
-    h_error("no treesitter Lua parser", {
-      "Functions, call edges and module symbols all come from it.",
-      "Install it: :TSInstall lua (nvim-treesitter), or use a Neovim build that bundles it.",
-    })
+    h_error(i18n.t("health.parser.missing"), advice("health.parser.missing.advice"))
+  end
+
+  -- A catalog that does not load leaves its locale speaking English, which nothing else on screen explains.
+  local catalog_problems = i18n.problems()
+  local broken = vim.tbl_keys(catalog_problems)
+  table.sort(broken)
+  for _, locale in ipairs(broken) do
+    local reason = catalog_problems[locale]
+    -- The one line with an English text in the code: when the source catalog is the broken one, the sentence
+    -- that says so cannot come out of it.
+    h_warn(
+      i18n.has("health.catalog.unreadable")
+          and i18n.t("health.catalog.unreadable", { locale = locale, reason = reason })
+        or ("interface catalog %s.json is not loaded: %s"):format(locale, reason)
+    )
   end
 
   -- Dependencies -----------------------------------------------------------
-  h_start("docmap.nvim: lib.nvim")
+  h_start(i18n.t("health.section.lib"))
 
   local missing = {}
   for _, mod in ipairs(DEPS) do
@@ -165,42 +184,34 @@ function M.check()
     end
   end
   if #missing == 0 then
-    h_ok(("all %d required lib.nvim modules load"):format(#DEPS))
+    h_ok(i18n.t("health.lib.ok", { count = #DEPS }))
   else
-    h_error(("%d of %d lib.nvim modules failed to load"):format(#missing, #DEPS), {
-      "Missing: " .. table.concat(missing, ", "),
-      "lib.nvim is a hard dependency: https://github.com/WKDSteve/lib.nvim",
-      'Add it to this plugin\'s spec: dependencies = { "WKDSteve/lib.nvim" }',
-    })
+    h_error(
+      i18n.t("health.lib.missing", { missing = #missing, count = #DEPS }),
+      advice("health.lib.missing.advice", { modules = table.concat(missing, ", ") })
+    )
   end
 
   -- Optional tools ---------------------------------------------------------
-  h_start("docmap.nvim: optional tools")
+  h_start(i18n.t("health.section.tools"))
 
   if vim.fn.executable("git") == 1 then
-    h_ok("git — :DocMap diff/impact, :DocMap serve and :DocBrowse history")
+    h_ok(i18n.t("health.git.ok"))
   else
-    h_warn("git not on PATH", {
-      ":DocMap diff, :DocMap impact, :DocMap serve and :DocBrowse history need it.",
-      "Everything else — generate, check, open, graph, dot, why — does not.",
-    })
+    h_warn(i18n.t("health.git.missing"), advice("health.git.missing.advice"))
   end
 
   if vim.fn.executable("lua-language-server") == 1 then
-    h_ok("lua-language-server — :DocMap full (class/alias detail, type edges)")
+    h_ok(i18n.t("health.luals.ok"))
   else
-    h_info("lua-language-server not on PATH", {
-      "Only :DocMap full needs it; a plain :DocMap never calls it.",
-      "Without it the Types and Inheritance views say so instead of rendering blank.",
-      -- Named here and nowhere else on purpose. `:Mason` is how a Neovim
-      -- user installs a language server, so saying it is genuinely helpful
-      -- — and saying it *only* here matters: the same sentence in a
-      -- committed HTML page or in docmap-desktop would be advice about a
-      -- program the reader may not be running. Pointing at mason is a
-      -- sentence; installing a toolchain on somebody's behalf is a
-      -- different kind of program, and not one this plugin is.
-      "In Neovim: :Mason, then install lua-language-server.",
-    })
+    -- The advice names `:Mason`, here and nowhere else on purpose. `:Mason` is
+    -- how a Neovim user installs a language server, so saying it is genuinely
+    -- helpful — and saying it *only* here matters: the same sentence in a
+    -- committed HTML page or in docmap-desktop would be advice about a
+    -- program the reader may not be running. Pointing at mason is a
+    -- sentence; installing a toolchain on somebody's behalf is a
+    -- different kind of program, and not one this plugin is.
+    h_info(i18n.t("health.luals.missing"), advice("health.luals.missing.advice"))
   end
 
   -- Optional, and the *absence* case is the interesting one: without it
@@ -220,36 +231,21 @@ function M.check()
       end
     end
     if #engines > 0 then
-      h_ok(
-        ("pickers.nvim — :DocMap pick uses it (%s available)"):format(table.concat(engines, ", "))
-      )
+      h_ok(i18n.t("health.pickers.ok", { engines = table.concat(engines, ", ") }))
     else
-      h_info("pickers.nvim installed, but none of its engines is", {
-        "It needs telescope.nvim, fzf-lua or snacks.nvim to resolve one.",
-        ":DocMap pick falls back to lib.nvim's chooser, so nothing is broken.",
-      })
+      h_info(i18n.t("health.pickers.no-engine"), advice("health.pickers.no-engine.advice"))
     end
   else
-    h_info("pickers.nvim not installed", {
-      ":DocMap pick uses lib.nvim's chooser instead, which defers to whatever",
-      "you wired into vim.ui.select. Nothing else needs it.",
-      "https://github.com/WKDSteve/pickers.nvim",
-    })
+    h_info(i18n.t("health.pickers.missing"), advice("health.pickers.missing.advice"))
   end
 
   local pdfport = soft_require.probe("pdfport")
   if pdfport and type(pdfport.can_create) == "function" and pdfport.can_create("markdown") then
-    h_ok("pdfport.nvim — overview.pdf (opts.pdf = true) can be written")
+    h_ok(i18n.t("health.pdfport.ok"))
   elseif pdfport then
-    h_info("pdfport.nvim installed, but no markdown producer is available", {
-      "opts.pdf = true would fail until pandoc + a PDF engine are installed.",
-      "See pdfport.nvim's :checkhealth for which producer is missing.",
-    })
+    h_info(i18n.t("health.pdfport.no-producer"), advice("health.pdfport.no-producer.advice"))
   else
-    h_info("pdfport.nvim not installed", {
-      "Only opts.pdf = true (overview.pdf, alongside overview.md) needs it.",
-      "https://github.com/WKDSteve/pdfport.nvim",
-    })
+    h_info(i18n.t("health.pdfport.missing"), advice("health.pdfport.missing.advice"))
   end
 
   -- **Reported as an addition, never as a requirement**, and the wording
@@ -260,18 +256,14 @@ function M.check()
   -- reader to install something for a case they may not have.
   local cma = require("docmap.core.soft_require").probe("color_my_ascii")
   if cma and type(cma.fences) == "table" and type(cma.fences.list_blocks) == "function" then
-    h_ok("color_my_ascii.nvim — fenced code blocks in :DocBrowse's detail pane are highlighted")
+    h_ok(i18n.t("health.color-my-ascii.ok"))
   elseif cma then
-    h_info("color_my_ascii.nvim installed, but without the fences API", {
-      "Inline `code` in :DocBrowse is unaffected — it needs no plugin.",
-      "Only ``` blocks would use it, and this build exposes no fences.list_blocks.",
-    })
+    h_info(
+      i18n.t("health.color-my-ascii.no-fences"),
+      advice("health.color-my-ascii.no-fences.advice")
+    )
   else
-    h_info("color_my_ascii.nvim not installed", {
-      "Inline `code` in :DocBrowse's detail pane is highlighted anyway.",
-      "Only ``` fenced blocks in a module header would use it — rare, by count.",
-      "https://github.com/WKDSteve/color_my_ascii.nvim",
-    })
+    h_info(i18n.t("health.color-my-ascii.missing"), advice("health.color-my-ascii.missing.advice"))
   end
 
   -- No external dependency to probe, unlike pdfport above — call hierarchy
@@ -297,42 +289,27 @@ function M.check()
         buffers = buffers + 1
       end
     end
-    h_ok(
-      ("Call hierarchy (opts.callhierarchy) — running, attached to %d buffer(s)"):format(buffers)
-    )
+    h_ok(i18n.t("health.callhierarchy.running", { buffers = buffers }))
   else
-    h_info(
-      "Call hierarchy (opts.callhierarchy) — not attached. Set it true in setup()/install(); "
-        .. "the client attaches on BufReadPost to Lua buffers under source/, so an already-open "
-        .. "buffer needs :e. No external dependency. See docs/call_hierarchy.md."
-    )
+    h_info(i18n.t("health.callhierarchy.detached"))
   end
 
   -- Same posture as call hierarchy directly above: no external dependency,
   -- nothing here that can be missing or broken.
-  h_ok(
-    "Diagnostics (opts.diagnostics) — no external dependency, set true on install() to publish findings as vim.diagnostic"
-  )
+  h_ok(i18n.t("health.diagnostics.available"))
 
   local telemetry_self = soft_require.probe("docmap.core.telemetry_self")
   local self_instance = telemetry_self and telemetry_self.instance()
   if self_instance then
-    h_ok(("runtime-analysis.nvim — self-instrumented as %q"):format(self_instance.namespace))
+    h_ok(i18n.t("health.telemetry.ok", { namespace = ("%q"):format(self_instance.namespace) }))
   elseif soft_require.probe("runtime-analysis.telemetry") then
-    h_info("runtime-analysis.nvim installed, but not yet self-instrumented", {
-      "docmap.setup() starts this automatically unless opts.telemetry = false.",
-      "Feeds :DocBrowse's telemetry mode and dead-function suppression.",
-    })
+    h_info(i18n.t("health.telemetry.idle"), advice("health.telemetry.idle.advice"))
   else
-    h_info("runtime-analysis.nvim not installed", {
-      "Optional: self-instrumentation for :DocBrowse's telemetry mode and",
-      "dead-function suppression (opts.telemetry, default true when present).",
-      "https://github.com/WKDSteve/runtime-analysis.nvim",
-    })
+    h_info(i18n.t("health.telemetry.missing"), advice("health.telemetry.missing.advice"))
   end
 
   -- Commands ---------------------------------------------------------------
-  h_start("docmap.nvim: commands")
+  h_start(i18n.t("health.section.commands"))
 
   local registered = {}
   for name in pairs(vim.api.nvim_get_commands({})) do
@@ -342,13 +319,9 @@ function M.check()
   end
   if #registered > 0 then
     table.sort(registered)
-    h_ok("registered: :" .. table.concat(registered, ", :"))
+    h_ok(i18n.t("health.commands.registered", { commands = table.concat(registered, ", :") }))
   else
-    h_warn("no command registered", {
-      'Commands are opt-in: call require("docmap").setup({}).',
-      "Requiring the module alone never creates one, by design.",
-      "If your spec lazy-loads on `cmd`, this is expected until it fires.",
-    })
+    h_warn(i18n.t("health.commands.none"), advice("health.commands.none.advice"))
   end
 
   -- What this plugin puts in the user's editor beyond the commands.
@@ -371,22 +344,19 @@ function M.check()
       end
     end
     h_info(
-      ("autocommands: %d global, %d buffer-local — all created lazily, none at require time"):format(
-        global,
-        buffer_local
-      ),
+      i18n.t("health.autocmds.summary", { global = global, buffer_local = buffer_local }),
       vim.tbl_map(function(a)
         return ("%s (%s) — %s"):format(table.concat(a.events, ","), a.owner, a.lifetime)
       end, manifest.list)
     )
-    h_info("keymaps: none global — every binding is buffer-local to a :DocBrowse scratch buffer")
+    h_info(i18n.t("health.keymaps.none-global"))
   end
 
   -- Configuration ----------------------------------------------------------
   --
   -- The section this file exists for. Every number below is what a `:DocMap`
   -- issued right now would act on.
-  h_start("docmap.nvim: resolved configuration")
+  h_start(i18n.t("health.section.config"))
 
   -- Where `config.build`'s degradation warnings go in this host.
   --
@@ -397,7 +367,7 @@ function M.check()
   -- visible — passing none silenced exactly what it was written to report.
   local notify = {
     warn = function(msg)
-      h_warn(("config: %s"):format(tostring(msg)))
+      h_warn(i18n.t("health.config.warning", { message = tostring(msg) }))
     end,
   }
 
@@ -405,18 +375,14 @@ function M.check()
     return require("docmap.config").build(vim.fn.getcwd(), nil, notify)
   end)
   if not ok_cfg then
-    h_error("docmap.core.config failed to load: " .. tostring(cfg))
+    h_error(i18n.t("health.config.load-failed", { error = tostring(cfg) }))
     return
   end
 
-  h_info(("root      %s"):format(cfg.root))
+  h_info(i18n.t("health.config.root", { root = cfg.root }))
   local sources = require("docmap.config").sources(cfg)
-  h_info(
-    ("source    %s   (auto-detected; override with opts.source)"):format(
-      table.concat(sources, ", ")
-    )
-  )
-  h_info(("out_dir   %s"):format(cfg.out_dir))
+  h_info(i18n.t("health.config.source", { sources = table.concat(sources, ", ") }))
+  h_info(i18n.t("health.config.out-dir", { out_dir = tostring(cfg.out_dir) }))
 
   -- One report per root. A tree with `lua/` beside `src/` has two answers to
   -- "does the source directory exist and hold anything", and collapsing them
@@ -424,18 +390,23 @@ function M.check()
   for _, src in ipairs(sources) do
     local source_dir = cfg.root .. "/" .. src
     if not require("docmap.core.safe_fs").is_dir(cfg.root, source_dir) then
-      h_error(("source directory does not exist: %s"):format(source_dir), {
-        "A :DocMap here would scan nothing and write an empty map.",
-        "Set opts.root or opts.source, or run from the repository you meant.",
-      })
+      h_error(
+        i18n.t("health.source.missing", { dir = source_dir }),
+        advice("health.source.missing.advice")
+      )
     else
       local n = count_lua(cfg.root, source_dir)
       if n == 0 then
         -- Not a warning for a non-Lua root: `src/` full of TypeScript is a
         -- perfectly good source root, and this counter only knows `.lua`.
-        h_info(("%s contains no .lua files"):format(src))
+        h_info(i18n.t("health.source.no-lua", { source = src }))
       else
-        h_ok(("%s contains %d .lua file%s"):format(src, n, n == 1 and "" or "s"))
+        h_ok(
+          i18n.t(
+            n == 1 and "health.source.lua-one" or "health.source.lua-many",
+            { source = src, count = n }
+          )
+        )
       end
     end
   end
@@ -461,7 +432,7 @@ function M.check()
   -- in every language with nothing installed. A grammar buys *function-level
   -- data*; `lua-language-server` buys `@class`/`@alias` detail in Lua. Those
   -- are the only two external dependencies, and neither is a linter.
-  h_start("docmap.nvim: language support")
+  h_start(i18n.t("health.section.languages"))
 
   local present = {}
   for _, src in ipairs(sources) do
@@ -471,7 +442,7 @@ function M.check()
   end
 
   if not next(present) then
-    h_info("no source files found to report language support for")
+    h_info(i18n.t("health.languages.none"))
   else
     local registry = require("docmap.core.lang_registry")
     local report = {}
@@ -492,30 +463,36 @@ function M.check()
         -- A backend that claims files but is switched off for this scan
         -- (`opts.languages`) has no report row. Silence would read as
         -- "supported"; it is the opposite.
-        h_info(("%s — files present, but this backend is not enabled"):format(name))
+        h_info(i18n.t("health.language.disabled", { language = name }))
       elseif entry.grammar_loaded == nil then
-        h_ok(("%s — no grammar needed"):format(name))
+        h_ok(i18n.t("health.language.no-grammar-needed", { language = name }))
       elseif entry.grammar_loaded then
-        h_ok(("%s — grammar %q loaded"):format(name, entry.grammar))
+        h_ok(
+          i18n.t(
+            "health.language.grammar-loaded",
+            { language = name, grammar = ("%q"):format(entry.grammar) }
+          )
+        )
       else
         no_grammar[#no_grammar + 1] = entry
-        h_warn(("%s — grammar %q not available"):format(name, entry.grammar), {
-          "The module tree, summaries and require edges still work.",
-          "Functions, symbols and call edges in this language do not.",
-          (":TSInstall %s (nvim-treesitter)"):format(entry.grammar),
-        })
+        h_warn(
+          i18n.t(
+            "health.language.grammar-missing",
+            { language = name, grammar = ("%q"):format(entry.grammar) }
+          ),
+          advice("health.language.grammar-missing.advice", { grammar = entry.grammar })
+        )
       end
     end
 
     if #no_grammar == 0 then
-      h_ok(("every language in this tree has what it needs (%d)"):format(#names))
+      h_ok(i18n.t("health.languages.all-ok", { count = #names }))
     end
 
-    h_info("the drift checks need none of the above", {
-      "Every check in core/check.lua reads the IR this plugin built, so they",
-      "report in any language with nothing installed. A grammar buys",
-      "function-level data; lua-language-server buys @class/@alias detail.",
-    })
+    h_info(
+      i18n.t("health.languages.checks-need-none"),
+      advice("health.languages.checks-need-none.advice")
+    )
   end
 
   -- The one configuration mistake that produces a *plausible wrong answer*
@@ -528,21 +505,14 @@ function M.check()
   -- test coverage for the whole map, and that reads as a badly tested
   -- repository rather than as a wrong path. Nothing else on the page says
   -- otherwise, so this is where it gets said.
-  h_info(
-    ("tests_dir %s   (auto-derived fn.tested; override with opts.tests_dir)"):format(
-      cfg.tests_dir or "TESTS"
-    )
-  )
+  h_info(i18n.t("health.tests-dir.resolved", { dir = cfg.tests_dir or "TESTS" }))
 
   local tests_dir = cfg.root .. "/" .. (cfg.tests_dir or "TESTS")
   if not require("docmap.core.safe_fs").is_dir(cfg.root, tests_dir) then
-    h_warn(("%s does not exist"):format(cfg.tests_dir or "TESTS"), {
-      "Not an error: a tree with no tests is a valid tree.",
-      "But every function will be left `tested = false`, so the Analysis tab's",
-      "test-coverage panel will report 0% for the whole map — which looks like",
-      "an untested repository rather than a misconfigured path.",
-      "If this tree does have tests, set opts.tests_dir to where they are.",
-    })
+    h_warn(
+      i18n.t("health.tests-dir.missing", { dir = cfg.tests_dir or "TESTS" }),
+      advice("health.tests-dir.missing.advice")
+    )
   else
     -- Every `.lua` file, not just `*_spec.lua`: `coverage.lua`'s `lua_files`
     -- filters on the extension alone and nothing else, so a helper or a
@@ -551,16 +521,15 @@ function M.check()
     -- number than the one the coverage figure is actually derived from.
     local n = count_lua(cfg.root, tests_dir)
     if n == 0 then
-      h_warn(("%s exists but holds no .lua files"):format(cfg.tests_dir or "TESTS"), {
-        "Same consequence as a missing directory: fn.tested stays false everywhere,",
-        "and the Analysis tab reports 0%% test coverage for the whole map.",
-      })
+      h_warn(
+        i18n.t("health.tests-dir.empty", { dir = cfg.tests_dir or "TESTS" }),
+        advice("health.tests-dir.empty.advice")
+      )
     else
       h_ok(
-        ("%s holds %d .lua file%s scanned for function mentions"):format(
-          cfg.tests_dir or "TESTS",
-          n,
-          n == 1 and "" or "s"
+        i18n.t(
+          n == 1 and "health.tests-dir.lua-one" or "health.tests-dir.lua-many",
+          { dir = cfg.tests_dir or "TESTS", count = n }
         )
       )
     end
@@ -589,18 +558,13 @@ function M.check()
     end
   end
   if found_lib then
-    h_ok(("headless runs resolve lib.nvim via %s"):format(found_lib.label))
+    h_ok(i18n.t("health.headless.ok", { source = found_lib.label }))
   else
-    h_info("headless runs would not find lib.nvim", {
-      "Only affects TESTS/run.lua and scripts/ci.sh, not the plugin itself —",
-      "those run with -u NONE and have no plugin manager to supply it.",
-      "Fix with any one of: LIB_NVIM_DIR=<path>, a clone at .deps/lib.nvim,",
-      "or a checkout beside this repository.",
-    })
+    h_info(i18n.t("health.headless.missing"), advice("health.headless.missing.advice"))
   end
 
   -- Artifacts --------------------------------------------------------------
-  h_start("docmap.nvim: artifacts")
+  h_start(i18n.t("health.section.artifacts"))
 
   -- Read the way the CLI reads the committed map (`core/artifact.lua`): an
   -- `out_dir` that is not a safe relative path, or a map behind a link that
@@ -609,37 +573,39 @@ function M.check()
   local safe_fs = require("docmap.core.safe_fs")
   local out_dir = require("docmap.core.safe_out_dir")(cfg.out_dir)
   if not out_dir then
-    h_warn(("out_dir is not a safe relative path: %s"):format(tostring(cfg.out_dir)), {
-      "The map is neither written nor read from there.",
-      "Set opts.out_dir to a path inside the repository.",
-    })
+    h_warn(
+      i18n.t("health.artifacts.unsafe-out-dir", { out_dir = tostring(cfg.out_dir) }),
+      advice("health.artifacts.unsafe-out-dir.advice")
+    )
     return
   end
   local artifact = cfg.root .. "/" .. out_dir .. "/module_map.json"
   local raw, kind, why = safe_fs.read(cfg.root, artifact)
   if kind == "refused" then
-    h_warn(("%s/module_map.json is not read: %s"):format(cfg.out_dir, why), {
-      "A link that stays inside the repository is followed; one that leaves it is not.",
-      "Replace it with a plain directory, or point opts.out_dir at one.",
-    })
+    h_warn(
+      i18n.t("health.artifacts.refused", { out_dir = cfg.out_dir, reason = tostring(why) }),
+      advice("health.artifacts.refused.advice")
+    )
     return
   end
   if not raw then
-    h_info(("no map generated yet under %s"):format(cfg.out_dir), {
-      "Run :DocMap (or nvim --headless -l scripts/gen_map.lua).",
-    })
+    h_info(
+      i18n.t("health.artifacts.none", { out_dir = cfg.out_dir }),
+      advice("health.artifacts.none.advice")
+    )
     return
   end
 
   local ok_json, decoded = pcall(vim.json.decode, raw, { luanil = { object = true } })
   if not ok_json or type(decoded) ~= "table" or type(decoded.nodes) ~= "table" then
-    h_error(("%s/module_map.json is not a readable artifact"):format(cfg.out_dir), {
-      "Regenerate it with :DocMap.",
-    })
+    h_error(
+      i18n.t("health.artifacts.unreadable", { out_dir = cfg.out_dir }),
+      advice("health.artifacts.unreadable.advice")
+    )
     return
   end
 
-  h_ok(("%s/module_map.json — %d nodes"):format(cfg.out_dir, #decoded.nodes))
+  h_ok(i18n.t("health.artifacts.ok", { out_dir = cfg.out_dir, nodes = #decoded.nodes }))
 
   -- Staleness by mtime rather than by regenerating: `:DocMap check` is the
   -- authoritative answer and costs a full scan, which is not what a health
@@ -665,12 +631,12 @@ function M.check()
   end
 
   if art_stat and newest > art_stat.mtime.sec then
-    h_warn("the map is older than the newest source file", {
-      "Newest: " .. tostring(newest_path),
-      "Run :DocMap to regenerate, or :DocMap check for the authoritative answer.",
-    })
+    h_warn(
+      i18n.t("health.artifacts.stale"),
+      advice("health.artifacts.stale.advice", { path = tostring(newest_path) })
+    )
   elseif art_stat then
-    h_ok("the map is newer than every source file (mtime check, not a full compare)")
+    h_ok(i18n.t("health.artifacts.fresh"))
   end
 
   -- The declared external tools (docs/install.json), reported out of the
@@ -678,7 +644,7 @@ function M.check()
   -- is absent (an older lib.nvim) or this plugin ships no spec.
   local ok_deps, deps_health = pcall(require, "lib.nvim.deps.health")
   if ok_deps then
-    h_start("docmap.nvim: declared tools (lib.nvim.deps)")
+    h_start(i18n.t("health.section.declared-tools"))
     deps_health.report_for("docmap.nvim")
   end
 end

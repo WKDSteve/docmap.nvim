@@ -16,6 +16,7 @@
 local M = {}
 
 local uv = vim.uv
+local i18n = require("docmap.core.i18n")
 local safe_fs = require("docmap.core.safe_fs")
 
 -- The three artifact-shape functions below moved to
@@ -54,21 +55,21 @@ M.rehydrate = artifact.rehydrate
 ---@return string|nil err
 function M.load_artifact(opts)
   if not require("docmap.core.safe_out_dir")(opts.out_dir) then
-    return nil, ("out_dir is not a safe relative path: %s"):format(tostring(opts.out_dir))
+    return nil, i18n.t("editor.browse.map.unsafe-out-dir", { out_dir = tostring(opts.out_dir) })
   end
   local path = M.artifact_path(opts)
 
   local content, kind, why = safe_fs.read(M.norm_root(opts.root), path)
   if kind == "refused" then
-    return nil, ("map at %s is not read: %s"):format(path, why)
+    return nil, i18n.t("editor.browse.map.refused", { path = path, reason = tostring(why) })
   end
   if not content then
-    return nil, ("no map at %s — run :DocMap first"):format(path)
+    return nil, i18n.t("editor.browse.map.missing", { path = path })
   end
 
   local ir = artifact.decode(content)
   if not ir or type(ir.root) ~= "string" then
-    return nil, ("map at %s is not a readable docmap artifact"):format(path)
+    return nil, i18n.t("editor.browse.map.unreadable", { path = path })
   end
 
   return ir

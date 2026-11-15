@@ -14,6 +14,7 @@
 --- page's Hierarchy instead, per `docs/ecosystem.md` §3.1, and is not what
 --- this lists.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -39,10 +40,7 @@ function M.run(ctx)
   end
 
   if #all == 0 then
-    ctx.notify.info(
-      "No call-based route registrations found — see :help docmap-endpoints "
-        .. "for what is recognized."
-    )
+    ctx.notify.info(i18n.t("editor.endpoints.none"))
     return
   end
 
@@ -74,7 +72,9 @@ function M.run(ctx)
 
   list.qf(items, "docmap endpoints")
 
-  ctx.notify.info(("%d route(s) across %d file(s)  ·  %d documented"):format(#all, nfiles, ndoc))
+  ctx.notify.info(
+    i18n.t("editor.endpoints.summary", { routes = #all, files = nfiles, documented = ndoc })
+  )
 end
 
 return M

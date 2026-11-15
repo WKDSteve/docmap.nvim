@@ -13,6 +13,7 @@
 --- since `--check` byte-compares. Same wall the History tab hit. So it lives
 --- beside `impact` — live-computed into the quickfix list, nothing written.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -47,7 +48,7 @@ end
 ---@param ms integer
 ---@return string
 local function timed_out_msg(ms)
-  return ("git log did not finish within %ds"):format(math.floor(ms / 1000))
+  return i18n.t("editor.git-log.timed-out", { seconds = ("%d"):format(math.floor(ms / 1000)) })
 end
 
 ---@param ctx Docmap.Bindings.Ctx
@@ -103,7 +104,10 @@ function M.run(ctx, arg)
         end
         -- A timeout kill surfaces as a non-zero exit with no stderr; keep the
         -- old wording for that case so the message stays recognisable.
-        ctx.notify.warn(stderr ~= "" and ("git log failed: " .. stderr) or timed_out_msg(timeout))
+        ctx.notify.warn(
+          stderr ~= "" and i18n.t("editor.git-log.failed", { error = stderr })
+            or timed_out_msg(timeout)
+        )
         return
       end
 
@@ -135,8 +139,8 @@ function M.run(ctx, arg)
 
       if seen_commits == 0 then
         ctx.notify.info(
-          range == "" and ("No commits outside %s."):format(out_dir)
-            or ("No commits in %s outside %s."):format(range, out_dir)
+          range == "" and i18n.t("editor.churn.no-commits", { out_dir = out_dir })
+            or i18n.t("editor.churn.no-commits-in-range", { range = range, out_dir = out_dir })
         )
         return
       end
@@ -163,9 +167,7 @@ function M.run(ctx, arg)
 
       if #result.entries == 0 then
         ctx.notify.info(
-          ("%d commit(s) examined, none touching a scanned module with documented functions."):format(
-            seen_commits
-          )
+          i18n.t("editor.churn.nothing-scanned", { count = ("%d"):format(seen_commits) })
         )
         return
       end
@@ -177,16 +179,17 @@ function M.run(ctx, arg)
 
       local top = result.entries[1]
       ctx.notify.info(
-        ("%d module(s) over %d commits — hottest %s (%d × %d = %d)%s"):format(
-          #result.entries,
-          seen_commits,
-          top.module or top.node,
-          top.commits,
-          top.complexity,
-          top.score,
-          result.unmatched > 0
-              and (" · %d changed path(s) back no scanned module"):format(result.unmatched)
-            or ""
+        i18n.t(
+          result.unmatched > 0 and "editor.churn.summary-unmatched" or "editor.churn.summary",
+          {
+            modules = #result.entries,
+            commits = ("%d"):format(seen_commits),
+            module = top.module or top.node,
+            module_commits = ("%d"):format(top.commits),
+            complexity = ("%d"):format(top.complexity),
+            score = ("%d"):format(top.score),
+            unmatched = ("%d"):format(result.unmatched),
+          }
         )
       )
     end)

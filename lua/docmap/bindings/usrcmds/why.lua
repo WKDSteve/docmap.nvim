@@ -30,6 +30,7 @@
 --- because the edges are; the require chain is module-to-module because that is
 --- all a `require` says.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -39,7 +40,7 @@ local M = {}
 function M.run(ctx, arg)
   local a, b = vim.trim(arg or ""):match("^(%S+)%s+(%S+)$")
   if not a then
-    ctx.notify.warn("Usage: :" .. ctx.command_name .. " why <from> <to>")
+    ctx.notify.warn(i18n.t("editor.why.usage", { command = ctx.command_name }))
     return
   end
 
@@ -48,7 +49,7 @@ function M.run(ctx, arg)
   local from_id = ctx.find_node(ir, a, lua_root)
   local to_id = ctx.find_node(ir, b, lua_root)
   if not from_id or not to_id then
-    ctx.notify.warn(("No module matching '%s' in the map."):format(from_id and b or a))
+    ctx.notify.warn(i18n.t("editor.module.no-match", { name = from_id and b or a }))
     return
   end
 
@@ -57,13 +58,13 @@ function M.run(ctx, arg)
   local call_chain = calls.path(ir, from_id, to_id)
 
   if chain and #chain == 0 then
-    ctx.notify.info("Those are the same module.")
+    ctx.notify.info(i18n.t("editor.why.same-module"))
     return
   end
   if not chain and not call_chain then
     -- Both traversals failed, so this really is "not connected" rather than
     -- "connected in the way the other chain describes".
-    ctx.notify.info(("%s does not reach %s at all — neither loads nor calls."):format(a, b))
+    ctx.notify.info(i18n.t("editor.why.unconnected", { from = a, to = b }))
     return
   end
 
@@ -73,7 +74,9 @@ function M.run(ctx, arg)
 
   for _, e in ipairs(chain or {}) do
     local target = ir.nodes[e.to]
-    names[#names + 1] = (target.module or e.to) .. (e.deferred and " (lazy)" or "")
+    names[#names + 1] = e.deferred
+        and i18n.t("editor.why.lazy-module", { module = target.module or e.to })
+      or (target.module or e.to)
     lazy = lazy or e.deferred == true
     items[#items + 1] = {
       filename = ctx.cfg.root .. "/" .. ((ir.nodes[e.from] or {}).source or e.from),
@@ -119,34 +122,31 @@ function M.run(ctx, arg)
   ---@type string[]
   local lines = {}
   if chain then
-    lines[#lines + 1] = ("loads · %d hop%s%s:  %s"):format(
-      #chain,
-      #chain == 1 and "" or "s",
-      -- A path that only exists through a deferred require does not run at load
-      -- time, which is usually the difference between "has to go" and "is
-      -- fine" — so it is said up front, not buried in the list.
-      lazy and ", lazy somewhere" or ", all at load time",
-      table.concat(names, " → ")
-    )
+    -- A path that only exists through a deferred require does not run at load
+    -- time, which is usually the difference between "has to go" and "is
+    -- fine" — so it is said up front, not buried in the list.
+    local variant = (#chain == 1 and "one" or "many") .. (lazy and "-lazy" or "-eager")
+    lines[#lines + 1] =
+      i18n.t("editor.why.loads." .. variant, { hops = #chain, path = table.concat(names, " → ") })
   else
     -- Said out loud rather than left as an absent line: a call path with no
     -- require path means the static graph understates the connection, which is
     -- a finding about `deps`, not about these two modules.
-    lines[#lines + 1] = "loads · no require path — the call below is reached some other way"
+    lines[#lines + 1] = i18n.t("editor.why.loads.none")
   end
 
   if call_chain and #call_chain > 0 then
-    lines[#lines + 1] = ("calls · %d hop%s%s:  %s"):format(
-      #call_chain,
-      #call_chain == 1 and "" or "s",
-      calls.chain_confidence(call_chain) == "heuristic" and ", one hop heuristic or more" or "",
-      table.concat(call_names, " → ")
+    local variant = (#call_chain == 1 and "one" or "many")
+      .. (calls.chain_confidence(call_chain) == "heuristic" and "-heuristic" or "")
+    lines[#lines + 1] = i18n.t(
+      "editor.why.calls." .. variant,
+      { hops = #call_chain, path = table.concat(call_names, " → ") }
     )
   else
     -- The other asymmetry, and the more useful one: A pulls B in and nothing
     -- along the way invokes it. In the require graph alone that looks exactly
     -- like a live dependency.
-    lines[#lines + 1] = "calls · nothing resolvable calls into it — loaded, not used"
+    lines[#lines + 1] = i18n.t("editor.why.calls.none")
   end
 
   ctx.notify.info(table.concat(lines, "\n"))

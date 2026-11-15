@@ -7,6 +7,8 @@
 --- something to yank, `:w`, or pipe through `:%!dot -Tsvg` — all of which the
 --- user can already do better than a flag could.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---@param ctx Docmap.Bindings.Ctx
@@ -15,7 +17,7 @@ function M.run(ctx, arg)
   local kind, target = vim.trim(arg or ""):match("^(%a*)%s*(.-)$")
   kind = (kind == "" or kind == "deps") and "require" or kind
   if kind ~= "require" and kind ~= "calls" then
-    ctx.notify.warn("Unknown graph: " .. kind .. " (expected deps or calls)")
+    ctx.notify.warn(i18n.t("editor.graph.unknown-kind", { kind = kind }))
     return
   end
 
@@ -24,7 +26,7 @@ function M.run(ctx, arg)
   if target ~= "" then
     scope = ctx.find_node(ir, target, ctx.cfg.lua_root or "lua")
     if not scope then
-      ctx.notify.warn("No module matching '" .. target .. "' in the map.")
+      ctx.notify.warn(i18n.t("editor.module.no-match", { name = target }))
       return
     end
   end
@@ -69,7 +71,7 @@ function M.run(ctx, arg)
     vim.bo[existing].modifiable = true
     vim.api.nvim_buf_set_lines(existing, 0, -1, false, vim.split(src, "\n", { plain = true }))
     vim.api.nvim_win_set_buf(0, existing)
-    ctx.notify.info("Pipe it: :%!dot -Tsvg > graph.svg")
+    ctx.notify.info(i18n.t("editor.dot.pipe-hint"))
     return
   end
 
@@ -81,7 +83,7 @@ function M.run(ctx, arg)
   vim.bo[buf].bufhidden = "hide"
   vim.bo[buf].swapfile = false
   pcall(vim.api.nvim_buf_set_name, buf, name)
-  ctx.notify.info("Pipe it: :%!dot -Tsvg > graph.svg")
+  ctx.notify.info(i18n.t("editor.dot.pipe-hint"))
 end
 
 return M

@@ -18,14 +18,16 @@
 --- `.txt` sources, and committing it would put a file in the tree that every
 --- clone regenerates differently.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---@param ctx Docmap.Bindings.Ctx
 function M.run(ctx)
   local found = vim.api.nvim_get_runtime_file("doc/docmap.txt", false)
   if #found == 0 then
-    ctx.notify.warn("Cannot find doc/docmap.txt on the runtimepath.", {
-      "This plugin's doc/ directory is not on 'runtimepath'.",
+    ctx.notify.warn(i18n.t("editor.helptags.not-found"), {
+      i18n.t("editor.helptags.not-found-detail"),
     })
     return
   end
@@ -33,11 +35,13 @@ function M.run(ctx)
   local doc_dir = vim.fs.dirname(found[1])
   local ok, err = pcall(vim.cmd.helptags, doc_dir)
   if not ok then
-    ctx.notify.warn(("Could not write %s/tags: %s"):format(doc_dir, tostring(err)))
+    ctx.notify.warn(
+      i18n.t("editor.helptags.write-failed", { dir = doc_dir, error = tostring(err) })
+    )
     return
   end
 
-  ctx.notify.info(("Wrote %s/tags — :help docmap.nvim"):format(doc_dir))
+  ctx.notify.info(i18n.t("editor.helptags.wrote", { dir = doc_dir }))
 end
 
 return M

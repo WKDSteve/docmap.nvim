@@ -65,6 +65,8 @@
 --- `.docmap.json` should use what the file now says, and one `io.open` of a
 --- file measured in hundreds of bytes is not the cost worth trading that for.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---The file a repository states its options in.
@@ -164,7 +166,7 @@ M.REPO_KEYS = {
 local function read(root, path, notify)
   local text, kind, why = require("docmap.core.safe_fs").read(root, path)
   if kind == "refused" and notify then
-    notify.warn(("%s: not read, %s"):format(M.NAME, tostring(why)))
+    notify.warn(i18n.t("report.config.file-refused", { file = M.NAME, reason = tostring(why) }))
   end
   return text
 end
@@ -206,10 +208,11 @@ function M.load(root, notify)
   if not ok or type(decoded) ~= "table" then
     if notify then
       notify.warn(
-        ("%s: not readable as a JSON object%s"):format(
-          M.NAME,
-          ok and "" or (" — " .. tostring(decoded):gsub("^.*:%s*", ""))
-        )
+        ok and i18n.t("report.config.file-not-an-object", { file = M.NAME })
+          or i18n.t("report.config.file-not-json", {
+            file = M.NAME,
+            error = (tostring(decoded):gsub("^.*:%s*", "")),
+          })
       )
     end
     return nil
@@ -244,15 +247,20 @@ function M.load(root, notify)
     if #host_only > 0 then
       table.sort(host_only)
       notify.warn(
-        ("%s: ignored — these belong to whoever opens the repository, not to it: %s"):format(
-          M.NAME,
-          table.concat(host_only, ", ")
+        i18n.t(
+          "report.config.file-host-only",
+          { file = M.NAME, keys = table.concat(host_only, ", ") }
         )
       )
     end
     if #unknown > 0 then
       table.sort(unknown)
-      notify.warn(("%s: unrecognized key(s): %s"):format(M.NAME, table.concat(unknown, ", ")))
+      notify.warn(
+        i18n.t(
+          "report.config.file-unknown-keys",
+          { file = M.NAME, keys = table.concat(unknown, ", ") }
+        )
+      )
     end
   end
 

@@ -17,6 +17,8 @@
 --- caller that actually needs the process to exit is the wrapper script, not
 --- this module.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---Exit code of a run that refused to go on and so reached no verdict: `--check`
@@ -44,9 +46,11 @@ local function report(findings, ir, opts)
       )
     end
   end
-  io.stdout:write(
-    ("\n%d errors, %d warnings, %d info\n"):format(tally.error, tally.warn, tally.info)
-  )
+  io.stdout:write("\n" .. i18n.t("cli.report.tally", {
+    errors = ("%d"):format(tally.error),
+    warnings = ("%d"):format(tally.warn),
+    info = ("%d"):format(tally.info),
+  }) .. "\n")
   -- A skipped check is not a pass: say so, with how many nodes it skipped.
   for _, na in ipairs(ir and require("docmap.core.check").not_applicable(ir, opts) or {}) do
     io.stdout:write(require("docmap.core.findings").format_not_applicable(na) .. "\n")
@@ -88,8 +92,7 @@ local function sarif_refusal(path, root)
     if windows and spelled:match("^%a:[^/]") then
       -- `C:drift.sarif` starts at the current directory *of that drive*, which
       -- the string does not say.
-      return "a path relative to a drive's current directory cannot be checked for links. "
-        .. "Spell it with a slash after the drive letter."
+      return i18n.t("cli.sarif.drive-relative")
     end
     if fold(spelled):sub(1, #root + 1) == fold(root) .. "/" then
       base, rel = root, spelled:sub(#root + 2)
@@ -118,9 +121,7 @@ local function sarif_refusal(path, root)
     return err
   end
   if link then
-    return ("%s is a link, so the report would be written wherever it leads. Remove it."):format(
-      link
-    )
+    return i18n.t("cli.sarif.link", { link = link })
   end
   return nil
 end
@@ -147,18 +148,20 @@ local function write_sarif(path, ir, findings, opts)
   local root = opts.root:gsub("\\", "/"):gsub("/+$", "")
   local refusal = sarif_refusal(path, root)
   if refusal then
-    io.stderr:write(("docmap: refusing to write %s: %s\n"):format(path, refusal))
+    io.stderr:write(i18n.t("cli.sarif.refused", { path = path, reason = refusal }) .. "\n")
     return
   end
   local body = require("docmap.core.render.sarif").render(ir, findings, opts)
   local fd, err = io.open(path, "w")
   if not fd then
-    io.stderr:write(("could not write %s: %s\n"):format(path, tostring(err)))
+    io.stderr:write(
+      i18n.t("cli.sarif.write-failed", { path = path, error = tostring(err) }) .. "\n"
+    )
     return
   end
   fd:write(body)
   fd:close()
-  io.stdout:write("wrote " .. path .. "\n")
+  io.stdout:write(i18n.t("cli.wrote", { path = path }) .. "\n")
 end
 
 ---The byte offset at which two strings first differ, or `nil` when they are
@@ -233,10 +236,15 @@ local function report_skipped_links()
   if #skipped == 0 then
     return
   end
-  io.stderr:write(("%d link%s not followed:\n"):format(#skipped, #skipped == 1 and "" or "s"))
+  io.stderr:write(
+    i18n.t(
+      #skipped == 1 and "cli.links.skipped-one" or "cli.links.skipped-many",
+      { count = #skipped }
+    ) .. "\n"
+  )
   for i, entry in ipairs(skipped) do
     if i > 20 then
-      io.stderr:write(("  ... and %d more\n"):format(#skipped - 20))
+      io.stderr:write("  " .. i18n.t("cli.links.more", { count = #skipped - 20 }) .. "\n")
       break
     end
     io.stderr:write(
@@ -290,15 +298,13 @@ end
 local function run_breaking(opts, root, ref)
   local out_dir = require("docmap.core.safe_out_dir")(opts.out_dir)
   if not out_dir then
-    io.stderr:write(
-      ("docmap: opts.out_dir is not a safe relative path: %s\n"):format(tostring(opts.out_dir))
-    )
+    io.stderr:write(i18n.t("cli.out-dir.unsafe", { out_dir = tostring(opts.out_dir) }) .. "\n")
     return REFUSED
   end
   -- `git show <ref>:<path>` is one argv element: a ref that starts with `-`
   -- would be read as an option (`--output=<file>` writes one), not a revision.
   if ref == "" or ref:sub(1, 1) == "-" then
-    io.stderr:write(("docmap: refusing to compare: %q is not a revision\n"):format(ref))
+    io.stderr:write(i18n.t("cli.breaking.not-a-revision", { ref = ("%q"):format(ref) }) .. "\n")
     return REFUSED
   end
   local rel = out_dir .. "/module_map.json"
@@ -308,7 +314,7 @@ local function run_breaking(opts, root, ref)
   local shown = vim.fn.system({ "git", "-C", root, "show", ("%s:%s"):format(ref, rel) })
   if vim.v.shell_error ~= 0 then
     io.stderr:write(
-      ("docmap: refusing to compare: cannot read %s at %s: %s\n"):format(rel, ref, vim.trim(shown))
+      i18n.t("cli.breaking.cannot-read", { file = rel, ref = ref, error = vim.trim(shown) }) .. "\n"
     )
     return REFUSED
   end
@@ -316,9 +322,7 @@ local function run_breaking(opts, root, ref)
     luanil = { object = true, array = true },
   })
   if not decoded or type(doc) ~= "table" or type(doc.nodes) ~= "table" then
-    io.stderr:write(
-      ("docmap: refusing to compare: the map at %s is not a readable artifact\n"):format(ref)
-    )
+    io.stderr:write(i18n.t("cli.breaking.not-an-artifact", { ref = ref }) .. "\n")
     return REFUSED
   end
 
@@ -330,12 +334,10 @@ local function run_breaking(opts, root, ref)
     io.stdout:write(line .. "\n")
   end
   if #surface.breaking > 0 then
-    io.stderr:write(
-      ("%d breaking change(s) to the published surface since %s.\n"):format(#surface.breaking, ref)
-    )
+    io.stderr:write(i18n.t("cli.breaking.found", { count = #surface.breaking, ref = ref }) .. "\n")
     return 1
   end
-  io.stdout:write(("No breaking change to the published surface since %s.\n"):format(ref))
+  io.stdout:write(i18n.t("cli.breaking.none", { ref = ref }) .. "\n")
   return 0
 end
 
@@ -404,7 +406,7 @@ function M.run(opts, argv)
   -- because the machine is German would break every one of them without a line of theirs changing. Only what
   -- this run prints is affected; the artifacts it writes are the same bytes in every locale.
   -- Neither given leaves the locale alone: this function also runs inside an editor that chose its own.
-  require("docmap.core.i18n").configure_run(cli_locale, os.getenv("DOCMAP_LOCALE"))
+  i18n.configure_run(cli_locale, os.getenv("DOCMAP_LOCALE"))
 
   -- **Replaced, not appended**, so parsing the same argv twice is the same
   -- as parsing it once. `standalone/docmap.lua` deliberately reads both
@@ -457,12 +459,10 @@ function M.run(opts, argv)
   -- repository takes the blame for the spelling.
   local unknown = require("docmap.core.lang_registry").unknown(opts.languages)
   if #unknown > 0 then
-    io.stderr:write(
-      ("Unknown language(s): %s. Known: %s\n"):format(
-        table.concat(unknown, ", "),
-        table.concat(known_language_names(), ", ")
-      )
-    )
+    io.stderr:write(i18n.t("cli.languages.unknown", {
+      unknown = table.concat(unknown, ", "),
+      known = table.concat(known_language_names(), ", "),
+    }) .. "\n")
   end
 
   if breaking_ref then
@@ -477,9 +477,7 @@ function M.run(opts, argv)
     -- and print an excerpt of it when it differed.
     local out_dir = require("docmap.core.safe_out_dir")(opts.out_dir)
     if not out_dir then
-      io.stderr:write(
-        ("docmap: opts.out_dir is not a safe relative path: %s\n"):format(tostring(opts.out_dir))
-      )
+      io.stderr:write(i18n.t("cli.out-dir.unsafe", { out_dir = tostring(opts.out_dir) }) .. "\n")
       return REFUSED
     end
 
@@ -506,7 +504,10 @@ function M.run(opts, argv)
       local actual, kind, why = safe_fs.read(root, root .. "/" .. out_dir .. "/" .. name)
       if kind == "refused" then
         io.stderr:write(
-          ("docmap: refusing to read %s/%s: %s\n"):format(out_dir, name, tostring(why))
+          i18n.t(
+            "cli.check.read-refused",
+            { file = out_dir .. "/" .. name, reason = tostring(why) }
+          ) .. "\n"
         )
         return REFUSED
       end
@@ -542,29 +543,33 @@ function M.run(opts, argv)
       -- `core/external_repos.lua`'s header for what they were). The first
       -- differing offset plus a window either side names that class of bug in
       -- the log itself, and costs nothing on a green run.
-      io.stderr:write("Module map is stale:\n")
+      io.stderr:write(i18n.t("cli.check.stale") .. "\n")
       for _, s in ipairs(stale) do
         io.stderr:write("  " .. s.file .. "\n")
         if not s.committed then
-          io.stderr:write("    not committed at all — the file is missing\n")
+          io.stderr:write("    " .. i18n.t("cli.check.stale.missing") .. "\n")
         else
           local at = first_difference(s.committed, s.generated) or (#s.committed + 1)
+          io.stderr:write("    " .. i18n.t("cli.check.stale.sizes", {
+            committed = #s.committed,
+            generated = #s.generated,
+            at = ("%d"):format(at),
+          }) .. "\n")
           io.stderr:write(
-            ("    committed %d B, generated %d B, first difference at byte %d\n"):format(
-              #s.committed,
-              #s.generated,
-              at
-            )
+            "      "
+              .. i18n.t("cli.check.stale.committed", { excerpt = excerpt(s.committed, at) })
+              .. "\n"
           )
-          io.stderr:write("      committed: " .. excerpt(s.committed, at) .. "\n")
-          io.stderr:write("      generated: " .. excerpt(s.generated, at) .. "\n")
+          io.stderr:write(
+            "      "
+              .. i18n.t("cli.check.stale.generated", { excerpt = excerpt(s.generated, at) })
+              .. "\n"
+          )
         end
       end
       -- Offsets into `index.html` are offsets into the *stripped* text, since
       -- that is what both sides were compared as.
-      io.stderr:write(
-        "\nRun :DocMap (or nvim --headless -l scripts/gen_map.lua) and commit the result.\n\n"
-      )
+      io.stderr:write("\n" .. i18n.t("cli.check.stale.advice") .. "\n\n")
       report(findings, ir, opts)
       return 1
     end
@@ -574,13 +579,13 @@ function M.run(opts, argv)
 
     if tally.error > 0 then
       if strict then
-        io.stderr:write("\nModule map has " .. tally.error .. " error-severity drift findings.\n")
+        io.stderr:write("\n" .. i18n.t("cli.check.errors", { count = tally.error }) .. "\n")
         return 1
       end
-      io.stdout:write(tally.error .. " error-severity findings (--lenient: not failing).\n")
+      io.stdout:write(i18n.t("cli.check.errors-lenient", { count = tally.error }) .. "\n")
     end
 
-    io.stdout:write("Module map is up to date.\n")
+    io.stdout:write(i18n.t("cli.check.up-to-date") .. "\n")
     return 0
   end
 
@@ -604,15 +609,13 @@ function M.run(opts, argv)
     return REFUSED
   end
   for _, w in ipairs(written) do
-    io.stdout:write("wrote " .. w .. "\n")
+    io.stdout:write(i18n.t("cli.wrote", { path = w }) .. "\n")
   end
-  io.stdout:write(
-    ("%d modules, %d namespaces, %d files\n"):format(
-      ir.meta.counts.module,
-      ir.meta.counts.namespace,
-      ir.meta.counts.file
-    )
-  )
+  io.stdout:write(i18n.t("cli.generate.counts", {
+    modules = ("%d"):format(ir.meta.counts.module),
+    namespaces = ("%d"):format(ir.meta.counts.namespace),
+    files = ("%d"):format(ir.meta.counts.file),
+  }) .. "\n")
   -- The one coverage gap unambiguous enough to print on every run: a whole
   -- language that has files in this tree and contributed nothing to the map,
   -- because all of them sit outside every source root. That is a fixable
@@ -645,24 +648,21 @@ function M.run(opts, argv)
     end
     if total > 0 then
       io.stdout:write(
-        ("%d file%s of a language this map contains none of, outside every source root (%s)\n"):format(
-          total,
-          total == 1 and "" or "s",
-          table.concat(parts, ", ")
-        )
+        i18n.t(
+          total == 1 and "cli.generate.outside-one" or "cli.generate.outside-many",
+          { count = ("%d"):format(total), languages = table.concat(parts, ", ") }
+        ) .. "\n"
       )
     end
   end
   local tested, tested_total = require("docmap.core.coverage").summary(ir)
   if tested_total > 0 then
-    io.stdout:write(
-      ("%d/%d functions found by name in %s (%.0f%%)\n"):format(
-        tested,
-        tested_total,
-        opts.tests_dir or "TESTS",
-        100 * tested / tested_total
-      )
-    )
+    io.stdout:write(i18n.t("cli.generate.tested", {
+      tested = ("%d"):format(tested),
+      total = ("%d"):format(tested_total),
+      tests_dir = opts.tests_dir or "TESTS",
+      percent = ("%.0f"):format(100 * tested / tested_total),
+    }) .. "\n")
   end
   -- Silent for a tree whose languages have no owning construct, which is
   -- most of the Lua ones this runs against — see `core/scopes.lua`.
@@ -673,13 +673,11 @@ function M.run(opts, argv)
   local doccoverage = require("docmap.core.doccoverage")
   local documented, doc_total = doccoverage.summary(ir)
   if doc_total > 0 then
-    io.stdout:write(
-      ("%d/%d published functions fully documented (%.0f%%)\n"):format(
-        documented,
-        doc_total,
-        100 * documented / doc_total
-      )
-    )
+    io.stdout:write(i18n.t("cli.generate.documented", {
+      documented = ("%d"):format(documented),
+      total = ("%d"):format(doc_total),
+      percent = ("%.0f"):format(100 * documented / doc_total),
+    }) .. "\n")
     -- The per-language split, and only when the tree has more than one
     -- language to split into: a breakdown of one row is the line above it
     -- with extra words. Nine backends do not set the same documentation bar
@@ -696,25 +694,21 @@ function M.run(opts, argv)
         -- single figure per language would put two different measures in one
         -- column and invite a comparison that means nothing.
         if row.judges_params then
-          io.stdout:write(
-            ("  %-8s %d/%d summarised (%.0f%%), %d fully documented (%.0f%%)\n"):format(
-              row.language,
-              row.summarised,
-              row.total,
-              100 * row.summarised / row.total,
-              row.documented,
-              100 * row.documented / row.total
-            )
-          )
+          io.stdout:write("  " .. i18n.t("cli.generate.language-row", {
+            language = ("%-8s"):format(row.language),
+            summarised = ("%d"):format(row.summarised),
+            total = ("%d"):format(row.total),
+            summarised_percent = ("%.0f"):format(100 * row.summarised / row.total),
+            documented = ("%d"):format(row.documented),
+            documented_percent = ("%.0f"):format(100 * row.documented / row.total),
+          }) .. "\n")
         else
-          io.stdout:write(
-            ("  %-8s %d/%d summarised (%.0f%%) — no per-parameter convention\n"):format(
-              row.language,
-              row.summarised,
-              row.total,
-              100 * row.summarised / row.total
-            )
-          )
+          io.stdout:write("  " .. i18n.t("cli.generate.language-row-no-params", {
+            language = ("%-8s"):format(row.language),
+            summarised = ("%d"):format(row.summarised),
+            total = ("%d"):format(row.total),
+            summarised_percent = ("%.0f"):format(100 * row.summarised / row.total),
+          }) .. "\n")
         end
       end
     end
@@ -725,14 +719,16 @@ function M.run(opts, argv)
   local telemetry_summary = require("docmap.core.telemetry_join").doc_usage_summary(ir, opts)
   if telemetry_summary then
     io.stdout:write(
-      ("%d documented function(s) never called — maintenance cost\n"):format(
-        telemetry_summary.documented_unused
-      )
+      i18n.t(
+        "cli.generate.documented-unused",
+        { count = ("%d"):format(telemetry_summary.documented_unused) }
+      ) .. "\n"
     )
     io.stdout:write(
-      ("%d undocumented function(s) actually called — prioritized backlog\n"):format(
-        telemetry_summary.undocumented_used
-      )
+      i18n.t(
+        "cli.generate.undocumented-used",
+        { count = ("%d"):format(telemetry_summary.undocumented_used) }
+      ) .. "\n"
     )
   end
   write_sarif(sarif_path, ir, findings, opts)

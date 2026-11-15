@@ -22,6 +22,8 @@
 ---   * `deps` is the require graph, collapsed to a depth so the picture stays
 ---     readable; `render_deps`'s own header explains why it is coarse.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
 ---@param ctx Docmap.Bindings.Ctx
@@ -32,7 +34,7 @@ function M.run(ctx, arg)
     kind = "tree"
   end
   if kind ~= "tree" and kind ~= "deps" then
-    ctx.notify.warn("Unknown graph: " .. kind .. " (expected tree or deps)")
+    ctx.notify.warn(i18n.t("editor.mermaid.unknown-kind", { kind = kind }))
     return
   end
 
@@ -75,7 +77,7 @@ function M.run(ctx, arg)
     vim.bo[existing].modifiable = true
     vim.api.nvim_buf_set_lines(existing, 0, -1, false, lines)
     vim.api.nvim_win_set_buf(0, existing)
-    ctx.notify.info("Paste it into a README — GitHub renders mermaid fences.")
+    ctx.notify.info(i18n.t("editor.mermaid.paste-hint"))
     return
   end
 
@@ -90,7 +92,7 @@ function M.run(ctx, arg)
   vim.bo[buf].bufhidden = "hide"
   vim.bo[buf].swapfile = false
   pcall(vim.api.nvim_buf_set_name, buf, name)
-  ctx.notify.info("Paste it into a README — GitHub renders mermaid fences.")
+  ctx.notify.info(i18n.t("editor.mermaid.paste-hint"))
 end
 
 return M

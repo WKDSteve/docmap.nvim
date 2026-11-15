@@ -7,6 +7,7 @@
 --- them further would put `handle.rescan()` in three places and invite the
 --- three to drift on how they tally findings.
 
+local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
 
 local M = {}
@@ -29,7 +30,7 @@ local function report_timing(ctx, ir)
   end
   -- One notification rather than one per stage: a stack of six messages is
   -- something to dismiss, a block is something to read.
-  ctx.notify.info("Scan timing (opts.debug):\n" .. table.concat(lines, "\n"))
+  ctx.notify.info(i18n.t("editor.generate.timing", { lines = table.concat(lines, "\n") }))
 end
 
 ---Rescan and write. `opts.luals` is the `full` variant.
@@ -78,9 +79,9 @@ function M.run(ctx, opts)
   if ctx.cfg.pdf then
     docmap.write_pdf_artifact(ir, findings, ctx.cfg, function(ok, path_or_err)
       if ok then
-        ctx.notify.info(("wrote %s"):format(path_or_err))
+        ctx.notify.info(i18n.t("editor.generate.pdf-written", { path = path_or_err }))
       else
-        ctx.notify.warn(("overview.pdf not written: %s"):format(path_or_err))
+        ctx.notify.warn(i18n.t("editor.generate.pdf-failed", { error = path_or_err }))
       end
     end)
   end
@@ -96,24 +97,20 @@ function M.run(ctx, opts)
   local where = ctx.cfg.title or vim.fn.fnamemodify(ctx.cfg.root, ":t")
 
   if luals then
-    ctx.notify.info(
-      ("%s: wrote %d artifacts with LuaLS enrichment (%d modules, %d edges, %d errors)"):format(
-        where,
-        #written,
-        ir.meta.counts.module,
-        #(ir.edges or {}),
-        tally.error
-      )
-    )
+    ctx.notify.info(i18n.t("editor.generate.wrote-luals", {
+      where = where,
+      artifacts = #written,
+      modules = ("%d"):format(ir.meta.counts.module),
+      edges = #(ir.edges or {}),
+      errors = ("%d"):format(tally.error),
+    }))
   else
-    ctx.notify.info(
-      ("%s: wrote %d artifacts (%d modules, %d errors)"):format(
-        where,
-        #written,
-        ir.meta.counts.module,
-        tally.error
-      )
-    )
+    ctx.notify.info(i18n.t("editor.generate.wrote", {
+      where = where,
+      artifacts = #written,
+      modules = ("%d"):format(ir.meta.counts.module),
+      errors = ("%d"):format(tally.error),
+    }))
   end
 end
 
@@ -123,21 +120,23 @@ function M.check(ctx)
   local docmap = require("docmap")
   local _, findings = ctx.handle.rescan()
   local tally = docmap.tally(findings)
-  local summary = ("%d errors · %d warnings · %d info"):format(
-    tally.error,
-    tally.warn,
-    tally.info
-  )
+  local counts = {
+    errors = ("%d"):format(tally.error),
+    warnings = ("%d"):format(tally.warn),
+    info = ("%d"):format(tally.info),
+  }
 
   -- Named for the same reason `run` names it, and it matters more here: the
   -- pre-commit hook runs this, and "0 errors" about the wrong tree is a green
   -- light nobody earned.
   local where = ctx.cfg.title or vim.fn.fnamemodify(ctx.cfg.root, ":t")
 
+  counts.where = where
+
   if tally.error > 0 then
-    ctx.notify.warn(("%s: module map drift — %s"):format(where, summary))
+    ctx.notify.warn(i18n.t("editor.check.drift", counts))
   else
-    ctx.notify.info(("%s: module map — %s"):format(where, summary))
+    ctx.notify.info(i18n.t("editor.check.clean", counts))
   end
 
   -- Route the detail through the quickfix list rather than a notification so
