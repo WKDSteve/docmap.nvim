@@ -336,10 +336,10 @@ return function(H)
   end
 
   -- A catalog that does not load is named, with the reason.
-  package.preload["docmap.core.i18n.bundled"] = function()
-    return { en = "{ not json" }
-  end
-  i18n._reset()
+  -- Played as a host without the catalog files, whose copy of them is broken.
+  local real_bundle = package.loaded["docmap.core.i18n.bundled"]
+  package.loaded["docmap.core.i18n.bundled"] = { en = "{ not json" }
+  i18n._without_files()
   local named
   for _, line in ipairs(checkhealth()) do
     if line.kind == "warn" and line.text:find("interface catalog en.json", 1, true) then
@@ -350,7 +350,6 @@ return function(H)
     named and named:find("is not loaded: not valid JSON", 1, true),
     "health: a catalog that failed to load is a warning with its reason: " .. tostring(named)
   )
-  package.preload["docmap.core.i18n.bundled"] = nil
-  package.loaded["docmap.core.i18n.bundled"] = nil
+  package.loaded["docmap.core.i18n.bundled"] = real_bundle
   i18n._reset()
 end

@@ -229,6 +229,71 @@ function GATES.standalone()
   say("  ok: no host-dependent number formatting in the standalone artifact")
 
   -- ------------------------------------------------------------------
+  -- No sentence left unsaid.
+  --
+  -- The engine says everything through the interface catalog (`core/i18n`), and a host that cannot load the
+  -- catalog still generates: every finding then reads `<missing-readme> path=lua/sample` and every other text
+  -- `‹missing:key›`, in files that look complete. That reached a release once: the engine docmap-desktop runs
+  -- in a browser bundles Lua modules only and had no catalog. So the artifacts of this build are read for both
+  -- shapes, and the catalog is loaded once more the way such a host loads it, from `bundled.lua` alone.
+  for _, name in ipairs({ "overview.md", "index.html" }) do
+    local artifact = io.open(out_abs .. "/" .. name, "rb")
+    local text = artifact and artifact:read("*a") or ""
+    if artifact then
+      artifact:close()
+    end
+    local marker = text:match("‹missing:[^›]*›")
+    -- A finding without its template is the check's own name in angle brackets and its parameters: at the
+    -- head of a table cell in overview.md, at the head of a `message` in the data of the page.
+    local bare = name == "overview.md" and text:match("| <([%l][%l%-%.]+)>[ |]")
+      or text:match('"message":"<([%l][%l%-%.]+)>')
+    if marker or bare then
+      fail(
+        ("standalone build wrote %s with a text the catalog did not resolve: %s"):format(
+          name,
+          marker or ("<" .. bare .. "> ...")
+        )
+      )
+      return
+    end
+  end
+  local page_fd = io.open(out_abs .. "/index.html", "rb")
+  local page = page_fd and page_fd:read("*a") or ""
+  if page_fd then
+    page_fd:close()
+  end
+  if not page:find("has no ---@module annotation", 1, true) then
+    fail("standalone build wrote a page without the sentences of the interface catalog")
+    return
+  end
+
+  local probe = root .. "/.deps/standalone-i18n-probe.lua"
+  vim.fn.writefile({
+    -- The path of this repository first, as standalone/docmap.lua sets it up; the shim brings `vim.json`.
+    ("package.path = %q .. package.path"):format(
+      root .. "/?.lua;" .. root .. "/lua/?.lua;" .. root .. "/lua/?/init.lua;"
+    ),
+    'require("standalone.vim_shim")',
+    'local i18n = require("docmap.core.i18n")',
+    "i18n._without_files()",
+    'local said = i18n.t("finding.missing-readme", { path = "lua/sample" })',
+    "local problem = next(i18n.problems())",
+    'io.stdout:write(said, "\\n", tostring(problem), "\\n")',
+    'os.exit(said == "lua/sample has no README.md" and problem == nil and 0 or 1)',
+  }, probe)
+  local probed = vim.system({ lua, probe }, { cwd = root, text = true }):wait()
+  vim.fn.delete(probe)
+  if probed.code ~= 0 then
+    fail(
+      "a host without the catalog files does not get its sentences from bundled.lua:\n    "
+        .. vim.trim((probed.stdout or "") .. (probed.stderr or ""))
+    )
+    return
+  end
+
+  say("  ok: every text of the standalone artifact is resolved, with and without the catalog files")
+
+  -- ------------------------------------------------------------------
   -- Links, on the interpreter and the `lfs` this build actually ships.
   --
   -- `TESTS/shim_links_spec.lua` compares the shim with the editor on the

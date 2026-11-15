@@ -14,9 +14,8 @@
 ---     user text in as a parameter; it is substituted literally and never looked up.
 ---
 --- **Standalone-safe.** No editor API: the engine (`standalone/docmap.lua`) loads this under PUC Lua with the
---- shim's `vim.json`. A source checkout reads the catalogs from the directory of this file; the packaged binary
---- has no such directory, so `scripts/package.lua` stages them as the Lua module `docmap.core.i18n.bundled`
---- (a table of locale code to JSON text), and that module wins when it exists.
+--- shim's `vim.json`. A checkout reads the catalogs from the directory of this file; a host that carries Lua
+--- modules only (the packaged binary, the engine in a browser) reads the generated copy `bundled.lua`.
 ---
 --- **The active locale starts as English and changes only when a host says so** (`M.configure`): the editor in
 --- `setup()`, the engine from `--locale`. A caller that never configures gets English, which is what keeps every
@@ -51,10 +50,6 @@ local cache = {}
 ---@type table<string, string> Why a catalog could not be read, by locale code.
 local problems = {}
 
----The module the packaged binary carries its catalogs in. A name in a variable, not in the `require` below: the
----module exists in no source tree, and the map's own check would report a require nothing declares.
-local BUNDLED = "docmap.core.i18n.bundled"
-
 local active = M.SOURCE
 local debug_mode = false
 
@@ -65,26 +60,37 @@ local function here()
   return (source:gsub("^@", ""):gsub("\\", "/"):match("^(.*/)") or "./")
 end
 
----The JSON text of one catalog: from the bundle when this is the packaged binary, from disk otherwise.
+---Set by a spec to read as a host without the files does (`M._without_files`).
+local files_hidden = false
+
+---The JSON text of one catalog: the file beside this module, or the same text out of `bundled.lua`.
+---
+---Two sources for one text, because not every host has the files. A checkout read by Neovim has them, and they
+---are the truth: `<locale>.json` is what a translator edits. A host that carries Lua modules and nothing else
+---has not: the packaged binary (`scripts/package.lua`), and the engine docmap-desktop runs in a browser, which
+---bundles `docmap.core` as Lua sources. Those read `docmap.core.i18n.bundled`, the generated copy of the files
+---(`scripts/gen_i18n_bundle.lua`), which `i18n_catalog_spec.lua` holds to the files byte for byte.
+---
+---The file is tried only under an absolute directory. A relative one is resolved against whatever directory
+---the process happens to stand in, and a catalog must not depend on that.
 ---@param code string
 ---@return string? text
 ---@return string? err
 local function read(code)
-  local has_bundle, bundle = pcall(require, BUNDLED)
-  if has_bundle and type(bundle) == "table" then
-    if type(bundle[code]) == "string" then
-      return bundle[code]
+  local dir = here()
+  if not files_hidden and (dir:sub(1, 1) == "/" or dir:match("^%a:/")) then
+    local fd = io.open(dir .. code .. ".json", "rb")
+    if fd then
+      local text = fd:read("*a")
+      fd:close()
+      return text
     end
-    return nil, "not in the bundle"
   end
-  local path = here() .. code .. ".json"
-  local fd = io.open(path, "rb")
-  if not fd then
-    return nil, "cannot open " .. path
+  local has_bundle, bundle = pcall(require, "docmap.core.i18n.bundled")
+  if has_bundle and type(bundle) == "table" and type(bundle[code]) == "string" then
+    return bundle[code]
   end
-  local text = fd:read("*a")
-  fd:close()
-  return text
+  return nil, ("neither %s%s.json nor the bundled copy can be read"):format(dir, code)
 end
 
 ---True for a locale code this build ships.
@@ -380,12 +386,19 @@ end
 function M._reset()
   cache = {}
   problems = {}
+  files_hidden = false
   active = M.SOURCE
   debug_mode = false
   M.LOCALES = {}
   for i, code in ipairs(SHIPPED) do
     M.LOCALES[i] = code
   end
+end
+
+---Read as a host without the catalog files does: from `bundled.lua` only. For specs; `M._reset()` ends it.
+function M._without_files()
+  M._reset()
+  files_hidden = true
 end
 
 ---Run on catalogs handed in, not on the files: what the golden cases need (`i18n_runtime_spec.lua`). For specs;

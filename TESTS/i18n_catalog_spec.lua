@@ -8,7 +8,8 @@
 --   * a message is a text or a table of plural categories with `other`;
 --   * a translation has no key and no placeholder its source lacks, and the same shape (text or plural);
 --   * a `maintained` or `contributed` locale is complete: every key of the source is translated.
--- And one behaviour: the packaged binary's bundle (`docmap.core.i18n.bundled`) wins over the files.
+-- And the copy for hosts without the files: `bundled.lua` is the files byte for byte, and a host that can read
+-- no file (the packaged binary, the engine in a browser) says every sentence from it.
 
 return function(H)
   local ok, eq = H.ok, H.eq
@@ -192,29 +193,73 @@ return function(H)
     end
   end
 
-  -- ── The bundle of the packaged binary wins over the files ───────────────
-  package.preload["docmap.core.i18n.bundled"] = function()
-    return {
-      en = '{"locale":"en","name":"English","tier":"source","messages":{"page.x":"from the bundle"}}',
-    }
-  end
-  i18n._reset()
-  eq(i18n.t("page.x"), "from the bundle", "bundle: the catalog comes from the bundled module")
+  -- ── The copy for hosts without the files ────────────────────────────────
+  -- A host that bundles Lua modules and nothing else has no `<locale>.json`: the packaged binary, and the engine
+  -- docmap-desktop runs in a browser. The first release of the catalog reached that engine without its texts, and
+  -- every finding read `<missing-readme> path=lua/sample`. `bundled.lua` is the catalogs as a module such a host
+  -- carries like any other; it is generated, so it is held to the files here.
+  local generator = dofile("scripts/gen_i18n_bundle.lua")
   eq(
-    i18n.has("finding.missing-readme"),
-    false,
-    "bundle: and the file beside the module is not read"
+    H.slurp("lua/docmap/core/i18n/bundled.lua"),
+    generator.current(),
+    "bundled.lua is stale: run nvim -l scripts/gen_i18n_bundle.lua after changing a <locale>.json"
   )
-  package.preload["docmap.core.i18n.bundled"] = nil
-  package.loaded["docmap.core.i18n.bundled"] = nil
+  local bundled = dofile("lua/docmap/core/i18n/bundled.lua")
+  for _, code in ipairs(i18n.LOCALES) do
+    eq(
+      bundled[code],
+      H.slurp(("%s/%s.json"):format(DIR, code)),
+      "bundled.lua holds " .. code .. ".json as it is"
+    )
+  end
+
+  -- The same host, played here: no file is read, and nothing falls back to a marker or to the bare check.
+  i18n._without_files()
+  eq(next(i18n.problems()), nil, "without the files: every shipped catalog loads from the copy")
+  eq(
+    #i18n.keys(),
+    #vim.tbl_keys(source.messages),
+    "without the files: every key of the source is there"
+  )
+  eq(
+    i18n.t("finding.missing-readme", { path = "lua/sample" }),
+    "lua/sample has no README.md",
+    "without the files: a finding is a sentence"
+  )
+  eq(
+    i18n.t("finding.missing-readme", { path = "lua/sample" }, "de"),
+    "lua/sample hat keine README.md",
+    "without the files: in German too"
+  )
+  -- `core/findings.lua` takes its templates when it is loaded: loaded in such a host, it has them all.
   i18n._reset()
-  ok(i18n.has("finding.missing-readme"), "bundle: without it the files are read again")
+  local loaded = require("docmap.core.findings")
+  i18n._without_files()
+  package.loaded["docmap.core.findings"] = nil
+  local fresh = require("docmap.core.findings")
+  package.loaded["docmap.core.findings"] = loaded
+  eq(
+    fresh.format({
+      severity = "info",
+      check = "missing-readme",
+      node = "lua/sample",
+      params = { path = "lua/sample" },
+    }),
+    "lua/sample has no README.md",
+    "without the files: findings.format says the sentence, not <missing-readme> path=lua/sample"
+  )
+  eq(
+    #vim.tbl_keys(fresh.CATALOG),
+    #vim.tbl_keys(loaded.CATALOG),
+    "without the files: every check has its template"
+  )
+  i18n._reset()
+  ok(i18n.has("finding.missing-readme"), "with the files again after the reset")
 
   -- A catalog that does not parse is no catalog, and the reason is kept for :checkhealth.
-  package.preload["docmap.core.i18n.bundled"] = function()
-    return { en = "{ not json" }
-  end
-  i18n._reset()
+  local real = package.loaded["docmap.core.i18n.bundled"]
+  package.loaded["docmap.core.i18n.bundled"] = { en = "{ not json" }
+  i18n._without_files()
   eq(
     i18n.t("page.x"),
     "‹missing:page.x›",
@@ -224,7 +269,13 @@ return function(H)
     tostring(i18n.problems().en):find("not valid JSON", 1, true),
     "broken catalog: the reason is reported"
   )
-  package.preload["docmap.core.i18n.bundled"] = nil
-  package.loaded["docmap.core.i18n.bundled"] = nil
+  -- And one that is in neither place says where it was looked for.
+  package.loaded["docmap.core.i18n.bundled"] = {}
+  i18n._without_files()
+  ok(
+    tostring(i18n.problems().en):find("nor the bundled copy", 1, true),
+    "missing catalog: the reason names both places"
+  )
+  package.loaded["docmap.core.i18n.bundled"] = real
   i18n._reset()
 end
