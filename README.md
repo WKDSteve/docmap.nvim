@@ -63,7 +63,7 @@ the question you arrived with. The four to reach for first:
 ### Configuration and everyday use
 
 - [Configuration](docs/configuration.md) — every option, the `.docmap.json` precedence rules, and rebinding `:DocBrowse` by action rather than by key.
-- [Interface languages](docs/i18n.md) — choosing a language (`locale = "de"`, `--locale=de`), where the catalogs live, and how to add a text or a language.
+- [Interface languages](docs/i18n.md) — English and German. Neovim follows the language of the system (`locale = "en"` keeps English), the engine speaks English until `--locale=de` says otherwise; where the catalogs live, and how to add a text or a language.
 - [Tabs](docs/tabs.md) — what each panel of the generated page shows, and why.
 - [Features](docs/FEATURES/README.md) — one page per area, with the reasoning behind each.
 - [Lua API](docs/api.md) — `generate()`, `install()`, and the live `Docmap.Handle`.

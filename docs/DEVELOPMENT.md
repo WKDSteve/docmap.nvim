@@ -293,6 +293,19 @@ commit. The pre-commit hook enforces exactly that:
 git config core.hooksPath scripts/hooks   # once per clone
 ```
 
+So do the `map` step of `scripts/test.sh ci` and the `map` job of the CI: both
+only check, on a pull request and on `main` alike. Nothing regenerates the map
+for you (until 2026-11-15 a push to `main` did, with a bot commit).
+
+**Committing the map does not publish it.** The page on GitHub Pages is
+deployed by `.github/workflows/pages.yml`, which runs when somebody starts it
+(`workflow_dispatch`) or with a `v*` tag, and uploads `docs/map/` as committed
+at that moment.
+
+The map resolves this repository's links into lib.nvim against a checkout at
+`../lib.nvim` (`.docmap.json`). In a git worktree that sits somewhere else,
+put one there first, or the regenerated map differs in exactly those links.
+
 The committed map is generated **without** `--full`: `--check` compares it byte
 for byte and would otherwise need `lua-language-server` installed to reproduce
 it. Both class-based Hierarchy views say so explicitly when opened against such

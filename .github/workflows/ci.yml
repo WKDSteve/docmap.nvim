@@ -228,22 +228,22 @@ jobs:
   # The pre-commit hook is opt-in per clone (`git config core.hooksPath`), so
   # without this job the committed map goes stale on main with nothing noticing.
   #
-  # Self-healing: on a PR the map is regenerated and any drift fails the job
-  # (the contributor is told to run gen_map.lua and commit). On a push to main
-  # the same drift is committed back automatically ([skip ci] so it does not
-  # loop) — a generated artifact that only ever fails the branch it lives on is
-  # a chore, not a gate.
+  # A check and nothing else, on a pull request and on main alike: the map is
+  # regenerated and any difference fails the job, with the one command that
+  # fixes it. `docs/map` belongs in the commit that changes what it shows
+  # (docs/DEVELOPMENT.md, "Regenerating this repository's own map").
+  #
+  # Until 2026-11-15 a push to main committed the regenerated map back by
+  # itself. That made two writers of `docs/map`, left every local
+  # `scripts/test.sh ci commit` red at the same step for a commit this job
+  # would then repair, and hid a stale map behind a bot commit nobody read.
   map:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: write
     steps:
+      # The default checkout: the commit this run is about, not the tip of its
+      # branch, so the verdict belongs to that commit.
       - uses: actions/checkout@v5
-        with:
-          # A branch, not the default detached HEAD, so the self-heal push
-          # below has somewhere to land.
-          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/checkout@v5
         with:
           repository: WKDSteve/lib.nvim
@@ -278,22 +278,16 @@ jobs:
         run: |
           exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
           nvim -n -i NONE --headless -l scripts/gen_map.lua
-      - name: Verify (PR) or commit the regenerated map (push to main)
+      - name: Verify the committed map
         run: |
           exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
           if git diff --quiet; then
             echo "module map is up to date"
             exit 0
           fi
-          if [ "${{ github.event_name }}" != "push" ] || [ "${{ github.ref_name }}" != "main" ]; then
-            echo "::error::module map is stale — run 'nvim -n -i NONE --headless -l scripts/gen_map.lua' and commit the result"
-            git --no-pager diff --stat
-            exit 1
-          fi
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "docs(map): regenerate module map [skip ci]"
-          git push
+          echo "::error::module map is stale — run 'nvim -n -i NONE --headless -l scripts/gen_map.lua' and commit the result"
+          git --no-pager diff --stat
+          exit 1
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
