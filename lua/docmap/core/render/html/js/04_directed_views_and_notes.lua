@@ -571,14 +571,10 @@ return [[
   // code that CI fails on.
   // =====================================================================
   var NOTE_KINDS = [
-    { key: "deprecated", title: "Deprecated", scalar: true,
-      sub: "Functions marked ---@deprecated. The text is the migration hint the author left." },
-    { key: "todo", title: "Todo",
-      sub: "Open ---@todo entries, one line per occurrence." },
-    { key: "bug", title: "Bug",
-      sub: "Known defects recorded with ---@bug, still present in the code." },
-    { key: "test", title: "Test",
-      sub: "---@test notes: what covers this function, or what still needs covering." }
+    { key: "deprecated", scalar: true, title: "page.notes.deprecated", sub: "page.notes.deprecated.sub" },
+    { key: "todo", title: "page.notes.todo", sub: "page.notes.todo.sub" },
+    { key: "bug", title: "page.notes.bug", sub: "page.notes.bug.sub" },
+    { key: "test", title: "page.notes.test", sub: "page.notes.test.sub" }
   ];
 
   function collectNotes(kind){
@@ -657,27 +653,30 @@ return [[
     return bits.join("");
   }
 
+  // The keys of the lines under the keywords of core/markers.lua (`M.KEYWORDS`). A keyword added there without
+  // a key here shows its English line.
+  var MARKER_SUB = {
+    TODO: "page.notes.marker.todo", FIX: "page.notes.marker.fix", HACK: "page.notes.marker.hack",
+    WARN: "page.notes.marker.warn", PERF: "page.notes.marker.perf", NOTE: "page.notes.marker.note",
+    TEST: "page.notes.marker.test"
+  };
+
   function drawMarkers(parts){
     var kinds = IR.marker_kinds || [];
     var byKind = collectMarkers();
     var total = 0;
     kinds.forEach(function(k){ total += (byKind[k.name] || []).length; });
 
-    parts.push('<h3 class="ngroup">Marker comments<span class="ncount">' +
-      total + "</span></h3>");
-    parts.push('<p class="nsub">Keywords written in ordinary comments — ' +
-      '<code>-- TODO:</code>, <code>// FIXME:</code>, <code>-- PERF:</code> — ' +
-      "read from the source text rather than from an annotation. The same " +
-      "keyword set <code>todo-comments.nvim</code> highlights in the editor, " +
-      "so what is coloured in the buffer is what is listed here.</p>");
+    parts.push('<h3 class="ngroup">' + esc(t("page.notes.markers")) + '<span class="ncount">' +
+      fmtNum(total) + "</span></h3>");
+    parts.push('<p class="nsub">' + prose(t("page.notes.markers.sub")) + "</p>");
 
     // An artifact generated before marker scanning existed carries no
     // `markers` key at all, and rendering that as "nothing to do" would be
     // the exact silent-degradation failure this page keeps being caught by.
     // Schema 4 is where the field arrived.
     if(!((IR.meta || {}).schema >= 4)){
-      parts.push('<p class="ntext none">This map predates marker scanning. ' +
-        "Regenerate it to list them.</p>");
+      parts.push('<p class="ntext none">' + esc(t("page.notes.markers.old-map")) + "</p>");
       return;
     }
 
@@ -686,8 +685,10 @@ return [[
       var items = byKind[k.name] || [];
       if(items.length === 0){ empty.push(k.name); return; }
       parts.push("<h3>" + esc(k.name) +
-        '<span class="ncount">' + items.length + "</span></h3>");
-      parts.push('<p class="nsub">' + esc(k.sub) + "</p>");
+        '<span class="ncount">' + fmtNum(items.length) + "</span></h3>");
+      // The line under a keyword is core/markers.lua's; the catalog says it again in the reader's language.
+      var subKey = MARKER_SUB[k.name];
+      parts.push('<p class="nsub">' + esc(subKey ? t(subKey) : k.sub) + "</p>");
       parts.push('<ul class="nlist">');
       items.forEach(function(it){ parts.push(markerItem(it)); });
       parts.push("</ul>");
@@ -697,17 +698,19 @@ return [[
     // a heading each: seven empty sections is the whole tab, and this page's
     // rule is density on demand, never on screen.
     if(empty.length === kinds.length){
-      parts.push('<p class="ntext none">No marker comments in this map.</p>');
+      parts.push('<p class="ntext none">' + esc(t("page.notes.markers.none")) + '</p>');
     } else if(empty.length){
-      parts.push('<p class="ntext none">Nothing marked ' +
-        esc(empty.join(", ")) + ".</p>");
+      parts.push('<p class="ntext none">' +
+        esc(t("page.notes.markers.empty", { kinds: empty.join(", ") })) + "</p>");
     }
   }
 
-  var notesDrawn = false;
+  // The locale the tab was drawn in: static over one IR, so only a change of
+  // language draws it again.
+  var notesDrawn = null;
   function drawNotes(){
-    if(notesDrawn) return; // static over one IR; nothing invalidates it
-    notesDrawn = true;
+    if(notesDrawn === appliedLocale) return;
+    notesDrawn = appliedLocale;
 
     var host = document.getElementById("view-notes");
     var parts = [];
@@ -717,18 +720,15 @@ return [[
     // "this repository has nothing outstanding" -- and was reported as
     // exactly that misreading by an author whose tree is full of
     // `-- TODO:`. Those four sections were never counting comments.
-    parts.push('<h3 class="ngroup">Annotations<\/h3>');
-    parts.push('<p class="nsub">Tags written in a documentation block, shown '
-      + 'beside the function they describe. Comment markers such as '
-      + '<code>-- TODO:<\/code> are a separate list, further down.<\/p>');
+    parts.push('<h3 class="ngroup">' + esc(t("page.notes.annotations")) + '<\/h3>');
+    parts.push('<p class="nsub">' + prose(t("page.notes.annotations.sub")) + '<\/p>');
     NOTE_KINDS.forEach(function(kind){
       var items = collectNotes(kind);
-      parts.push('<h3>' + esc(kind.title) +
-        '<span class="ncount">' + items.length + '</span></h3>');
-      parts.push('<p class="nsub">' + esc(kind.sub) + '</p>');
+      parts.push('<h3>' + esc(t(kind.title)) +
+        '<span class="ncount">' + fmtNum(items.length) + '</span></h3>');
+      parts.push('<p class="nsub">' + esc(t(kind.sub)) + '</p>');
       if(items.length === 0){
-        parts.push('<p class="ntext none">No function carries <code>---@' +
-          esc(kind.key) + '<\/code>. Comment markers are listed under Marker comments below.<\/p>');
+        parts.push('<p class="ntext none">' + prose(t("page.notes.none", { tag: kind.key })) + '<\/p>');
         return;
       }
       parts.push('<ul class="nlist">');

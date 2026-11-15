@@ -194,6 +194,46 @@ return {
     { shot = "de-dark-quicks" },
     { scheme = "light" },
 
+    -- The Tree detail pane of a module with a finding: section titles, the Stats labels, Meta.
+    {
+      expect = "(r => (location.hash = '#tab=tree&id=' + encodeURIComponent(r.dataset.id) + '&lang=de', true))"
+        .. "([...document.querySelectorAll('#tree .row[data-id]')].find(r => /util/.test(r.textContent)))",
+      note = "the module util in the Tree",
+    },
+    {
+      wait = "[...document.querySelectorAll('#detail .sec')].some(s => /^Zahlen/.test(s.textContent))",
+      note = "its detail pane is drawn, in German",
+    },
+    {
+      expect = "(secs => secs.includes('Meta')"
+        .. " && !secs.some(s => /^(Stats|Requires|Required by|Functions|Contains)\\b/.test(s)))"
+        .. "([...document.querySelectorAll('#detail .sec')].map(s => s.textContent))"
+        .. " && /^Art: /.test([...document.querySelectorAll('#detail .lst li')].pop().textContent)",
+      note = "no section title is left in English, and the Meta line is German",
+    },
+    { hover = "h1" },
+    { press = "Escape", note = "the explanation of the tab is put away" },
+    { expect = "(document.getElementById('detail').scrollIntoView(), true)", note = "the pane in view" },
+    { shot = "de-light-detail" },
+
+    -- Notes and Index: drawn once per language.
+    { click = '.tab-btn[data-tab="notes"]' },
+    { wait = "document.querySelector('#view-notes .ngroup') !== null" },
+    {
+      expect = "[...document.querySelectorAll('#view-notes .ngroup')].map(h => h.firstChild.textContent).join('|')"
+        .. " === 'Annotationen|Kommentar-Marker'",
+      note = "the two groups of the Notes tab are German",
+    },
+    { hover = "h1" },
+    { press = "Escape", note = "the explanation of the tab is put away" },
+    { shot = "de-light-notes" },
+    { click = '.tab-btn[data-tab="index"]' },
+    { wait = "document.querySelector('#ixbody .nsub, #ixbody .none') !== null" },
+    {
+      expect = "/(dokumentierte Funktion|keine dokumentierten Funktionen)/.test(document.getElementById('ixbody').textContent)",
+      note = "the Index says its line in German",
+    },
+
     -- Back to English through the picker, the way a reader would.
     {
       expect = "(s => (s.value = 'en', s.dispatchEvent(new Event('change')), true))(document.getElementById('langsel'))",

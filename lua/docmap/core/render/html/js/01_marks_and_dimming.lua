@@ -595,6 +595,20 @@ return [[
     return out;
   }
 
+  // A catalog sentence with a bold part (`**3** modules would be affected`): escaped, and `**…**` set in <b>.
+  // The emphasis stays inside the message, so a translation moves it with the word it belongs to.
+  function bold(s){
+    return esc(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  }
+
+  // A span that says a message and names it, for markup drawn once and kept (the Tree): `applyI18n` says it
+  // again at a change of language, as it does for the static markup.
+  function i18nSpan(cls, key, params){
+    return '<span class="' + cls + '" data-i18n="' + key + '"' +
+      (params ? ' data-i18n-params="' + esc(JSON.stringify(params)) + '"' : '') + '>' +
+      esc(t(key, params)) + '</span>';
+  }
+
   // =====================================================================
   // The lookup layer
   //

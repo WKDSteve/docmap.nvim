@@ -108,19 +108,10 @@ return [[
     // point of the notice and it is simply untrue of `localhost` — a warning
     // that cries wolf is one people learn to click past.
     var tip = ceIsLocal()
-      ? '<b>Experimental — your own Compiler Explorer.</b> Opens ' + esc(ceBase()) +
-        ' in a new tab with this function’s source and shows you real ' +
-        '<code>luac</code> bytecode. Nothing leaves your machine, because that ' +
-        'address is on it. Cleared in the Compare tab.'
-      : '<b>Experimental — leaves your machine.</b> ' +
-        'Opens Compiler Explorer in a new tab and hands it this function’s source, so ' +
-        'godbolt.org compiles it and shows you real <code>luac</code> bytecode. The code ' +
-        'travels inside the link itself: nothing is uploaded ahead of time and nothing is ' +
-        'stored there. It is still someone else’s server, and this map has no other ' +
-        'outbound request anywhere. The Compare tab is where you point this at a ' +
-        'Compiler Explorer you run yourself instead.';
+      ? '<b>' + esc(t("page.godbolt.local.title")) + '</b> ' + prose(t("page.godbolt.local.body", { base: ceBase() }))
+      : '<b>' + esc(t("page.godbolt.remote.title")) + '</b> ' + prose(t("page.godbolt.remote.body"));
     return '<span class="godi-wrap"><a href="#" class="godi" data-godbolt="' + kind +
-      '" data-godbolt-key="' + esc(key) + '">⚙ Compiler Explorer ↗</a>' +
+      '" data-godbolt-key="' + esc(key) + '">' + esc(t("page.godbolt.link")) + '</a>' +
       '<span class="godi-tip" role="note">' + tip + '</span></span>';
   }
 
@@ -129,20 +120,20 @@ return [[
   // its own lifecycle — one set of rules for one page.
   function docRefsHTML(key){
     var refs = DOCREFS[key] || [];
-    var h = ['<div class="fn-sig">Mentioned in the docs<span class="fn-badges">' +
+    var h = ['<div class="fn-sig">' + esc(t("page.fn.docrefs.title")) + '<span class="fn-badges">' +
       '<span class="bd">' + refs.length + '</span></span></div>'];
     refs.forEach(function(r){
       h.push('<div class="docref">' +
         '<div class="docref-where">' + esc(r.doc) + ':' + r.line +
         (r.confidence === "heuristic"
-          ? '<span class="bd" title="matched on a bare, tree-unique name">heuristic</span>'
+          ? '<span class="bd" title="' + esc(t("page.fn.docrefs.heuristic.title")) + '">' +
+            esc(t("page.fn.docrefs.heuristic")) + '</span>'
           : '') +
         '</div>' +
         '<div class="docref-ctx">' + esc(r.context) + '</div></div>');
     });
     if(refs.more){
-      h.push('<div class="fn-desc">… and ' + refs.more +
-        ' more, not carried into the artifact.</div>');
+      h.push('<div class="fn-desc">' + esc(t("page.fn.docrefs.more", { count: fmtNum(refs.more) })) + '</div>');
     }
     return h.join("");
   }
@@ -241,18 +232,17 @@ return [[
     // it as opaque text is to answer "does this have call variants" at a
     // glance, the same way "deprecated"/"async" already do.
     if(fn.overload && fn.overload.length){
-      badges.push('<span class="bd">+'+fn.overload.length+' signature'
-        +(fn.overload.length===1?'':'s')+'</span>');
+      badges.push('<span class="bd">'+esc(t("page.fn.badge.signatures", { count: fn.overload.length }))+'</span>');
     }
     // R2 — auto-derived, coarse and safe in the "tested" direction (see
     // coverage.lua). No badge for the false case: this is a "not found
     // by name in a spec" signal, not "definitely untested", and a
     // warning-shaped badge on the majority of functions would be noise,
     // not information.
-    if(fn.tested) badges.push('<span class="bd tested">tested</span>');
+    if(fn.tested) badges.push('<span class="bd tested">'+esc(t("page.fn.badge.tested"))+'</span>');
     h.push('<div class="fn-sig">'+esc(fn.signature)
       +(badges.length?'<span class="fn-badges">'+badges.join("")+'</span>':'')+'</div>');
-    if(fn.deprecated){ h.push('<div class="fn-dep">⚠ Deprecated: '+esc(fn.deprecated)+'</div>'); }
+    if(fn.deprecated){ h.push('<div class="fn-dep">'+esc(t("page.fn.deprecated", { reason: fn.deprecated }))+'</div>'); }
     if(fn.summary){ h.push('<div class="fn-desc">'+prose(fn.summary)+'</div>'); }
     if(fn.params && fn.params.length){
       h.push('<ul class="fn-plist">');
@@ -271,7 +261,7 @@ return [[
       h.push('</ul>');
     }
     if(fn.overload && fn.overload.length){
-      h.push('<div class="fn-overloads"><div class="fn-ov-label">Also callable as</div>');
+      h.push('<div class="fn-overloads"><div class="fn-ov-label">'+esc(t("page.fn.overloads"))+'</div>');
       fn.overload.forEach(function(ov){
         if(ov.params.length === 0 && ov.returns.length === 0 && !ov.raw.match(/^fun\s*\(\s*\)/)){
           // Did not parse as fun(...) — shown verbatim rather than as an
@@ -309,9 +299,9 @@ return [[
         var targetId = seeIndex[target];
         return targetId
           ? '<a href="#" data-see-target="'+esc(targetId)+'">'+esc(target)+'</a>'
-          : '<span title="unresolved">'+esc(target)+'</span>';
+          : '<span title="'+esc(t("page.fn.see.unresolved"))+'">'+esc(target)+'</span>';
       });
-      h.push('<div class="fn-desc fn-see">See also: '+seeLinks.join(", ")+'</div>');
+      h.push('<div class="fn-desc fn-see">'+esc(t("page.fn.see"))+' '+seeLinks.join(", ")+'</div>');
     }
     if(fn.example){ h.push('<div class="fn-ex">'+exampleHTML(fn.example)+'</div>'); }
     return h.join("");
@@ -667,14 +657,14 @@ return [[
   function snippetHTML(fn, node){
     if(!fn.snippet) return "";
     var omitted = fn.snippet_omitted
-      ? ' <span class="bd" title="truncated — not carried into the artifact">+' +
-        fn.snippet_omitted + ' more line' + (fn.snippet_omitted === 1 ? '' : 's') + '</span>'
+      ? ' <span class="bd" title="' + esc(t("page.fn.snippet.truncated")) + '">' +
+        esc(t("page.fn.snippet.more", { count: fn.snippet_omitted })) + '</span>'
       : '';
     // The path rides on the container rather than on every keyword span:
     // one attribute per snippet instead of one per word, and the lookup
     // walks up to it, which is what `.closest` is for.
     var path = node ? (node.source || node.path || "") : "";
-    return '<div class="fn-snip-label">Source' + omitted + '</div>' +
+    return '<div class="fn-snip-label">' + esc(t("page.fn.snippet.label")) + omitted + '</div>' +
       '<div class="fn-snip" data-path="' + esc(path) + '"' +
       (node ? ' data-fnkey="' + esc(fnKey(node.id, fn.name)) + '"' : '') + '>' +
       snipBodyHTML(fn.snippet, path, node ? { fnKey: fnKey(node.id, fn.name) } : null) + '</div>';

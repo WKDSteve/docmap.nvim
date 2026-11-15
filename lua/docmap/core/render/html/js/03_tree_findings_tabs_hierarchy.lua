@@ -15,9 +15,9 @@ return [[
   function badges(n){
     var b = [];
     if(n.readme) b.push('<span class="bd rd">readme</span>');
-    if(n.types && n.types.length) b.push('<span class="bd">types</span>');
+    if(n.types && n.types.length) b.push(i18nSpan("bd", "page.tree.badge.types"));
     var f = findByNode[n.id] || [];
-    if(f.some(function(x){return x.severity==="error";})) b.push('<span class="bd" style="color:var(--error);border-color:var(--error)">drift</span>');
+    if(f.some(function(x){return x.severity==="error";})) b.push(i18nSpan("bd bd-drift", "page.tree.badge.drift"));
     return b.length ? '<span class="badges">'+b.join("")+'</span>' : "";
   }
 
@@ -33,8 +33,7 @@ return [[
     var head = document.createElement("div");
     head.className = "row fnhead";
     head.innerHTML = '<span class="tw">▸</span>' +
-      '<span class="nm">ƒ ' + n.functions.length + ' function' +
-      (n.functions.length === 1 ? '' : 's') + '</span>';
+      i18nSpan("nm", "page.tree.functions", { count: n.functions.length });
 
     var list = document.createElement("div");
     list.className = "kids fnkids hide";
@@ -122,19 +121,21 @@ return [[
     var links = [];
     if(n.readme) links.push('<a href="'+esc(rel(n.readme))+'">README</a>');
     if(n.source){ var u = srcUrl(n.source);
-      links.push(u ? '<a href="'+esc(u)+'">source ↗</a>' : '<a href="'+esc(rel(n.source))+'">source</a>'); }
-    (n.types||[]).forEach(function(t){
-      var u2 = srcUrl(t);
-      links.push(u2 ? '<a href="'+esc(u2)+'">types ↗</a>' : '<a href="'+esc(rel(t))+'">types</a>');
+      links.push(u ? '<a href="'+esc(u)+'">'+esc(t("page.detail.link.source.remote"))+'</a>'
+        : '<a href="'+esc(rel(n.source))+'">'+esc(t("page.detail.link.source"))+'</a>'); }
+    (n.types||[]).forEach(function(tp){
+      var u2 = srcUrl(tp);
+      links.push(u2 ? '<a href="'+esc(u2)+'">'+esc(t("page.detail.link.types.remote"))+'</a>'
+        : '<a href="'+esc(rel(tp))+'">'+esc(t("page.detail.link.types"))+'</a>');
     });
     if(n.kind !== "file"){
-      links.push('<a href="#" data-goto="hierarchy">Hierarchy ↳</a>');
+      links.push('<a href="#" data-goto="hierarchy">'+esc(t("page.detail.link.hierarchy"))+'</a>');
     }
     if((n.requires||[]).length || (n.required_by||[]).length){
-      links.push('<a href="#" data-goto="deps">Dependencies ↳</a>');
+      links.push('<a href="#" data-goto="deps">'+esc(t("page.detail.link.deps"))+'</a>');
     }
     if((n.functions||[]).length){
-      links.push('<a href="#" data-goto="calls">Calls ↳</a>');
+      links.push('<a href="#" data-goto="calls">'+esc(t("page.detail.link.calls"))+'</a>');
       // No module-level Compiler Explorer link, deliberately — removed
       // rather than repaired, for two independent reasons.
       //
@@ -164,12 +165,12 @@ return [[
       // `prose`.
       h.push('<div class="prose">'+richText([n.summary, n.body].filter(Boolean).join("\n\n"))+'</div>');
     } else {
-      h.push('<p class="empty">No description — this module has an @module tag but no prose.</p>');
+      h.push('<p class="empty">'+esc(t("page.detail.no-description"))+'</p>');
     }
 
     var f = findByNode[n.id] || [];
     if(f.length){
-      h.push('<div class="sec">Drift</div><ul class="lst">');
+      h.push('<div class="sec">'+esc(t("page.detail.drift"))+'</div><ul class="lst">');
       // The severity badge is the trigger of the check's card (lookup kind
       // `check`): which check said this, what it compares and why.
       f.forEach(function(x){ h.push('<li><span class="sev '+x.severity+'" data-kw="'+esc(x.check)+
@@ -183,19 +184,21 @@ return [[
     // dropped rather than shown as "0 markdown", which would be five sixths
     // noise on a leaf file.
     var st = n.stats || {};
+    // The label of a cell is a plural table chosen by the cell's count; English keeps one form.
     var cells = [
-      ["modules", st.modules], ["namespaces", st.namespaces],
-      ["lua files", st.files_lua], ["markdown", st.files_md],
-      ["other files", st.files_other], ["lines of lua", st.lines],
-      ["functions", st.functions], ["tables & values", st.symbols],
-      ["types", st.types]
+      ["page.detail.stat.modules", st.modules], ["page.detail.stat.namespaces", st.namespaces],
+      ["page.detail.stat.files-lua", st.files_lua], ["page.detail.stat.markdown", st.files_md],
+      ["page.detail.stat.files-other", st.files_other], ["page.detail.stat.lines", st.lines],
+      ["page.detail.stat.functions", st.functions], ["page.detail.stat.symbols", st.symbols],
+      ["page.detail.stat.types", st.types]
     ].filter(function(c){ return c[1]; });
     if(cells.length){
-      h.push('<div class="sec">Stats' +
-        (n.kind === "file" ? '' : ' <span class="sub">(this and everything below)</span>') +
+      h.push('<div class="sec">' + esc(t("page.detail.stats")) +
+        (n.kind === "file" ? '' : ' <span class="sub">' + esc(t("page.detail.stats.below")) + '</span>') +
         '</div><div class="stat-grid">');
       cells.forEach(function(c){
-        h.push('<div class="stat"><b>' + fmtNum(c[1]) + '</b><span>' + esc(c[0]) + '</span></div>');
+        h.push('<div class="stat"><b>' + fmtNum(c[1]) + '</b><span>' +
+          esc(t(c[0], { count: c[1] })) + '</span></div>');
       });
       h.push('</div>');
     }
@@ -203,18 +206,18 @@ return [[
     // Dependencies as text, next to the diagram that draws the same thing:
     // the graph answers "what does this sit in the middle of", a list answers
     // "is X in there", and the second question is the more common one.
-    function depList(title, ids){
+    function depList(titleKey, ids){
       if(!ids || !ids.length) return;
-      h.push('<div class="sec">'+title+' ('+ids.length+')</div><ul class="lst">');
+      h.push('<div class="sec">'+esc(t(titleKey, { count: fmtNum(ids.length) }))+'</div><ul class="lst">');
       ids.forEach(function(id){
-        var t = byId[id];
-        if(!t) return;
-        h.push('<li><a href="#" data-node-link="'+esc(id)+'">'+esc(t.module || t.path)+'</a></li>');
+        var dep = byId[id];
+        if(!dep) return;
+        h.push('<li><a href="#" data-node-link="'+esc(id)+'">'+esc(dep.module || dep.path)+'</a></li>');
       });
       h.push('</ul>');
     }
-    depList("Requires", n.requires);
-    depList("Required by", n.required_by);
+    depList("page.detail.requires", n.requires);
+    depList("page.detail.required-by", n.required_by);
 
     // Opt-in (`spec_state`): the specs behind this module and how their last
     // run ended. Every value comes out of the embedded payload and goes through
@@ -222,19 +225,19 @@ return [[
     if(IR.spec_state && IR.spec_state.nodes && IR.spec_state.nodes[n.id]){
       var ss = IR.spec_state.nodes[n.id];
       var known = {pass:1, fail:1, error:1, skip:1, xfail:1, xpass:1, timeout:1, crash:1};
-      h.push('<div class="sec">Specs</div><ul class="lst">');
+      h.push('<div class="sec">'+esc(t("page.detail.specs"))+'</div><ul class="lst">');
       if(!ss.spec_count && !ss.indirect_count){
-        h.push('<li><b>no specs</b> require this module, directly or through another one</li>');
+        h.push('<li>'+bold(t("page.detail.specs.none"))+'</li>');
       } else {
         (ss.specs || []).forEach(function(sp){ h.push('<li><code>'+esc(sp)+'</code></li>'); });
         if(ss.spec_count > (ss.specs || []).length){
-          h.push('<li>… and '+(ss.spec_count - ss.specs.length)+' more</li>');
+          h.push('<li>'+esc(t("page.detail.specs.more", { count: fmtNum(ss.spec_count - ss.specs.length) }))+'</li>');
         }
         if(ss.indirect_count){
-          h.push('<li>'+ss.indirect_count+' more spec'+(ss.indirect_count === 1 ? '' : 's')+' reach it only through other modules</li>');
+          h.push('<li>'+esc(t("page.detail.specs.indirect", { count: ss.indirect_count }))+'</li>');
         }
         if(ss.last_status && known[ss.last_status]){
-          h.push('<li>last run: <b>'+esc(ss.last_status)+'</b></li>');
+          h.push('<li>'+bold(t("page.detail.specs.last-run", { status: ss.last_status }))+'</li>');
         }
       }
       h.push('</ul>');
@@ -244,16 +247,15 @@ return [[
     // answer to "is this safe to change".
     if((n.requires || []).length || (n.required_by || []).length){
       var hull = impactOf(n.id);
-      h.push('<div class="sec">Impact</div><ul class="lst"><li>' +
-        '<b>' + hull.length + '</b> module' + (hull.length === 1 ? '' : 's') +
-        ' would be affected by changing this — ' + (n.required_by || []).length +
-        ' directly.</li></ul>');
+      h.push('<div class="sec">' + esc(t("page.detail.impact")) + '</div><ul class="lst"><li>' +
+        bold(t("page.detail.impact.text", { count: hull.length, direct: fmtNum((n.required_by || []).length) })) +
+        '</li></ul>');
     }
 
     if(n.types_detail && n.types_detail.length){
-      h.push('<div class="sec">Types ('+n.types_detail.length+')</div><ul class="lst">');
-      n.types_detail.forEach(function(t){
-        h.push('<li>'+t.kind+' <code>'+esc(t.name)+'</code>'+(t.fields.length?' — '+t.fields.length+' field'+(t.fields.length===1?'':'s'):'')+'</li>');
+      h.push('<div class="sec">'+esc(t("page.detail.types", { count: fmtNum(n.types_detail.length) }))+'</div><ul class="lst">');
+      n.types_detail.forEach(function(ty){
+        h.push('<li>'+ty.kind+' <code>'+esc(ty.name)+'</code>'+(ty.fields.length?' — '+esc(t("page.detail.types.fields", { count: ty.fields.length })):'')+'</li>');
       });
       h.push('</ul>');
     }
@@ -278,8 +280,8 @@ return [[
         var outN = (callOut[key] || []).length, inN = (callIn[key] || []).length;
         if(outN || inN){
           var cl = [];
-          if(outN) cl.push('<a href="#" data-calls="'+esc(key)+'" data-dir="out">calls '+outN+' ↓</a>');
-          if(inN) cl.push('<a href="#" data-calls="'+esc(key)+'" data-dir="in">callers '+inN+' ↑</a>');
+          if(outN) cl.push('<a href="#" data-calls="'+esc(key)+'" data-dir="out">'+esc(t("page.detail.fn.calls", { count: fmtNum(outN) }))+'</a>');
+          if(inN) cl.push('<a href="#" data-calls="'+esc(key)+'" data-dir="in">'+esc(t("page.detail.fn.callers", { count: fmtNum(inN) }))+'</a>');
           h.push('<div class="fn-desc fn-see">'+cl.join(" · ")+'</div>');
         }
         var godboltFn = godboltTrigger("fn", key);
@@ -291,11 +293,9 @@ return [[
       // The count line says how many scopes only when there are any: a Lua
       // or C module has none and would otherwise carry a permanent "in 0
       // scopes" that is true and reads like something is missing.
-      h.push('<div class="sec">Functions ('+n.functions.length
-        + (grouped.scopes.length
-            ? ', ' + grouped.scopes.length + ' scope' + (grouped.scopes.length===1?'':'s')
-            : '')
-        + ')</div>');
+      h.push('<div class="sec">' + esc(grouped.scopes.length
+        ? t("page.detail.functions.scoped", { n: fmtNum(n.functions.length), count: grouped.scopes.length })
+        : t("page.detail.functions", { count: fmtNum(n.functions.length) })) + '</div>');
       // Free functions first, then each scope with its own members. Twelve
       // sibling rows for three classes of four methods was the state this
       // replaces.
@@ -304,8 +304,7 @@ return [[
         h.push('<div class="scope"><div class="scope-head">'
           + '<span class="bd sk-table">'+esc(sc.kind)+'</span>'
           + esc(sc.name)
-          + ' <span class="sdet">'+sc.functions.length+' function'
-          + (sc.functions.length===1?'':'s')+'</span></div>');
+          + ' <span class="sdet">'+esc(t("page.detail.scope.functions", { count: sc.functions.length }))+'</span></div>');
         sc.functions.forEach(pushFn);
         h.push('</div>');
       });
@@ -317,7 +316,7 @@ return [[
     // are usually the first thing you go looking for, and nothing generated
     // showed them before.
     if(n.symbols && n.symbols.length){
-      h.push('<div class="sec">Tables &amp; values ('+n.symbols.length+')</div><ul class="lst syms">');
+      h.push('<div class="sec">'+esc(t("page.detail.symbols", { count: fmtNum(n.symbols.length) }))+'</div><ul class="lst syms">');
       n.symbols.forEach(function(sy){
         h.push('<li><span class="bd sk-'+sy.kind+'">'+sy.kind+'</span> <code>'+esc(sy.name)+'</code>'
           + (sy.detail ? ' <span class="sdet">'+esc(sy.detail)+'</span>' : '')
@@ -329,7 +328,7 @@ return [[
 
     var kids = (n.children||[]).map(function(i){return byId[i];}).filter(Boolean);
     if(kids.length){
-      h.push('<div class="sec">Contains ('+kids.length+')</div><ul class="lst">');
+      h.push('<div class="sec">'+esc(t("page.detail.contains", { count: fmtNum(kids.length) }))+'</div><ul class="lst">');
       kids.forEach(function(k){
         h.push('<li>'+esc(k.name)+(k.summary?' — <span style="font-family:inherit">'+prose(k.summary)+'</span>':'')+'</li>');
       });
@@ -337,9 +336,9 @@ return [[
     }
 
     var meta = [];
-    if(n.export) meta.push("exports: " + n.export);
-    meta.push("kind: " + n.kind);
-    h.push('<div class="sec">Meta</div><ul class="lst"><li>'+esc(meta.join("  ·  "))+'</li></ul>');
+    if(n.export) meta.push(t("page.detail.meta.exports", { name: n.export }));
+    meta.push(t("page.detail.meta.kind", { kind: n.kind }));
+    h.push('<div class="sec">'+esc(t("page.detail.meta"))+'</div><ul class="lst"><li>'+esc(meta.join("  ·  "))+'</li></ul>');
 
     detailEl.innerHTML = h.join("");
 

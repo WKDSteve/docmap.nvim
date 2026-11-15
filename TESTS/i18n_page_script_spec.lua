@@ -11,9 +11,9 @@
 -- a word shown to the reader from a word handed to the DOM, and says so here rather than pretending. A literal
 -- that is the first argument of `t(`, `I18N.t(` or `I18N.has(` is a key and is passed.
 --
--- The regions are listed below, each between two markers that are lines of the slice, with the task that moved
--- it. A task that moves another panel adds its region. `DATA` holds the literals a region may keep, each with
--- its reason, and an entry nothing needs any more fails the spec.
+-- The regions are listed below, each between two markers that are lines of the slice (no `to`: the end of the
+-- slice), with the task that moved it. A task that moves another panel adds its region. `DATA` holds the
+-- literals a region may keep, each with its reason, and an entry nothing needs any more fails the spec.
 
 return function(H)
   local ok, eq = H.ok, H.eq
@@ -42,6 +42,34 @@ return function(H)
       from = "  var QUICKS = IR.quicks",
       to = "  // =====================================================================\n  // Compare",
       task = "i18n-page-tree-index-notes-quicks (the Quicks panel)",
+    },
+    {
+      slice = "02_explorer_and_state",
+      from = "  function godboltTrigger(kind, key){",
+      to = "  function glossaryAnswer(tableName){",
+      task = "i18n-page-tree-index-notes-quicks (the function cards)",
+    },
+    {
+      slice = "02_explorer_and_state",
+      from = "  function snippetHTML(fn, node){",
+      to = "  // Artifact lives in out_dir",
+      task = "i18n-page-tree-index-notes-quicks (the source snippet)",
+    },
+    {
+      slice = "03_tree_findings_tabs_hierarchy",
+      from = "  function renderDetail(n){",
+      to = '    detailEl.innerHTML = h.join("");',
+      task = "i18n-page-tree-index-notes-quicks (the Tree detail pane)",
+    },
+    {
+      slice = "04_directed_views_and_notes",
+      from = "  // Notes tab: Doxygen",
+      task = "i18n-page-tree-index-notes-quicks (the Notes tab)",
+    },
+    {
+      slice = "05_features_help_index",
+      from = '  // Doxygen\'s "File Members"',
+      task = "i18n-page-tree-index-notes-quicks (the Index tab)",
     },
   }
 
@@ -139,8 +167,8 @@ return function(H)
     local src = require("docmap.core.render.html.js." .. region.slice)
     local a = src:find(region.from, 1, true)
     ok(a ~= nil, ("%s: the region starts at %q"):format(region.slice, region.from))
-    local b = a and src:find(region.to, a, true)
-    ok(b ~= nil, ("%s: the region ends at %q"):format(region.slice, region.to))
+    local b = a and (region.to and src:find(region.to, a, true) or (not region.to and #src + 1))
+    ok(b, ("%s: the region ends at %q"):format(region.slice, tostring(region.to)))
     if a and b then
       local part = src:sub(a, b - 1)
       -- t() calls, and keys named for one (`EXPLAIN` lists keys and says them in one place).
@@ -178,6 +206,22 @@ return function(H)
         ("DATA: %s keeps %q, which no region holds any more"):format(slice, text)
       )
     end
+  end
+
+  -- The Notes tab says the line under each marker keyword from the catalog; its English is core/markers.lua's.
+  local i18n = require("docmap.core.i18n")
+  local notes = require("docmap.core.render.html.js.04_directed_views_and_notes")
+  for _, kw in ipairs(require("docmap.core.markers").KEYWORDS) do
+    local key = "page.notes.marker." .. kw.name:lower()
+    ok(
+      notes:find(("%s: %q"):format(kw.name, key), 1, true) ~= nil,
+      "Notes: the keyword " .. kw.name .. " names its key"
+    )
+    eq(
+      i18n.t(key, nil, "en"),
+      kw.sub,
+      "Notes: the English of " .. key .. " is the line markers.lua writes"
+    )
   end
 
   -- The tokenizer itself, on the cases it has to tell apart.

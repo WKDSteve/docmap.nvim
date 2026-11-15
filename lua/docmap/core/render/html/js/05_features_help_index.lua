@@ -928,9 +928,13 @@ return [[
   // model. The Tree tab already filters and the picker already
   // fuzzy-matches; what neither gives you is the flat alphabet, the one way
   // to find something whose module you do not already know.
-  var indexFnHTML = null;
+  // One rendering per locale: the words and the name order are the reader's.
+  var indexFnHTML = {};
   function renderIndexFunctions(){
-    if(indexFnHTML !== null) return indexFnHTML;
+    if(own(indexFnHTML, appliedLocale)) return indexFnHTML[appliedLocale];
+    return (indexFnHTML[appliedLocale] = buildIndexFunctions());
+  }
+  function buildIndexFunctions(){
 
     var entries = [];
     IR.nodes.forEach(function(n){
@@ -940,35 +944,32 @@ return [[
     });
 
     if(entries.length === 0){
-      indexFnHTML = '<p class="ntext none">This map contains no documented functions.</p>';
-      return indexFnHTML;
+      return '<p class="ntext none">' + esc(t("page.index.functions.none")) + '</p>';
     }
 
     var built = buildIndexBuckets(entries);
     var parts = [];
-    parts.push('<p class="nsub">' + entries.length +
-      ' documented functions, filed under the last segment of the declared name' +
-      ' (<code>M.read</code> sorts under R).</p>');
+    parts.push('<p class="nsub">' + prose(t("page.index.functions.sub", { count: entries.length })) + '</p>');
     parts.push(indexJumpBar(built.order));
 
     built.order.forEach(function(c){
       parts.push('<h3 id="ix-' + esc(c) + '">' + esc(c) +
-        '<span class="ncount">' + built.buckets[c].length + '</span></h3>');
+        '<span class="ncount">' + fmtNum(built.buckets[c].length) + '</span></h3>');
       parts.push('<ul class="nlist ixlist">');
       built.buckets[c].forEach(function(e){
+        // `internal` and `deprecated` are the tags as the author wrote them; `tested` is the page's word.
         parts.push('<li><a class="nfn" tabindex="0" role="button" data-node="' + esc(e.node.id) + '">' +
           esc(e.fn.signature) + '</a>' +
           sigTrigger(e.node.id, e.fn.name) + docTrigger(fnKey(e.node.id, e.fn.name)) +
           (e.fn.internal ? '<span class="ixtag">internal</span>' : '') +
           (e.fn.deprecated ? '<span class="ixtag dep">deprecated</span>' : '') +
-          (e.fn.tested ? '<span class="ixtag tested">tested</span>' : '') +
+          (e.fn.tested ? '<span class="ixtag tested">' + esc(t("page.fn.badge.tested")) + '</span>' : '') +
           '<span class="nwhere">' + esc(e.node.module || e.node.path) +
           ':' + e.fn.line + '</span></li>');
       });
       parts.push("</ul>");
     });
-    indexFnHTML = parts.join("");
-    return indexFnHTML;
+    return parts.join("");
   }
 
   // R3: the same flat alphabet, one level up — every *module and namespace*
@@ -978,9 +979,12 @@ return [[
   // keeps its File Index and Class Index as separate pages for the same
   // reason a flat function alphabet and a flat module alphabet answer two
   // different "I know the name, not the location" questions.
-  var indexModHTML = null;
+  var indexModHTML = {};
   function renderIndexModules(){
-    if(indexModHTML !== null) return indexModHTML;
+    if(own(indexModHTML, appliedLocale)) return indexModHTML[appliedLocale];
+    return (indexModHTML[appliedLocale] = buildIndexModules());
+  }
+  function buildIndexModules(){
 
     var entries = [];
     IR.nodes.forEach(function(n){
@@ -990,33 +994,29 @@ return [[
     });
 
     if(entries.length === 0){
-      indexModHTML = '<p class="ntext none">This map contains no modules.</p>';
-      return indexModHTML;
+      return '<p class="ntext none">' + esc(t("page.index.modules.none")) + '</p>';
     }
 
     var built = buildIndexBuckets(entries);
     var parts = [];
-    parts.push('<p class="nsub">' + entries.length +
-      ' modules and namespaces, filed under the last segment of the module path' +
-      ' (<code>lib.nvim.fs</code> sorts under F).</p>');
+    parts.push('<p class="nsub">' + prose(t("page.index.modules.sub", { count: entries.length })) + '</p>');
     parts.push(indexJumpBar(built.order));
 
     built.order.forEach(function(c){
       parts.push('<h3 id="ix-' + esc(c) + '">' + esc(c) +
-        '<span class="ncount">' + built.buckets[c].length + '</span></h3>');
+        '<span class="ncount">' + fmtNum(built.buckets[c].length) + '</span></h3>');
       parts.push('<ul class="nlist ixlist">');
       built.buckets[c].forEach(function(e){
         var fnCount = (e.node.functions || []).length;
         parts.push('<li><a class="nfn" tabindex="0" role="button" data-node="' + esc(e.node.id) + '">' +
           esc(e.label) + '</a>' + docTrigger(e.node.id) +
           '<span class="ixtag">' + esc(e.node.kind) + '</span>' +
-          '<span class="nwhere">' + fnCount + (fnCount === 1 ? " function" : " functions") +
+          '<span class="nwhere">' + esc(t("page.detail.scope.functions", { count: fnCount })) +
           '</span></li>');
       });
       parts.push("</ul>");
     });
-    indexModHTML = parts.join("");
-    return indexModHTML;
+    return parts.join("");
   }
 
   function drawIndex(){

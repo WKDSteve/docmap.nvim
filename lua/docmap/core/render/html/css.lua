@@ -194,6 +194,7 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
   border-radius:4px;border:1px solid var(--line);color:var(--muted)}
 .bd.rd{color:var(--accent);border-color:var(--accent)}
 .bd.dep{color:var(--error);border-color:var(--error)}
+.bd.bd-drift{color:var(--error);border-color:var(--error)}
 .bd.tested{color:var(--accent);border-color:var(--accent)}
 .kids{margin-left:15px;border-left:1px solid var(--line);padding-left:3px}
 .kids.hide{display:none}
