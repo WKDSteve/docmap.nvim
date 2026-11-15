@@ -221,6 +221,7 @@ flowchart LR
   nlua_docmap_core_loaded_diff_lua --> nlua_docmap_core_check_lua
   nlua_docmap_core_loaded_diff_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_core_quicks_lua --> nlua_docmap_core_doccoverage_lua
+  nlua_docmap_core_quicks_lua --> nlua_docmap_core_i18n
   nlua_docmap_core_render --> nlua_docmap_core_check_lua
   nlua_docmap_core_render --> nlua_docmap_core_docs_lua
   nlua_docmap_core_render --> nlua_docmap_core_endpoints_lua

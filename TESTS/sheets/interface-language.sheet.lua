@@ -170,6 +170,28 @@ return {
     { hover = "h1" },
     { press = "Escape", note = "the explanation of the tab is put away" },
     { shot = "de-dark-analysis" },
+
+    -- Quicks: the verdicts are said from their keys and parameters.
+    { click = '.tab-btn[data-tab="quicks"]' },
+    {
+      wait = "document.querySelector('#view-quicks .qk') !== null",
+      note = "the verdicts are drawn",
+    },
+    {
+      expect = "[...document.querySelectorAll('#view-quicks .qk-h')].every(h =>"
+        .. " /^(Lohnt eine Korrektur|Läuft gut)/.test(h.textContent))"
+        .. " && [...document.querySelectorAll('#view-quicks .qk-acts button')].every(b =>"
+        .. " /^(Die Zeilen zeigen|Alle \\d+ markieren)$/.test(b.textContent))",
+      note = "column heads and buttons are German",
+    },
+    {
+      expect = "[...document.querySelectorAll('#view-quicks .qk-line')].every(l =>"
+        .. " !/^(Your|Most|The|Nothing|No |A |Many|Several|There|Almost|Deprecated|Nearly)/.test(l.textContent))",
+      note = "and no verdict reads as one of the English sentences the page carries",
+    },
+    { hover = "h1" },
+    { press = "Escape", note = "the explanation of the tab is put away" },
+    { shot = "de-dark-quicks" },
     { scheme = "light" },
 
     -- Back to English through the picker, the way a reader would.

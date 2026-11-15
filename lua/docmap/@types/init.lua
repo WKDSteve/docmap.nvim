@@ -749,6 +749,9 @@
 ---@field detail string The number rendered for display, e.g. "62.5% — 45 of 72". **Page only**: interface text, stripped from `module_map.json` (schema 5), where `value`/`n`/`total` carry the same fact without phrasing it in English.
 ---@field headline string The sentence. Phrased for the polarity it landed on. **Page only**, same as `detail`.
 ---@field basis string What the number actually measured, including its blind spots. Required, not optional — see the module header for why. **Page only**, same as `detail`.
+---@field key string Catalog key of `headline` (`report.quicks.<id>.good` or `.bad`): the page says the headline in the reader's language from it. **Page only**.
+---@field basis_key string Catalog key of `basis`. **Page only**.
+---@field params table<string, string|number>? Parameters of both sentences; `count` picks a plural. **Page only**.
 ---@field weight integer Ranking weight within a polarity.
 ---@field distance number How far past its own threshold the value sits; the tie-break under `weight`.
 ---@field tab string Page tab holding the rows behind this number.

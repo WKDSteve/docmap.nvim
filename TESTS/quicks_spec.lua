@@ -348,4 +348,30 @@ return function(H)
   local no_findings = quicks.compute(ir_with(none_tested), nil)
   ok(no_findings ~= nil, "quicks: a nil finding list is tolerated")
   eq(find(no_findings, "drift-errors").value, 0, "quicks: nil findings counts as zero errors")
+
+  -- A verdict travels as catalog keys and parameters beside its English (docs/i18n.md): the page says it in
+  -- the reader's language from those, so they have to say exactly the English the artifact carries.
+  local i18n = require("docmap.core.i18n")
+  local said = 0
+  for _, result in ipairs({ quicks.compute(ir_with(none_tested), {}), good_res, mid }) do
+    for _, q in ipairs(vim.list_extend(vim.list_extend({}, result.good), result.bad)) do
+      said = said + 1
+      eq(
+        q.key,
+        "report.quicks." .. q.id .. "." .. q.polarity,
+        "quicks: the headline key of " .. q.id
+      )
+      eq(
+        i18n.t(q.key, q.params, "en"),
+        q.headline,
+        "quicks: key and params say the headline of " .. q.id
+      )
+      eq(i18n.t(q.basis_key, q.params, "en"), q.basis, "quicks: and the basis of " .. q.id)
+      ok(
+        i18n.t(q.key, q.params, "de") ~= q.headline,
+        "quicks: German has its own headline for " .. q.id
+      )
+    end
+  end
+  ok(said >= 4, "quicks: the key check saw verdicts (got " .. said .. ")")
 end

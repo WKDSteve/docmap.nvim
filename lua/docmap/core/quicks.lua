@@ -48,6 +48,8 @@
 
 local M = {}
 
+local i18n = require("docmap.core.i18n")
+
 ---How many verdicts of each polarity `compute` returns.
 M.DEFAULT_LIMIT = 5
 
@@ -103,13 +105,6 @@ local function pct(n, total)
   return math.floor((1000 * n / total) + 0.5) / 10
 end
 
----`1` -> "", `2` -> "s".
----@param n number
----@return string
-local function s(n)
-  return n == 1 and "" or "s"
-end
-
 ---Walk every function in the tree.
 ---@param ir Docmap.IR
 ---@param fn fun(fninfo: Docmap.FunctionInfo, node: Docmap.Node)
@@ -145,9 +140,10 @@ end
 ---@field good_when "high"|"low"
 ---@field n integer? Numerator, for the headline.
 ---@field total integer? Denominator, for the headline.
----@field headline_good string
----@field headline_bad string
----@field basis string
+---@field good_key string Catalog key of the headline when the verdict lands good (`report.quicks.<id>.good`).
+---@field bad_key string The same, when it lands bad.
+---@field basis_key string Catalog key of what the number measured, including its blind spots.
+---@field params table<string, string|number>? The parameters of the three sentences (`count` picks a plural).
 ---@field tab string Page tab a reader should land on to see the rows.
 ---@field atool string? Analysis panel within that tab.
 ---@field evidence string[]? Bounded list of node/function keys behind the number.
@@ -238,10 +234,9 @@ local function probes(ir, findings)
       good_when = "high",
       n = documented,
       total = publishable,
-      headline_good = "Your published API is well documented",
-      headline_bad = "Most of your published API is undocumented",
-      basis = "A function counts as documented when it has a summary and every "
-        .. "parameter is annotated correctly. `@internal` functions are excluded.",
+      good_key = "report.quicks.doc-coverage.good",
+      bad_key = "report.quicks.doc-coverage.bad",
+      basis_key = "report.quicks.doc-coverage.basis",
       tab = "analysis",
       atool = "doc",
     }
@@ -254,12 +249,9 @@ local function probes(ir, findings)
       good_when = "high",
       n = tested,
       total = testable,
-      headline_good = "Most of your published API is named in a spec",
-      headline_bad = "Most of your published API is never named in a spec",
-      basis = "Auto-derived and coarse: a function counts as tested when its bare "
-        .. "name appears somewhere under `tests_dir`. That means 'not found by name', "
-        .. "not 'definitely untested' — and a name matched there was not necessarily "
-        .. "executed.",
+      good_key = "report.quicks.test-coverage.good",
+      bad_key = "report.quicks.test-coverage.bad",
+      basis_key = "report.quicks.test-coverage.basis",
       tab = "analysis",
       atool = "test",
       evidence = bounded(untested),
@@ -273,9 +265,9 @@ local function probes(ir, findings)
       good_when = "high",
       n = with_example,
       total = testable,
-      headline_good = "A good share of your published API carries a usage example",
-      headline_bad = "Almost nothing in your published API shows how to call it",
-      basis = "Counts `@example` blocks on non-`@internal` functions.",
+      good_key = "report.quicks.examples.good",
+      bad_key = "report.quicks.examples.bad",
+      basis_key = "report.quicks.examples.basis",
       tab = "index",
     }
   end
@@ -289,14 +281,10 @@ local function probes(ir, findings)
       good_when = "high",
       n = simple,
       total = fn_count,
-      headline_good = ("Nearly every function stays under complexity %d"):format(
-        M.SIMPLE_COMPLEXITY
-      ),
-      headline_bad = ("A lot of functions sit above complexity %d"):format(M.SIMPLE_COMPLEXITY),
-      basis = (
-        "Cyclomatic complexity (McCabe), counted over each function's own "
-        .. "subtree including nested closures. %d function%s above the line."
-      ):format(complex_fns, s(complex_fns)),
+      good_key = "report.quicks.complexity.good",
+      bad_key = "report.quicks.complexity.bad",
+      basis_key = "report.quicks.complexity.basis",
+      params = { threshold = M.SIMPLE_COMPLEXITY, count = complex_fns },
       tab = "analysis",
       atool = "complexity",
       evidence = bounded(complex_list),
@@ -308,13 +296,10 @@ local function probes(ir, findings)
       value = math.floor((10 * fn_lines / fn_count) + 0.5) / 10,
       unit = "count",
       good_when = "low",
-      headline_good = "Your functions are short on average",
-      headline_bad = "Your functions run long on average",
-      basis = (
-        "Mean source span (`line` to `line_end`) across %d function%s. "
-        .. "A long mean is a smell, not a defect — a table-driven dispatcher is "
-        .. "legitimately long."
-      ):format(fn_count, s(fn_count)),
+      good_key = "report.quicks.avg-fn-lines.good",
+      bad_key = "report.quicks.avg-fn-lines.bad",
+      basis_key = "report.quicks.avg-fn-lines.basis",
+      params = { count = fn_count },
       tab = "index",
       evidence = bounded(long_fns),
     }
@@ -343,10 +328,9 @@ local function probes(ir, findings)
       good_when = "high",
       n = described,
       total = describable,
-      headline_good = "Nearly every file opens with a description",
-      headline_bad = "Many files have no description at the top",
-      basis = "Counts a non-empty summary in the file's leading doc-comment block. "
-        .. "Namespace directories are excluded — they have no file to hold one.",
+      good_key = "report.quicks.module-summary.good",
+      bad_key = "report.quicks.module-summary.bad",
+      basis_key = "report.quicks.module-summary.basis",
       tab = "tree",
     }
   end
@@ -371,12 +355,10 @@ local function probes(ir, findings)
       good_when = "high",
       n = mentioned,
       total = describable,
-      headline_good = "Your prose docs actually reach most of the tree",
-      headline_bad = "Your prose docs mention only a fraction of the tree",
-      basis = (
-        "Counts modules referenced from a code span in one of the %d "
-        .. "scanned `.md` file%s."
-      ):format(#docs.files, s(#docs.files)),
+      good_key = "report.quicks.docs-mentions.good",
+      bad_key = "report.quicks.docs-mentions.bad",
+      basis_key = "report.quicks.docs-mentions.basis",
+      params = { count = #docs.files },
       tab = "analysis",
       atool = "docs",
     }
@@ -390,14 +372,10 @@ local function probes(ir, findings)
       value = #dups.groups,
       unit = "count",
       good_when = "low",
-      headline_good = "No two functions share a structure",
-      headline_bad = "Several functions are structural copies of each other",
-      basis = (
-        "Groups functions by a hash of their parse-tree node types, so a "
-        .. "renamed copy still matches. %d function%s across those groups. Sharing "
-        .. "a shape is not automatically wrong — two folds over the same shape are "
-        .. "legitimate."
-      ):format(dups.functions or 0, s(dups.functions or 0)),
+      good_key = "report.quicks.duplicates.good",
+      bad_key = "report.quicks.duplicates.bad",
+      basis_key = "report.quicks.duplicates.basis",
+      params = { count = dups.functions or 0 },
       tab = "analysis",
       atool = "duplicates",
     }
@@ -417,10 +395,9 @@ local function probes(ir, findings)
     value = errors,
     unit = "count",
     good_when = "low",
-    headline_good = "The map is in sync with the tree",
-    headline_bad = "The map has drifted from the tree",
-    basis = "Error-severity findings from the drift checks — the same set "
-      .. "`:DocMap check` fails a pre-commit hook on.",
+    good_key = "report.quicks.drift-errors.good",
+    bad_key = "report.quicks.drift-errors.bad",
+    basis_key = "report.quicks.drift-errors.basis",
     tab = "notes",
   }
   out[#out + 1] = {
@@ -429,9 +406,9 @@ local function probes(ir, findings)
     value = warnings,
     unit = "count",
     good_when = "low",
-    headline_good = "Nothing in the tree raised a warning",
-    headline_bad = "The drift checks raised a pile of warnings",
-    basis = "Warn-severity findings. These never fail `:DocMap check`.",
+    good_key = "report.quicks.drift-warnings.good",
+    bad_key = "report.quicks.drift-warnings.bad",
+    basis_key = "report.quicks.drift-warnings.basis",
     tab = "notes",
   }
 
@@ -442,10 +419,9 @@ local function probes(ir, findings)
       value = #deprecated,
       unit = "count",
       good_when = "low",
-      headline_good = "Nothing is left marked deprecated",
-      headline_bad = "Deprecated functions are still in the tree",
-      basis = "Counts functions carrying `@deprecated`. Whether that is overdue "
-        .. "depends on a deprecation window this map knows nothing about.",
+      good_key = "report.quicks.deprecated.good",
+      bad_key = "report.quicks.deprecated.bad",
+      basis_key = "report.quicks.deprecated.basis",
       tab = "index",
       evidence = bounded(deprecated),
     }
@@ -501,12 +477,9 @@ local function probes(ir, findings)
       value = recorded,
       unit = "count",
       good_when = "low",
-      headline_good = "No line is marked as currently broken",
-      headline_bad = "There are defects marked in the source and still there",
-      basis = "Counts `FIX`/`FIXME`/`BUG`/`FIXIT`/`ISSUE` comment markers. "
-        .. "This is the author's own claim about their code, not a finding of "
-        .. "this tool's -- nothing here was verified, and nothing fails "
-        .. "`:DocMap check` because of it.",
+      good_key = "report.quicks.recorded-defects.good",
+      bad_key = "report.quicks.recorded-defects.bad",
+      basis_key = "report.quicks.recorded-defects.basis",
       tab = "notes",
       evidence = bounded(recorded_files),
     }
@@ -519,11 +492,9 @@ local function probes(ir, findings)
       value = todos,
       unit = "count",
       good_when = "low",
-      headline_good = "No open `@todo` or `@bug` annotations",
-      headline_bad = "There is a backlog of `@todo`/`@bug` annotations",
-      basis = "Counts `@todo` and `@bug` entries on functions. Written-down work "
-        .. "is better than undocumented work — a high number here is a reading, "
-        .. "not an accusation.",
+      good_key = "report.quicks.todos.good",
+      bad_key = "report.quicks.todos.bad",
+      basis_key = "report.quicks.todos.basis",
       tab = "notes",
     }
   end
@@ -580,14 +551,21 @@ local function judge(p, th)
     return (("%.14g"):format(n))
   end
 
+  -- The sentences are said from the catalog (`report.quicks.*`), in English: the page is one artifact for every
+  -- language and speaks them again from `key`, `basis_key` and `params` in the reader's (docs/i18n.md).
   local detail
   if p.unit == "percent" and p.total then
-    detail = ("%s%% — %d of %d"):format(numstr(p.value), p.n, p.total)
+    detail = i18n.t(
+      "report.quicks.detail.share",
+      { percent = numstr(p.value), n = p.n, total = p.total },
+      i18n.SOURCE
+    )
   elseif p.unit == "percent" then
-    detail = ("%s%%"):format(numstr(p.value))
+    detail = i18n.t("report.quicks.detail.percent", { percent = numstr(p.value) }, i18n.SOURCE)
   else
     detail = numstr(p.value)
   end
+  local key = polarity == "good" and p.good_key or p.bad_key
 
   ---@type Docmap.Quick
   return {
@@ -603,8 +581,11 @@ local function judge(p, th)
     n = p.n,
     total = p.total,
     detail = detail,
-    headline = polarity == "good" and p.headline_good or p.headline_bad,
-    basis = p.basis,
+    headline = i18n.t(key, p.params, i18n.SOURCE),
+    basis = i18n.t(p.basis_key, p.params, i18n.SOURCE),
+    key = key,
+    basis_key = p.basis_key,
+    params = p.params,
     weight = p.weight,
     distance = distance,
     tab = p.tab,

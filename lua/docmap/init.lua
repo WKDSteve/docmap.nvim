@@ -341,6 +341,11 @@ M.render = {
 ---Nothing is lost by dropping them here, because `n` and `total` now travel
 ---beside `value`, so a consumer can phrase "45 of 72" in its own language
 ---instead of receiving it in English.
+---`key`, `basis_key` and `params` go with them: they are how the page says the same three sentences in the
+---reader's language (`report.quicks.*` in the catalog), and the page builds its own payload.
+local PAGE_ONLY_QUICK_FIELDS =
+  { headline = true, basis = true, detail = true, key = true, basis_key = true, params = true }
+
 ---@param quicks Docmap.Quicks.Result?
 ---@return table
 local function strip_quicks_prose(quicks)
@@ -354,7 +359,7 @@ local function strip_quicks_prose(quicks)
     for i, q in ipairs(quicks[bucket] or {}) do
       local copy = {}
       for k, v in pairs(q) do
-        if k ~= "headline" and k ~= "basis" and k ~= "detail" then
+        if not PAGE_ONLY_QUICK_FIELDS[k] then
           copy[k] = v
         end
       end

@@ -13,26 +13,46 @@ return [[
   // tidy — the same verdicts have to be reachable from the CLI and from a
   // spec, and a rule that lives in this file is a rule only the browser can
   // check.
+  //
+  // The sentences ride along twice: in English (`headline`, `basis`,
+  // `detail`) and as catalog keys with their parameters (`key`,
+  // `basis_key`, `params`, `report.quicks.*`), which the page says in the
+  // reader's language. The English stands in for an artifact older than
+  // the keys.
   // =====================================================================
   var QUICKS = IR.quicks || { good: [], bad: [], total_good: 0, total_bad: 0 };
 
+  function quickText(key, params, english){
+    return key && I18N.has(key) ? t(key, params) : english;
+  }
+
+  // "62.5% — 45 of 72", with the numbers in the reader's locale.
+  function quickDetail(q){
+    if(typeof q.value !== "number") return q.detail;
+    if(q.unit === "percent" && q.total !== undefined && q.total !== null){
+      return t("report.quicks.detail.share", { percent: fmtNum(q.value), n: fmtNum(q.n), total: fmtNum(q.total) });
+    }
+    if(q.unit === "percent") return t("report.quicks.detail.percent", { percent: fmtNum(q.value) });
+    return fmtNum(q.value);
+  }
+
   function quickHTML(q){
     var h = ['<div class="qk ' + (q.polarity === "good" ? "good" : "bad") + '">'];
-    h.push('<div class="qk-head"><span class="qk-line">' + esc(q.headline) + '</span>' +
-      '<span class="qk-val">' + esc(q.detail) + '</span></div>');
-    h.push('<div class="qk-basis">' + esc(q.basis) + '</div>');
+    h.push('<div class="qk-head"><span class="qk-line">' + esc(quickText(q.key, q.params, q.headline)) + '</span>' +
+      '<span class="qk-val">' + esc(quickDetail(q)) + '</span></div>');
+    h.push('<div class="qk-basis">' + esc(quickText(q.basis_key, q.params, q.basis)) + '</div>');
 
     var acts = [];
     if(q.tab){
-      acts.push('<button data-qgoto="' + esc(q.id) + '">Show the rows</button>');
+      acts.push('<button data-qgoto="' + esc(q.id) + '">' + esc(t("page.quicks.show-rows")) + '</button>');
     }
     // Only where the verdict actually carried evidence — an offer to mark
     // "the functions behind this" that silently marks nothing is worse than
     // no button. `quicks.lua` attaches evidence to negative verdicts only,
     // and caps the list, so this is bounded by construction.
     if(q.evidence && q.evidence.length){
-      acts.push('<button data-qmark="' + esc(q.id) + '">Mark all ' +
-        q.evidence.length + '</button>');
+      acts.push('<button data-qmark="' + esc(q.id) + '">' +
+        esc(t("page.quicks.mark-all", { count: fmtNum(q.evidence.length) })) + '</button>');
     }
     if(acts.length) h.push('<div class="qk-acts">' + acts.join("") + '</div>');
     h.push("</div>");
@@ -54,11 +74,7 @@ return [[
       // artifact, a tree too small to say anything about, or a genuinely
       // unremarkable one. Only the last is good news, so do not phrase all
       // three as if they were.
-      h.push('<p class="ntext none">Nothing crossed a threshold in either direction. ' +
-        'That is the normal reading for a tree that is doing fine — every measure ' +
-        'landed in the unremarkable band between its two cut points. An artifact ' +
-        'generated before Quicks existed also lands here; regenerate with ' +
-        '<code>:DocMap</code> if this map is old.</p>');
+      h.push('<p class="ntext none">' + prose(t("page.quicks.none")) + '</p>');
       h.push("</div>");
       el.innerHTML = h.join("");
       return;
@@ -68,18 +84,16 @@ return [[
     // headline — a page that opens with praise buries the one thing the
     // reader could act on today.
     if(QUICKS.bad.length){
-      h.push('<div class="qk-col"><div class="qk-h">Worth fixing' +
-        (QUICKS.total_bad > QUICKS.bad.length
-          ? ' — ' + QUICKS.bad.length + ' of ' + QUICKS.total_bad + ' shown'
-          : '') + '</div>');
+      h.push('<div class="qk-col"><div class="qk-h">' + esc(QUICKS.total_bad > QUICKS.bad.length
+        ? t("page.quicks.worth-fixing.capped", { shown: fmtNum(QUICKS.bad.length), total: fmtNum(QUICKS.total_bad) })
+        : t("page.quicks.worth-fixing")) + '</div>');
       QUICKS.bad.forEach(function(q){ h.push(quickHTML(q)); });
       h.push("</div>");
     }
     if(QUICKS.good.length){
-      h.push('<div class="qk-col"><div class="qk-h">Going well' +
-        (QUICKS.total_good > QUICKS.good.length
-          ? ' — ' + QUICKS.good.length + ' of ' + QUICKS.total_good + ' shown'
-          : '') + '</div>');
+      h.push('<div class="qk-col"><div class="qk-h">' + esc(QUICKS.total_good > QUICKS.good.length
+        ? t("page.quicks.going-well.capped", { shown: fmtNum(QUICKS.good.length), total: fmtNum(QUICKS.total_good) })
+        : t("page.quicks.going-well")) + '</div>');
       QUICKS.good.forEach(function(q){ h.push(quickHTML(q)); });
       h.push("</div>");
     }

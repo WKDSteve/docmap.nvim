@@ -37,6 +37,12 @@ return function(H)
       to = "  // The second level",
       task = "i18n-page-explanations-and-lookup-cards",
     },
+    {
+      slice = "11_quicks_compare_init",
+      from = "  var QUICKS = IR.quicks",
+      to = "  // =====================================================================\n  // Compare",
+      task = "i18n-page-tree-index-notes-quicks (the Quicks panel)",
+    },
   }
 
   -- Literals a region keeps although they read as text. Keyed by slice, then by the literal; the value says why.
