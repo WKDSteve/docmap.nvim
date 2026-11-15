@@ -60,7 +60,7 @@ binary with anything.
 
 | Field | What it says |
 |---|---|
-| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, `rules` when `rules.nvim`'s engine is part of it, `rules-agent` when its agent functions are too (`rules/plan`, `rules/validate`), and `rules-write` when its two writers are too (`rules/accept`, `rules/waive`). The `rules/*` routes are listed in `routes` either way and answer with a reason without the engine; an older engine lacks the route names, so a missing route is read off this answer, never from an error. A host that wants one thing can test for it without parsing the rest. |
+| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, `rules` when `rules.nvim`'s engine is part of it, `rules-agent` when its agent functions are too (`rules/plan`, `rules/validate`), `rules-attach` with them (`rules/attach`), and `rules-write` when its two writers are too (`rules/accept`, `rules/waive`). The `rules/*` routes are listed in `routes` either way and answer with a reason without the engine; an older engine lacks the route names, so a missing route is read off this answer, never from an error. A host that wants one thing can test for it without parsing the rest. |
 | `schema` | The artifact schema this build writes. The release is rolling (`standalone-latest`), so there is no version number to report that would not be fiction; the schema is what actually decides whether two artifacts are comparable, and it is bumped deliberately. |
 | `build` | Commit, commit date, and whether the tree it was built from was clean. **Present only in a bundled binary** — `scripts/package.lua` writes it at bundle time and never into the source tree, so a run from a checkout answers `null` rather than claiming a provenance it does not have. |
 | `routes` | Every `/api/*` route name this build answers, read from `core/api.routes`. A route added there is advertised here without this being told. |
@@ -118,6 +118,7 @@ instead of generating anything. Today's routes:
 | `rules/run` | The mechanical run of a selection: one result per rule, `pass`, `fail`, `error`, `manual` or `waived`, with findings. See below. |
 | `rules/plan` | What an agent run over a selection would send: the requests (`system`, `prompt`, files, rules), what is not sent and why, sizes and a token estimate. Sends nothing. See below. |
 | `rules/validate` | One model answer about one rule, checked against the tree: a proposal with the findings whose quotes hold up. See below. |
+| `rules/attach` | One file of the project as a request would carry it, or why the deny list, the size limit or the tree keeps it out. For a host's conversation about a rule. Sends nothing; not offered by `:DocMap serve`. See below. |
 | `rules/accept` | **Writes.** One proposal of `rules/validate`, accepted by a person: the verdict goes into the project's `.rules-verdicts.json`. See below. |
 | `rules/waive` | **Writes.** A waiver of one rule into the project's `.rules-waivers.json`. See below. |
 
@@ -195,6 +196,29 @@ exist once. Neither route sends anything or opens a connection; sending a reques
 - `:DocMap serve` answers `/api/rules/plan?select=...` by GET and `POST /api/rules/validate?select=<ID>` with the
   model's answer as the request body (required, at most 1 MiB; a GET there still says that a query is no place for an
   answer). Validating only compares the answer with the tree and returns a proposal: nothing is written or run.
+
+### `rules/attach`
+
+```bash
+docmap /path/to/project --api=rules/attach --select=lua/mod/init.lua
+```
+
+A conversation about a rule (the desktop app's chat in the run view) cannot open files by itself: a person attaches
+one. Whether that file may go into a request is the planner's question, so it is asked of the planner: the path is
+planned as the only scope of a stand-in rule, and the deny list (built in plus `agent.deny`, case ignored), the links
+that are never sent, the folders the walk never enters (`.git`, `.deps`, `.claude`), `agent.max_context_bytes` and
+the reading of the file (binary, too large, unreadable) are exactly those of `rules/plan`.
+
+- `--select=` is one path relative to the project (`\` is read as `/`, `.` segments are dropped). A path that is
+  empty, absolute, leaves the project (`..`), has a control character or a `*` (a pattern) is refused with a reason
+  (`available: false`).
+- The answer is `{ "available": true, "file", "sent": true, "denied": false, "text", "bytes", "chars", "tokens" }`,
+  `text` being the file the way a request carries it (`=== path ===` and numbered lines) and `tokens` the same rough
+  estimate as `rules/plan`'s. A file that may not go is `{ "available": true, "file", "sent": false, "denied", "reason" }`
+  with no text; `denied` is true when the deny list (or a link) is the reason.
+- **`:DocMap serve` does not offer it** (404, like the writers): it hands out the text of any file a request may
+  carry, not only the files a rule's scope names, and a page that can reach loopback must not be able to ask for
+  that. `--capabilities` lists `rules-attach` when the agent functions are part of the build.
 
 ### `rules/accept` and `rules/waive`
 

@@ -503,6 +503,50 @@ return function(H)
     local unknown = validate("NOPE-01", "violation.json")
     eq(unknown.unknown, { "NOPE-01" }, "validate: an unknown id is named")
 
+    -- attach: one file as a request carries it, decided by the same planner
+    local function attach(path)
+      return api.answer("rules/attach", { root = agent_project }, path)
+    end
+    local a = attach("lua/a.lua")
+    eq(a.available, true, "attach: available")
+    eq(a.sent, true, "attach: a file of the tree may go")
+    eq(a.file, "lua/a.lua", "attach: named as the request names it")
+    ok(a.text:find("^=== lua/a.lua ===\n1: ") ~= nil, "attach: the file block, numbered")
+    ok(a.text:find('4:   local mod = require("x")', 1, true) ~= nil, "attach: with its lines")
+    ok(a.text:find("ATTACH", 1, true) == nil, "attach: nothing of the stand-in rule")
+    eq(a.bytes, 96, "attach: its size")
+    eq(a.tokens, math.ceil(a.chars / 4), "attach: the token estimate")
+    eq(attach("./lua\\a.lua").file, "lua/a.lua", "attach: a path is normalised")
+    local env = attach(".env")
+    eq(
+      { env.sent, env.denied, env.text },
+      { false, true, nil },
+      "attach: the built-in deny list holds"
+    )
+    eq(attach("keys/server.pem").denied, true, "attach: agent.deny holds")
+    eq(attach("KEYS/server.pem").sent, false, "attach: a deny entry in another case holds")
+    local big = attach("lua/big.lua")
+    eq(big.sent, false, "attach: a file over the context limit is not sent")
+    ok(tostring(big.reason):find("^context exceeds limit") ~= nil, "attach: and says so")
+    eq(attach("lua/blob.bin").sent, false, "attach: a binary file is not sent")
+    eq(
+      attach("lua/nope.lua").reason,
+      "no such file in the tree a request may read from",
+      "attach: a missing file"
+    )
+    for _, bad in ipairs({
+      "",
+      "../x.lua",
+      "lua/../../x",
+      "/etc/passwd",
+      "C:/x",
+      "lua/*.lua",
+      "a\nb",
+    }) do
+      eq(attach(bad).available, false, "attach: refused: " .. vim.inspect(bad))
+    end
+    eq(api.NOT_SERVED["rules/attach"], true, "attach: not offered by :DocMap serve")
+
     -- accept and waive: they write, so into a copy of the agent fixture in a throwaway folder
     ok(rules_api.write_engine() ~= nil, "write: rules.nvim's writers load")
     local scratch = (vim.fn.tempname():gsub("\\", "/")) .. "-rules-write"

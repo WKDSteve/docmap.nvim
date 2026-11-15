@@ -538,6 +538,11 @@ M.routes = {
   ["rules/validate"] = function(opts, param)
     return require("docmap.core.rules_api").validate(opts, param)
   end,
+  -- one file of the project as a request would carry it, or why it may not go into one (`param` the relative path):
+  -- what a host's conversation about a rule attaches. Listed in `M.NOT_SERVED`: it reads any file a request may.
+  ["rules/attach"] = function(opts, param)
+    return require("docmap.core.rules_api").attach(opts, param)
+  end,
   -- The two routes that write into the project (`docs/hosting.md`, "rules/accept and rules/waive"): a verdict
   -- accepted from one proposal (`rules.engine.verdicts.accept`) and a waiver (`rules.ops`, `:Rules waive`'s code).
   -- `param` the rule id. Listed in `M.WRITES` as well: a host that serves routes to a page must not offer them.
@@ -553,6 +558,12 @@ M.routes = {
 ---their own folder); `editor/serve.lua` refuses them, because anything that can send a request to loopback could ask.
 ---@type table<string, true>
 M.WRITES = { ["rules/accept"] = true, ["rules/waive"] = true }
+
+---Routes that read and are still not offered by `editor/serve.lua`: `rules/attach` hands out the text of any file of
+---the project a request may carry, not only the files a rule's scope names, and a page that can reach loopback must
+---not be able to ask for that. The command line answers it (the desktop app's conversation about a rule).
+---@type table<string, true>
+M.NOT_SERVED = { ["rules/attach"] = true }
 
 ---Answer one route by name.
 ---@param name string

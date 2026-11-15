@@ -821,6 +821,27 @@ function GATES.standalone()
           and r.proposal.raw == "Looks fine to me, nothing to report.\n"
       end,
     },
+    -- `rules/attach`: one file as a request carries it, or why not, by the same planner
+    {
+      label = "attach, a file of the tree",
+      project = agent_project_api,
+      args = { "rules/attach", "--select=lua/a.lua" },
+      check = function(r)
+        return r.available == true
+          and r.sent == true
+          and r.file == "lua/a.lua"
+          and tostring(r.text):find('4:   local mod = require("x")', 1, true) ~= nil
+          and r.tokens == math.ceil(r.chars / 4)
+      end,
+    },
+    {
+      label = "attach, a file the deny list keeps out",
+      project = agent_project_api,
+      args = { "rules/attach", "--select=keys/server.pem" },
+      check = function(r)
+        return r.available == true and r.sent == false and r.denied == true and r.text == nil
+      end,
+    },
   }
   for _, case in ipairs(api_cases) do
     local route, extra = case.args[1], vim.list_slice(case.args, 2)

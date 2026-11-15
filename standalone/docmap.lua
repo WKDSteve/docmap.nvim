@@ -205,6 +205,8 @@ if capabilities_only then
     -- `rules-agent`: `rules/plan` and `rules/validate` can answer (`rules.nvim`'s agent functions are here too)
     if rules_api.agent_engine() then
       caps[#caps + 1] = "rules-agent"
+      -- `rules-attach`: `rules/attach` can say whether one file may go into a request (the same planner)
+      caps[#caps + 1] = "rules-attach"
       -- `rules-write`: `rules/accept` and `rules/waive` can write a verdict and a waiver into the project, through
       -- `rules.nvim`'s own writers (`docs/hosting.md`, "rules/accept and rules/waive")
       if rules_api.write_engine() then

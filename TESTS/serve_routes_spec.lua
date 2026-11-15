@@ -91,7 +91,8 @@ return function(H)
         asked[#asked + 1] = name
         return { available = true }
       end
-      for _, name in ipairs({ "rules/accept", "rules/waive" }) do
+      -- `rules/attach` too: it reads, but any file a request may carry
+      for _, name in ipairs({ "rules/accept", "rules/waive", "rules/attach" }) do
         local wcode, _, wbody = api.handler({ params = { name }, query = { select = "DEP-07" } })
         eq(wcode, 404, "serve: " .. name .. " is not offered")
         ok(
@@ -100,7 +101,7 @@ return function(H)
         )
       end
       core_api.answer = real_answer
-      eq(#asked, 0, "serve: the writing routes never reach core.api")
+      eq(#asked, 0, "serve: the writing routes and rules/attach never reach core.api")
       ok(
         core_api.WRITES["rules/accept"] and core_api.WRITES["rules/waive"],
         "serve: WRITES names both"

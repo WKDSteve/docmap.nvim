@@ -136,7 +136,8 @@ local function api_answer(name, cfg, param)
   -- The routes that write into the project are not offered here, by any method: this server answers whatever can
   -- reach loopback, a page in the browser included, and the editor has `:Rules` for the same two writes. Answered
   -- like a route that does not exist, so a caller learns nothing it could act on.
-  if api.WRITES[name] then
+  -- `rules/attach` (`api.NOT_SERVED`) the same way: it reads any file a request may carry.
+  if api.WRITES[name] or api.NOT_SERVED[name] then
     return error_answer(404, "no such endpoint")
   end
   cfg.git = cfg.git or git

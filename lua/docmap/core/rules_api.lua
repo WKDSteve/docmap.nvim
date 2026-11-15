@@ -774,6 +774,119 @@ local function validate(opts, param)
   }
 end
 
+-- ── one file a person attaches to a conversation ─────────────────────────────────
+
+---The longest path `rules/attach` takes, in bytes.
+M.MAX_ATTACH_PATH = 1024
+
+---The path `rules/attach` was given, made relative and "/"-separated, or the reason it is not one file of the project.
+---@param param string|nil
+---@return string|nil path
+---@return string|nil reason
+local function attach_path(param)
+  local raw = tostring(param or ""):gsub("\\", "/"):match("^%s*(.-)%s*$")
+  if raw == "" then
+    return nil, "name one file relative to the project (--select=<path>)"
+  end
+  if #raw > M.MAX_ATTACH_PATH then
+    return nil, ("the path is too long (more than %d bytes)"):format(M.MAX_ATTACH_PATH)
+  end
+  if raw:find("%c") then
+    return nil, "the path has a control character"
+  end
+  if raw:sub(1, 1) == "/" or raw:find("^%a:") then
+    return nil, "the path must be relative to the project"
+  end
+  -- `*` is the only pattern character of `rules.engine.glob`; a path with one would name several files
+  if raw:find("*", 1, true) then
+    return nil, "a path with * is a pattern: name one file"
+  end
+  local parts = {}
+  for part in raw:gmatch("[^/]+") do
+    if part == ".." then
+      return nil, "the path must stay inside the project"
+    end
+    if part ~= "." then
+      parts[#parts + 1] = part
+    end
+  end
+  if #parts == 0 then
+    return nil, "name one file relative to the project (--select=<path>)"
+  end
+  return table.concat(parts, "/"), nil
+end
+
+---`rules/attach`, `param` one path relative to the project -- whether that file may go into a request, and if so its
+---text the way a request carries it (`=== path ===` and numbered lines).
+---
+---For a host's conversation about a rule, which cannot open files by itself: a person attaches one. The decision is
+---the planner's, not a second copy of it: the file is planned as the only scope of a stand-in rule, so the deny list
+---(built in plus `agent.deny`), the links that are never sent, the folders the walk never enters, the size limit
+---and the reading of the file are exactly those of `rules/plan`. Nothing is sent and nothing is written.
+---@param opts table A resolved `Docmap.Opts`.
+---@param param string|nil
+---@return table
+local function attach(opts, param)
+  local engine = M.engine()
+  if not engine then
+    return { available = false, reason = M.NO_ENGINE }
+  end
+  local agent = M.agent_engine()
+  if not agent then
+    return { available = false, reason = M.NO_AGENT }
+  end
+  local path, refused = attach_path(param)
+  if not path then
+    return { available = false, reason = refused }
+  end
+  local loaded, reason = load(engine, opts)
+  if not loaded then
+    return { available = false, reason = reason }
+  end
+  -- the stand-in rule has nothing of its own but the scope: its id and text never leave this function
+  local stand_in = {
+    id = "ATTACH-0",
+    severity = "info",
+    title = "",
+    text = "",
+    agent = { include = { path } },
+  }
+  local planned = agent.plan.plan({ stand_in }, loaded.root, { agent = agent_config(loaded) })
+  local function not_sent(why, denied)
+    return { available = true, file = path, sent = false, denied = denied, reason = why }
+  end
+  for _, denied in ipairs(planned.denied) do
+    if denied == path then
+      return not_sent("the deny list keeps this file out of every request (or it is a link)", true)
+    end
+  end
+  local skipped = planned.skipped[1]
+  if skipped then
+    if tostring(skipped.reason):find("^scope matches no file") then
+      return not_sent("no such file in the tree a request may read from", false)
+    end
+    return not_sent(skipped.reason, false)
+  end
+  local batch = planned.batches[1]
+  local req, build_err = agent.request.build(batch, loaded.root)
+  if not req then
+    return not_sent(build_err, false)
+  end
+  -- the stand-in rule's block comes first; everything after the `Files:` line is the file
+  local block = req.prompt:match("\nFiles:\n\n(.*)$") or ""
+  return {
+    available = true,
+    file = path,
+    sent = true,
+    denied = false,
+    text = block,
+    bytes = batch.bytes,
+    chars = #block,
+    tokens = agent.request.estimate_tokens(#block),
+    errors = loaded.errors,
+  }
+end
+
 -- ── the two routes that write ────────────────────────────────────────────────────
 
 ---What `rules/accept` and `rules/waive` answer when `rules.nvim` is there but cannot write (an older one, or a
@@ -1127,6 +1240,10 @@ M.plan = guarded(plan)
 ---`/api/rules/validate` (see `validate` above).
 ---@type fun(opts: table, param: string|nil): table
 M.validate = guarded(validate)
+
+---`rules/attach` (see `attach` above).
+---@type fun(opts: table, param: string|nil): table
+M.attach = guarded(attach)
 
 ---`rules/accept` (see `accept` above).
 ---@type fun(opts: table, param: string|nil): table
