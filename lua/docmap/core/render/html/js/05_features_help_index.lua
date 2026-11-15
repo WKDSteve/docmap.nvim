@@ -1040,10 +1040,12 @@ return [[
   // `entry.bare`. Ties broken by `entry.tie` so two entries with the same
   // bare name (`M.setup` everywhere; two modules named `init`) sort
   // deterministically instead of leaving it to the engine's discretion.
+  // Names are ordered the way the active locale orders them
+  // (`I18N.compare`, an `Intl.Collator`), case and accents second.
   function buildIndexBuckets(entries){
     entries.sort(function(a, b){
-      var ab = a.bare.toLowerCase(), bb = b.bare.toLowerCase();
-      if(ab !== bb) return ab < bb ? -1 : 1;
+      var by = I18N.compare(a.bare, b.bare);
+      if(by !== 0) return by;
       return a.tie < b.tie ? -1 : (a.tie > b.tie ? 1 : 0);
     });
     var buckets = {}, order = [];

@@ -99,11 +99,24 @@ return function(H)
     "});",
     "rt.configure({ locale: 'en', debug: false });",
     "out.has = [rt.has('plain'), rt.has('no.such.key'), rt.configure({ locale: 'de-AT' }), rt.configure({ locale: 'zz' })];",
+    -- The formatters of the page, in each locale: they follow the active locale, not the machine's.
+    "out.format = {};",
+    "['en', 'de'].forEach(function(code){",
+    "  rt.configure({ locale: code });",
+    "  out.format[code] = {",
+    "    number: rt.number(1234567.5), small: rt.number(7), notnum: rt.number('n/a'),",
+    "    date: rt.date('2026-03-01'), notdate: rt.date('yesterday'), nodate: rt.date(undefined),",
+    "    moment: rt.dateTime(Date.UTC(2026, 2, 1, 12, 0) / 1000),",
+    "    sorted: ['zebra', 'Äpfel', 'banana', 'apfel', 'Zoo'].sort(rt.compare)",
+    "  };",
+    "});",
+    "rt.configure({ locale: 'en' });",
     "process.stdout.write(JSON.stringify(out));",
   })
   local tmp = H.tmpfile(".js")
   H.write(tmp, driver)
-  local result = vim.system({ "node", tmp, path }, { text = true }):wait()
+  -- A fixed zone, so the moment reads the same on every machine.
+  local result = vim.system({ "node", tmp, path }, { text = true, env = { TZ = "UTC" } }):wait()
   vim.fn.delete(tmp)
   eq(result.code, 0, "js: the runtime evaluates in node: " .. tostring(result.stderr))
   local got = vim.json.decode(result.stdout)
@@ -120,4 +133,28 @@ return function(H)
   eq(got.has[2], false, "js has: an unknown key")
   eq(got.has[3], "de", "js configure: returns the locale now active")
   eq(got.has[4], "en", "js configure: an unknown tag leaves English active")
+
+  -- ── The formatters of the page (no Lua twin: Lua writes ungrouped ASCII digits) ──
+  local en_f, de_f = got.format.en, got.format.de
+  eq(en_f.number, "1,234,567.5", "js number: grouped the English way")
+  eq(de_f.number, "1.234.567,5", "js number: and the German way")
+  eq(de_f.small, "7", "js number: a small count stays as it is")
+  eq(de_f.notnum, "n/a", "js number: what is no number is shown as given")
+  eq(en_f.date, "Mar 1, 2026", "js date: a git day in English")
+  ok(de_f.date:match("^1%. M.+ 2026$") ~= nil, "js date: and in German, day first: " .. de_f.date)
+  eq(de_f.notdate, "yesterday", "js date: what is no git day is shown as given")
+  eq(de_f.nodate, "", "js date: no day, no text")
+  ok(
+    en_f.moment:find("Mar 1, 2026", 1, true) and en_f.moment:find("12:00", 1, true),
+    "js dateTime: day and time in English: " .. en_f.moment
+  )
+  ok(
+    de_f.moment:match("^1%. M.+ 2026") and de_f.moment:find("12:00", 1, true),
+    "js dateTime: and in German: " .. de_f.moment
+  )
+  eq(
+    table.concat(de_f.sorted, " "),
+    "apfel Äpfel banana zebra Zoo",
+    "js compare: the order of the locale, case and accents second"
+  )
 end

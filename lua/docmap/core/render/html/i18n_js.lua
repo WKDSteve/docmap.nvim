@@ -4,6 +4,8 @@
 --- The twin of `core/i18n/init.lua`, function for function (`normalize`, `resolve`, `pluralCategory`,
 --- `interpolate`, `t`), and held to it by `TESTS/fixtures/i18n/cases.json`: `i18n_runtime_spec.lua` runs every
 --- golden case through both and compares the answers. A change of semantics is a change of that file first.
+--- `number`, `date`, `dateTime` and `compare` have no twin: they format with `Intl` in the active locale, and the
+--- Lua side keeps ungrouped ASCII digits (`docs/i18n.md`). `i18n_runtime_spec.lua` checks them in `node`.
 ---
 --- **Pure on purpose.** One function, no `document`, no `location`, no `navigator`: it takes the embedded
 --- catalogs (`core.i18n.for_page()`) and returns the runtime, so the spec can evaluate it in `node` and the page
@@ -95,6 +97,61 @@ function docmapI18n(data){
     return active;
   }
 
+  // ── Formatting in the active locale (page only) ───────────────────────────
+  // The Lua side has no ICU and writes ungrouped ASCII digits (docs/i18n.md, "Placeholders"); the page has
+  // `Intl` and formats in the locale the reader chose, not the browser's. One formatter per locale and kind,
+  // built on first use. Without `Intl` (an old engine) the plain string stands, never an exception.
+  var formatters = {};
+  function formatter(kind, make){
+    var id = kind + "|" + active;
+    if(!own.call(formatters, id)){
+      try { formatters[id] = (typeof Intl === "object") ? make(active) : null; }
+      catch(e){ formatters[id] = null; }
+    }
+    return formatters[id];
+  }
+
+  // A count or a size: grouped the way the locale groups ("12,345", "12.345").
+  function number(n){
+    if(typeof n !== "number" || !isFinite(n)) return String(n);
+    var f = formatter("number", function(l){ return new Intl.NumberFormat(l); });
+    return f ? f.format(n) : String(n);
+  }
+
+  // A calendar day as git writes it with `--date=short` ("2026-11-15"). Read and written in UTC: the day is
+  // the author's, and a reader west of Greenwich must not see the day before. Anything else is shown as given.
+  function date(day){
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day || ""));
+    if(!m) return day === undefined || day === null ? "" : String(day);
+    var f = formatter("date", function(l){
+      return new Intl.DateTimeFormat(l, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+    });
+    return f ? f.format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]))) : String(day);
+  }
+
+  // A moment in seconds since the epoch (a telemetry capture, a saved snapshot), in the reader's time zone.
+  function dateTime(seconds){
+    if(typeof seconds !== "number" || !isFinite(seconds)) return String(seconds);
+    var when = new Date(seconds * 1000);
+    var f = formatter("datetime", function(l){
+      return new Intl.DateTimeFormat(l, {
+        year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+    });
+    return f ? f.format(when) : when.toISOString();
+  }
+
+  // Name order of the locale: letters first, accents and case only to break a tie (`Äpfel` beside `apfel`, not
+  // behind `zebra`). A total order, so a sort does not depend on the order it was handed.
+  function compare(a, b){
+    var base = formatter("collator", function(l){ return new Intl.Collator(l, { sensitivity: "base" }); });
+    var full = formatter("collator-full", function(l){ return new Intl.Collator(l); });
+    a = String(a); b = String(b);
+    if(base && full) return base.compare(a, b) || full.compare(a, b) || (a < b ? -1 : (a > b ? 1 : 0));
+    a = a.toLowerCase(); b = b.toLowerCase();
+    return a < b ? -1 : (a > b ? 1 : 0);
+  }
+
   return {
     source: source,
     locales: data.locales || [],
@@ -105,6 +162,10 @@ function docmapI18n(data){
     has: has,
     t: t,
     configure: configure,
+    number: number,
+    date: date,
+    dateTime: dateTime,
+    compare: compare,
     locale: function(){ return active; }
   };
 }

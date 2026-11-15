@@ -747,7 +747,7 @@ return [[
       if(on) seen = true;
       var subject = c.subject.length > 60 ? c.subject.slice(0, 59) + "…" : c.subject;
       h += '<option value="' + esc(c.sha) + '"' + (on ? " selected" : "") + '>' +
-        esc(c.short + " · " + c.date + " · " + subject) + '</option>';
+        esc(c.short + " · " + fmtDay(c.date) + " · " + subject) + '</option>';
     });
     // A link can name a commit the list does not reach back to.
     if(selected && !seen){

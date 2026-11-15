@@ -109,7 +109,7 @@ return [[
       return '<div class="crow' + (c.sha === histSelected ? " sel" : "") +
         '" data-sha="' + esc(c.sha) + '">' +
         '<div class="csub">' + esc(c.subject) + "</div>" +
-        '<div class="cmeta">' + esc(c.short) + " · " + esc(c.date) + " · " + esc(c.author) +
+        '<div class="cmeta">' + esc(c.short) + " · " + esc(fmtDay(c.date)) + " · " + esc(c.author) +
         "</div></div>";
     }).join("");
     host.querySelectorAll(".crow").forEach(function(row){
@@ -157,7 +157,7 @@ return [[
     var out = [];
 
     out.push("<h2>" + esc(c.subject) + "</h2>");
-    out.push('<div class="mp">' + esc(c.short) + " · " + esc(c.date) + " · " + esc(c.author) + "</div>");
+    out.push('<div class="mp">' + esc(c.short) + " · " + esc(fmtDay(c.date)) + " · " + esc(c.author) + "</div>");
     if(c.body) out.push('<div class="prose">' + esc(c.body) + "</div>");
 
     if(!d.has_map){

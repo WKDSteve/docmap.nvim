@@ -42,6 +42,10 @@ return [[
   var LANG_LS_KEY = "docmap.lang";
 
   function t(key, params){ return I18N.t(key, params); }
+  // Numbers, days and moments in the active locale, not the browser's (docs/i18n.md).
+  function fmtNum(n){ return I18N.number(n); }
+  function fmtDay(day){ return I18N.date(day); }
+  function fmtMoment(seconds){ return I18N.dateTime(seconds); }
 
   function offeredLocale(tag){
     var code = I18N.normalize(tag);

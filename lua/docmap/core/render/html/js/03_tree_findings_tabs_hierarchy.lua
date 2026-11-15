@@ -195,7 +195,7 @@ return [[
         (n.kind === "file" ? '' : ' <span class="sub">(this and everything below)</span>') +
         '</div><div class="stat-grid">');
       cells.forEach(function(c){
-        h.push('<div class="stat"><b>' + c[1].toLocaleString() + '</b><span>' + esc(c[0]) + '</span></div>');
+        h.push('<div class="stat"><b>' + fmtNum(c[1]) + '</b><span>' + esc(c[0]) + '</span></div>');
       });
       h.push('</div>');
     }

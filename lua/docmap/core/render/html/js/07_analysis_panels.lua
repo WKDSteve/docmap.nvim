@@ -110,8 +110,7 @@ return [[
 
   function telPickerHTML(){
     var aItems = [{ v: "", l: "Latest" }].concat((telSnapList || []).map(function(s){
-      var d = new Date(s.saved_at * 1000);
-      return { v: s.name, l: s.name + " (" + d.toLocaleString() + ")" };
+      return { v: s.name, l: s.name + " (" + fmtMoment(s.saved_at) + ")" };
     }));
     var h = ['<div class="telpicker">'];
     h.push('<label>Snapshot: <select id="telsnap">' +
@@ -540,8 +539,7 @@ return [[
   function loadedPickerHTML(list){
     var items = [{ v: "", l: (list.length === 0 ? "No snapshots saved yet" : "— choose a snapshot —") }]
       .concat(list.map(function(s){
-        var d = new Date(s.saved_at * 1000);
-        return { v: s.name, l: s.name + " (" + d.toLocaleString() + ")" };
+        return { v: s.name, l: s.name + " (" + fmtMoment(s.saved_at) + ")" };
       }));
     return '<div class="telpicker"><label>Snapshot: <select id="loadedsnap">' +
       telOptionsHTML(items, state.lsnap || "") + '</select></label></div>';
@@ -599,7 +597,7 @@ return [[
       };
     }));
 
-    var capturedAt = d.captured_at ? new Date(d.captured_at * 1000).toLocaleString() : "unknown time";
+    var capturedAt = d.captured_at ? fmtMoment(d.captured_at) : "unknown time";
     if(totalRows === 0){
       parts.push('<p class="ntext none">Snapshot <code>' + esc(d.snapshot) + '</code> (captured ' +
         esc(capturedAt) + ') has data for prefix <code>' + esc(d.prefix) +

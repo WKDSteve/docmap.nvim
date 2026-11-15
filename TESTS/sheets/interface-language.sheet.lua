@@ -112,6 +112,15 @@ return {
       expect = "/lang=de/.test(location.hash)",
       note = "the language stays in the link across tabs",
     },
+    {
+      -- The fixture has no history and no count above a thousand, so the formatters of the page are asked
+      -- directly: the runtime the page embeds, with the catalogs it embeds, in this browser's Intl.
+      expect = "(rt => (rt.configure({ locale: 'de' }), rt.number(1234567.5) === '1.234.567,5'"
+        .. " && /^1\\. M.+ 2026$/.test(rt.date('2026-03-01'))"
+        .. " && ['zebra', 'Äpfel', 'apfel'].sort(rt.compare).join(' ') === 'apfel Äpfel zebra'))"
+        .. "(docmapI18n(JSON.parse(document.getElementById('i18n').textContent)))",
+      note = "a German number, a German day and the German name order, in the browser's Intl",
+    },
     { hover = "h1" },
     { press = "Escape", note = "the explanation of the tab is put away" },
     { shot = "de-light-findings" },
