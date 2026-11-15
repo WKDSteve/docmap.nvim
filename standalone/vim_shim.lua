@@ -2893,7 +2893,8 @@ function uv.os_getpid()
   end
   pid = tonumber(text and text:match("^(%d+)"))
   if not pid then
-    local address = tonumber(tostring({}):match("0x(%x+)") or "0", 16) or 0
+    -- the hex digits at the end: `table: 0x55d0...` on Linux, `table: 000002AB...` (no `0x`) on Windows
+    local address = tonumber(tostring({}):match("(%x+)$") or "0", 16) or 0
     pid = math.floor((os.time() * 1000 + os.clock() * 1e6 + address) % 2147483647)
   end
   return pid
