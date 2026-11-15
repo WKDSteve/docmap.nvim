@@ -100,12 +100,11 @@ return [[
       total += n;
       if(f.theme === theme) shown = n;
     });
-    var where = ' in <code>' + esc(feats.folder) + '</code>.';
     if(feats.files.length < 2){
-      return total + ' feature' + (total === 1 ? '' : 's') + ' across 1 file' + where;
+      return rich(t("page.features.count.one-file", { count: total, folder: feats.folder }));
     }
-    return esc(themeTitle(theme)) + ': ' + shown + ' of ' + total + ' feature' +
-      (total === 1 ? '' : 's') + ' across ' + feats.files.length + ' files' + where;
+    return rich(t("page.features.count", { theme: themeTitle(theme), shown: shown, count: total,
+      files: feats.files.length, folder: feats.folder }));
   }
 
   // A card to scroll to once the tab is drawn: set by the feature popup,
@@ -142,19 +141,18 @@ return [[
     }
   }
 
-  var featuresDrawn = false;
+  // The locale the tab was drawn in: static over one IR, drawn again only at a change of language.
+  var featuresDrawn = null;
   function drawFeatures(){
-    if(featuresDrawn){ syncFeatureTheme(state); return; } // static over one IR
-    featuresDrawn = true;
+    if(featuresDrawn === appliedLocale){ syncFeatureTheme(state); return; }
+    featuresDrawn = appliedLocale;
 
     var host = document.getElementById("view-features");
     var feats = IR.features;
     var parts = ['<div class="feat-wrap">'];
 
     if(!feats){
-      parts.push('<p class="ntext none">No <code>docs/FEATURES/</code> (or ' +
-        '<code>docs/features/</code>) folder in this repo — see ' +
-        '<code>docs/features_format.md</code> for the convention this tab reads.</p>');
+      parts.push('<p class="ntext none">' + rich(t("page.features.none")) + '</p>');
       parts.push("</div>");
       host.innerHTML = parts.join("");
       return;
@@ -164,7 +162,7 @@ return [[
     // of a screen's length would otherwise push it out of sight.
     if(feats.files.length > 1){
       parts.push('<div class="hview-toggle feat-themes" id="feattoggle" role="tablist" ' +
-        'aria-label="Feature themes">');
+        'aria-label="' + esc(t("page.features.themes.aria")) + '">');
       feats.files.forEach(function(f){
         parts.push('<button class="anview-btn" role="tab" data-ftheme="' + esc(f.theme) +
           '" data-explain="feat.theme">' + esc(themeTitle(f.theme)) +
@@ -202,13 +200,12 @@ return [[
         parts.push('<div class="nsub feat-fileintro">' + renderFeatureBody(f.intro) + '</div>');
       }
       if(f.entries.length === 0){
-        parts.push('<p class="ntext none">No <code>##</code> sections in this file.</p>');
+        parts.push('<p class="ntext none">' + rich(t("page.features.no-sections")) + '</p>');
         parts.push('</section>');
         return;
       }
       if(visible.length === 0){
-        parts.push('<p class="ntext none">Every feature in this file is promoted to its ' +
-          'own tab — see the tab bar.</p>');
+        parts.push('<p class="ntext none">' + esc(t("page.features.all-promoted")) + '</p>');
         parts.push('</section>');
         return;
       }
@@ -302,15 +299,15 @@ return [[
     var n = featureRefs(key).length;
     if(!n) return "";
     return '<span class="feati" tabindex="0" role="button" data-feat="' + esc(key) +
-      '" aria-label="Described by ' + n + ' feature' + (n === 1 ? '' : 's') +
-      '" title="Features that describe this">&#9670;' +
+      '" aria-label="' + esc(t("page.features.trigger.aria", { count: n })) +
+      '" title="' + esc(t("page.features.trigger.title")) + '">&#9670;' +
       (n > 1 ? '<span class="docn">' + n + '</span>' : '') + '</span>';
   }
 
   function featRefsHTML(key){
     var refs = featureRefs(key);
-    var h = ['<div class="fn-sig">Described by<span class="fn-badges">' +
-      '<span class="bd">' + refs.length + ' feature' + (refs.length === 1 ? '' : 's') +
+    var h = ['<div class="fn-sig">' + esc(t("page.features.described-by")) + '<span class="fn-badges">' +
+      '<span class="bd">' + esc(t("page.features.n", { count: refs.length })) +
       '</span></span></div>'];
     refs.forEach(function(r){
       var hit = featureAt(r.file, r.line);
@@ -323,7 +320,7 @@ return [[
         '</div>');
     });
     h.push('<div class="fn-desc fn-see"><a href="#" data-feat-goto="">' +
-      'All features ↳</a></div>');
+      esc(t("page.features.all")) + '</a></div>');
     return h.join("");
   }
 

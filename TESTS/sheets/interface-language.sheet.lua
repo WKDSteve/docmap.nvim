@@ -231,6 +231,21 @@ return {
     { shot = "de-dark-quicks" },
     { scheme = "light" },
 
+    -- Compare with nothing marked, and History opened from a file: both say why they are empty, in German.
+    { click = '.tab-btn[data-tab="compare"]' },
+    {
+      wait = "/^Noch nichts markiert/.test(document.getElementById('cmpbody').textContent)",
+      note = "the empty Compare tab explains marks in German",
+    },
+    { click = '.tab-btn[data-tab="history"]' },
+    {
+      wait = "/^Diese Seite wurde aus einer Datei geöffnet/.test(document.getElementById('hist-detail').textContent)",
+      note = "History says in German why a file page has nothing to ask",
+    },
+    { hover = "h1" },
+    { press = "Escape", note = "the explanation of the tab is put away" },
+    { shot = "de-light-history" },
+
     -- The Tree detail pane of a module with a finding: section titles, the Stats labels, Meta.
     {
       expect = "(r => (location.hash = '#tab=tree&id=' + encodeURIComponent(r.dataset.id) + '&lang=de', true))"

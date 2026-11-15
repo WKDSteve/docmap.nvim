@@ -48,15 +48,12 @@ return [[
   function drawAnalysisTelemetry(){
     var host = document.getElementById("anbody");
     if(!historyAvailable()){
-      host.innerHTML = '<p class="hmsg">This page was opened from a file, so the Telemetry panel has ' +
-        'nothing to ask.<br><br>Call counts live outside the committed map on purpose — they change between ' +
-        'runs, which the committed artifact never does — so reading them needs a server. Run ' +
-        '<code>:DocMap serve</code> and open the URL it prints (or <code>:DocMap open</code> while it runs).</p>';
+      host.innerHTML = '<p class="hmsg">' + paragraphs(t("page.telemetry.file")) + '</p>';
       return;
     }
 
     var token = ++telReqToken;
-    host.innerHTML = '<p class="hmsg">Loading telemetry…</p>';
+    host.innerHTML = '<p class="hmsg">' + esc(t("page.telemetry.loading")) + '</p>';
 
     var snapListPromise = telSnapLoaded
       ? Promise.resolve(telSnapList)
@@ -76,7 +73,7 @@ return [[
       })
       .catch(function(e){
         if(token !== telReqToken) return;
-        explainFetchFailure(e, "the Telemetry panel").then(function(msg){
+        explainFetchFailure(e, "telemetry").then(function(msg){
           // The token is re-checked after the probe: a newer selection may
           // have superseded this one while it was in flight.
           if(token === telReqToken) host.innerHTML = msg;
@@ -109,16 +106,16 @@ return [[
   }
 
   function telPickerHTML(){
-    var aItems = [{ v: "", l: "Latest" }].concat((telSnapList || []).map(function(s){
+    var aItems = [{ v: "", l: t("page.telemetry.latest") }].concat((telSnapList || []).map(function(s){
       return { v: s.name, l: s.name + " (" + fmtMoment(s.saved_at) + ")" };
     }));
     var h = ['<div class="telpicker">'];
-    h.push('<label>Snapshot: <select id="telsnap">' +
+    h.push('<label>' + esc(t("page.telemetry.snapshot")) + ' <select id="telsnap">' +
       telOptionsHTML(aItems, state.tsnap || "") + '</select></label>');
     if((telSnapList || []).length > 0){
-      var bItems = [{ v: "", l: "— not comparing —" }, { v: "latest", l: "Latest" }]
+      var bItems = [{ v: "", l: t("page.telemetry.not-comparing") }, { v: "latest", l: t("page.telemetry.latest") }]
         .concat((telSnapList || []).map(function(s){ return { v: s.name, l: s.name }; }));
-      h.push('<label>Compare vs: <select id="telsnapb">' +
+      h.push('<label>' + esc(t("page.telemetry.compare-vs")) + ' <select id="telsnapb">' +
         telOptionsHTML(bItems, state.tsnapb || "") + '</select></label>');
     }
     h.push("</div>");
@@ -137,20 +134,14 @@ return [[
   }
 
   function telUnavailableMessage(d){
+    // `reason` is the host's word for what is missing, compared, never shown.
     var reason = (d && d.reason) || "unknown";
-    if(reason === "no namespace"){
-      return "No telemetry namespace configured for this project — set " +
-        "<code>opts.telemetry_namespace</code> or <code>opts.title</code>.";
-    }
-    if(reason === "no map generated yet"){
-      return "No map has been generated yet on this machine — run <code>:DocMap</code> first.";
-    }
+    if(reason === "no namespace") return rich(t("page.telemetry.no-namespace"));
+    if(reason === "no map generated yet") return rich(t("page.runtime.no-map"));
     if(reason === "snapshot not found"){
-      return "Snapshot <code>" + esc((d && d.snapshot) || "") + "</code> was not found — it may have " +
-        "been evicted (only the most recent ones are kept).";
+      return rich(t("page.runtime.snapshot-missing", { snapshot: (d && d.snapshot) || "" }));
     }
-    return "No telemetry data for namespace <code>" + esc((d && d.namespace) || "") + "</code> yet — " +
-      "install/enable <code>runtime-analysis.nvim</code>, or <code>:RATelemetry start</code> there.";
+    return rich(t("page.telemetry.no-data", { namespace: (d && d.namespace) || "" }));
   }
 
   function renderAnalysisTelemetryBody(dA, dB){
@@ -183,27 +174,25 @@ return [[
       }));
 
       if(totalRows === 0){
-        parts.push('<p class="ntext none">Telemetry namespace <code>' + esc(dA.namespace) +
-          '</code> has data, but none of it resolved to a function still in this map.</p>');
+        parts.push('<p class="ntext none">' + rich(t("page.telemetry.unresolved", { namespace: dA.namespace })) + '</p>');
         host.innerHTML = parts.join("");
         telWirePicker();
         return;
       }
 
       var cols = [
-        { label: "Function", key: "ir_key", get: function(r){ return r.ir_key; }, initial: "asc" },
-        { label: "Calls", key: "calls", get: function(r){ return r.calls; }, initial: "desc" },
-        { label: "Static caller?", key: "has_static_caller",
+        { label: t("page.an.col.function"), key: "ir_key", get: function(r){ return r.ir_key; }, initial: "asc" },
+        { label: t("page.telemetry.col.calls"), key: "calls", get: function(r){ return r.calls; }, initial: "desc" },
+        { label: t("page.telemetry.col.static"), key: "has_static_caller",
           get: function(r){ return r.has_static_caller ? 1 : 0; }, initial: "desc" }
       ];
       anSort(rows, cols, function(a, b){ return b.calls - a.calls; });
 
-      parts.push('<p class="nsub">' + rows.length + ' function' + (rows.length === 1 ? '' : 's') +
-        ' with telemetry data in namespace <code>' + esc(dA.namespace) + '</code>' +
-        (state.tsnap ? ' (snapshot ' + esc(state.tsnap) + ')' : ' (latest)') + '.' +
+      parts.push('<p class="nsub">' + rich(t(state.tsnap ? "page.telemetry.sub.snapshot" : "page.telemetry.sub.latest",
+        { count: rows.length, namespace: dA.namespace, snapshot: state.tsnap })) +
         anFilterNote(rows.length, totalRows) + '</p>');
       if(rows.length === 0){
-        parts.push('<p class="ntext none">No function matches that filter.</p>');
+        parts.push('<p class="ntext none">' + esc(t("page.an.nomatch.function")) + '</p>');
         host.innerHTML = parts.join("");
         telWirePicker();
         return;
@@ -213,7 +202,7 @@ return [[
         parts.push('<tr class="anrow" data-node="' + esc(r.id) + '">' +
           '<td><code>' + esc(r.ir_key) + '</code></td>' +
           '<td>' + r.calls + '</td>' +
-          '<td>' + (r.has_static_caller ? "yes" : "no static caller found") + '</td>' +
+          '<td>' + esc(t(r.has_static_caller ? "page.an.yes" : "page.telemetry.no-static")) + '</td>' +
           '</tr>');
       });
       parts.push("</tbody></table>");
@@ -249,20 +238,20 @@ return [[
     }));
 
     var cols = [
-      { label: "Function", key: "ir_key", get: function(r){ return r.ir_key; }, initial: "asc" },
+      { label: t("page.an.col.function"), key: "ir_key", get: function(r){ return r.ir_key; }, initial: "asc" },
       { label: "A", key: "callsA", get: function(r){ return r.callsA; }, initial: "desc" },
       { label: "B", key: "callsB", get: function(r){ return r.callsB; }, initial: "desc" },
       { label: "Δ (B − A)", key: "delta", get: function(r){ return Math.abs(r.delta); }, initial: "desc" }
     ];
     anSort(diffRows, cols, function(a, b){ return Math.abs(b.delta) - Math.abs(a.delta); });
 
-    var aLabel = state.tsnap ? esc(state.tsnap) : "latest";
-    var bLabel = (state.tsnapb === "latest" || !state.tsnapb) ? "latest" : esc(state.tsnapb);
-    parts.push('<p class="nsub">Comparing <code>' + aLabel + '</code> (A) against <code>' + bLabel +
-      '</code> (B) — ' + diffRows.length + ' function' + (diffRows.length === 1 ? '' : 's') + '.' +
+    // "latest" is the name of the live capture, the same word the link carries.
+    var aLabel = state.tsnap ? state.tsnap : "latest";
+    var bLabel = (state.tsnapb === "latest" || !state.tsnapb) ? "latest" : state.tsnapb;
+    parts.push('<p class="nsub">' + rich(t("page.telemetry.comparing", { a: aLabel, b: bLabel, count: diffRows.length })) +
       anFilterNote(diffRows.length, allKeys.length) + '</p>');
     if(diffRows.length === 0){
-      parts.push('<p class="ntext none">No function matches that filter.</p>');
+      parts.push('<p class="ntext none">' + esc(t("page.an.nomatch.function")) + '</p>');
       host.innerHTML = parts.join("");
       telWirePicker();
       return;
@@ -425,20 +414,12 @@ return [[
     var tpl = document.getElementById("startup-graph");
 
     if(!tpl){
-      host.innerHTML = '<p class="ntext none">No startup flamegraph is baked ' +
-        'into this page. It comes from <code>runtime-analysis.nvim</code>: ' +
-        'measure a session (<code>telemetry.startup.autostart()</code> from ' +
-        'that plugin\'s own lazy.nvim <code>init</code> hook), run ' +
-        '<code>:RATelemetry flamegraph</code>, then regenerate the map.</p>';
+      host.innerHTML = '<p class="ntext none">' + rich(t("page.startup.none")) + '</p>';
       return;
     }
 
-    var when = tpl.dataset.measured ? " Measured " + tpl.dataset.measured + "." : "";
-    host.innerHTML = '<p class="nsub">Startup attribution from ' +
-      '<code>runtime-analysis.nvim</code>: width is total time, depth is ' +
-      'require nesting, one colour per module root.' + esc(when) +
-      ' Baked in at generation time — unlike Telemetry and Loaded this needs ' +
-      'no <code>:DocMap serve</code>.</p>';
+    host.innerHTML = '<p class="nsub">' + rich(t(tpl.dataset.measured ? "page.startup.sub.measured" : "page.startup.sub",
+      { measured: tpl.dataset.measured })) + '</p>';
 
     var frame = document.createElement("div");
     frame.className = "startup-graph";
@@ -476,10 +457,7 @@ return [[
   function drawAnalysisLoaded(){
     var host = document.getElementById("anbody");
     if(!historyAvailable()){
-      host.innerHTML = '<p class="hmsg">This page was opened from a file, so the Loaded panel has ' +
-        'nothing to ask.<br><br>Snapshots live outside the committed map on purpose — the same reason ' +
-        'Telemetry does — so reading them needs a server. Run <code>:DocMap serve</code> and open the ' +
-        'URL it prints (or <code>:DocMap open</code> while it runs).</p>';
+      host.innerHTML = '<p class="hmsg">' + paragraphs(t("page.loaded.file")) + '</p>';
       return;
     }
 
@@ -499,7 +477,7 @@ return [[
     // fetched" because a *second*, later fetch is just as real as the first.
     // Left un-gated only for the true no-op case: an already-loaded list
     // with no snapshot picked resolves with nothing to wait for.
-    if(!loadedSnapLoaded || state.lsnap) host.innerHTML = '<p class="hmsg">Loading…</p>';
+    if(!loadedSnapLoaded || state.lsnap) host.innerHTML = '<p class="hmsg">' + esc(t("page.loaded.loading")) + '</p>';
 
     var snapListPromise = loadedSnapLoaded
       ? Promise.resolve(loadedSnapList)
@@ -527,16 +505,16 @@ return [[
         renderAnalysisLoadedBody(d, list);
       });
     }).catch(function(e){
-      explainFetchFailure(e, "the Loaded panel").then(function(msg){ host.innerHTML = msg; });
+      explainFetchFailure(e, "loaded").then(function(msg){ host.innerHTML = msg; });
     });
   }
 
   function loadedPickerHTML(list){
-    var items = [{ v: "", l: (list.length === 0 ? "No snapshots saved yet" : "— choose a snapshot —") }]
+    var items = [{ v: "", l: t(list.length === 0 ? "page.loaded.no-snapshots" : "page.loaded.choose") }]
       .concat(list.map(function(s){
         return { v: s.name, l: s.name + " (" + fmtMoment(s.saved_at) + ")" };
       }));
-    return '<div class="telpicker"><label>Snapshot: <select id="loadedsnap">' +
+    return '<div class="telpicker"><label>' + esc(t("page.telemetry.snapshot")) + ' <select id="loadedsnap">' +
       telOptionsHTML(items, state.lsnap || "") + '</select></label></div>';
   }
 
@@ -548,21 +526,14 @@ return [[
   }
 
   function loadedUnavailableMessage(d){
+    // `reason` is the host's word for what is missing, compared, never shown.
     var reason = (d && d.reason) || "unknown";
-    if(reason === "no map generated yet"){
-      return "No map has been generated yet on this machine — run <code>:DocMap</code> first.";
-    }
-    if(reason === "no single root module prefix for this tree"){
-      return "This tree has no single root module (opts.source resolves to several top-level " +
-        "modules, or equals opts.lua_root) — there is no one prefix to snapshot.";
-    }
+    if(reason === "no map generated yet") return rich(t("page.runtime.no-map"));
+    if(reason === "no single root module prefix for this tree") return esc(t("page.loaded.no-prefix"));
     if(reason === "snapshot not found"){
-      return "Snapshot <code>" + esc((d && d.snapshot) || "") + "</code> was not found — it may have " +
-        "been evicted (only the most recent ones are kept).";
+      return rich(t("page.runtime.snapshot-missing", { snapshot: (d && d.snapshot) || "" }));
     }
-    return "No loaded-snapshot data for prefix <code>" + esc((d && d.prefix) || "") + "</code> yet — " +
-      "install/enable <code>runtime-analysis.nvim</code>, then <code>:RA loaded snapshot " +
-      esc((d && d.prefix) || "&lt;prefix&gt;") + "</code> there.";
+    return rich(t("page.loaded.no-data", { prefix: (d && d.prefix) || "", command: (d && d.prefix) || "<prefix>" }));
   }
 
   function renderAnalysisLoadedBody(d, list){
@@ -570,8 +541,7 @@ return [[
     var parts = [loadedPickerHTML(list || [])];
 
     if(!state.lsnap){
-      parts.push('<p class="ntext none">Choose a snapshot above — this panel has nothing live to ' +
-        'fall back to (see the panel\'s own note: a browser tab has no package.loaded of its own).</p>');
+      parts.push('<p class="ntext none">' + esc(t("page.loaded.choose-above")) + '</p>');
       host.innerHTML = parts.join("");
       loadedWirePicker();
       return;
@@ -592,39 +562,36 @@ return [[
       };
     }));
 
-    var capturedAt = d.captured_at ? fmtMoment(d.captured_at) : "unknown time";
+    var capturedAt = d.captured_at ? fmtMoment(d.captured_at) : t("page.loaded.unknown-time");
     if(totalRows === 0){
-      parts.push('<p class="ntext none">Snapshot <code>' + esc(d.snapshot) + '</code> (captured ' +
-        esc(capturedAt) + ') has data for prefix <code>' + esc(d.prefix) +
-        '</code>, but nothing disagreed with the source.</p>');
+      parts.push('<p class="ntext none">' + rich(t("page.loaded.agrees", { snapshot: d.snapshot, captured: capturedAt,
+        prefix: d.prefix })) + '</p>');
       host.innerHTML = parts.join("");
       loadedWirePicker();
       return;
     }
 
     var cols = [
-      { label: "Module", key: "id", get: function(r){ return r.id; }, initial: "asc" },
-      { label: "Name", key: "name", get: function(r){ return r.name; }, initial: "asc" },
-      { label: "Discrepancy", key: "kind", get: function(r){ return r.kind; }, initial: "asc" }
+      { label: t("page.an.col.module"), key: "id", get: function(r){ return r.id; }, initial: "asc" },
+      { label: t("page.loaded.col.name"), key: "name", get: function(r){ return r.name; }, initial: "asc" },
+      { label: t("page.loaded.col.discrepancy"), key: "kind", get: function(r){ return r.kind; }, initial: "asc" }
     ];
     anSort(rows, cols, function(a, b){
       if(a.id !== b.id) return a.id < b.id ? -1 : 1;
       return a.name < b.name ? -1 : 1;
     });
 
-    parts.push('<p class="nsub">' + rows.length + ' discrepanc' + (rows.length === 1 ? 'y' : 'ies') +
-      ' in snapshot <code>' + esc(d.snapshot) + '</code> (captured ' + esc(capturedAt) +
-      ') for prefix <code>' + esc(d.prefix) + '</code>.' + anFilterNote(rows.length, totalRows) + '</p>');
+    parts.push('<p class="nsub">' + rich(t("page.loaded.sub", { count: rows.length, snapshot: d.snapshot,
+      captured: capturedAt, prefix: d.prefix })) + anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
-      parts.push('<p class="ntext none">No function matches that filter.</p>');
+      parts.push('<p class="ntext none">' + esc(t("page.an.nomatch.function")) + '</p>');
       host.innerHTML = parts.join("");
       loadedWirePicker();
       return;
     }
     parts.push('<table class="antable">' + anHead(cols) + '<tbody>');
     rows.forEach(function(r){
-      var label = r.kind === "declared_only"
-        ? "✕ declared, not loaded" : "! loaded, not declared";
+      var label = esc(t(r.kind === "declared_only" ? "page.loaded.declared-only" : "page.loaded.loaded-only"));
       parts.push('<tr class="anrow" data-node="' + esc(r.id) + '">' +
         '<td><code>' + esc(r.id) + '</code></td>' +
         '<td><code>' + esc(r.name) + '</code></td>' +

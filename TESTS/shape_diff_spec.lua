@@ -336,7 +336,7 @@ return function(H)
     "a page that cannot fetch says so in place"
   )
   has(
-    'explainFetchFailure(e, t("page.shape.what"))',
+    'explainFetchFailure(e, "comparison")',
     "a host that does not answer is explained like History's"
   )
   has(

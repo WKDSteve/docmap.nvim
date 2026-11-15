@@ -294,7 +294,7 @@ return [[
   // for a module (which has annotations but no signature to hang a `ⓘ` off).
   function markTrigger(key){
     return '<span class="marki" tabindex="0" role="button" data-mark="' + esc(key) +
-      '" aria-label="Mark for comparison" title="Mark for comparison">&#43;</span>';
+      '" aria-label="' + esc(t("page.mark.trigger")) + '" title="' + esc(t("page.mark.trigger")) + '">&#43;</span>';
   }
 
   // Paints mark state onto whatever is currently in the DOM, and keeps the
@@ -1076,7 +1076,7 @@ return [[
   // would be a list the compare tab silently cannot reach.
   function sigTrigger(nodeId, fnName){
     var key = fnKey(nodeId, fnName);
-    return '<span class="sigi" tabindex="0" role="button" aria-label="Annotations"' +
+    return '<span class="sigi" tabindex="0" role="button" aria-label="' + esc(t("page.sig.trigger")) + '"' +
       ' data-sig="' + esc(key) + '">&#9432;</span>' + markTrigger(key);
   }
 
@@ -1092,8 +1092,7 @@ return [[
     var refs = DOCREFS[key];
     if(!refs || !refs.length) return "";
     return '<span class="doci" tabindex="0" role="button" data-doc="' + esc(key) +
-      '" aria-label="Mentioned in ' + refs.length + ' place' +
-      (refs.length === 1 ? '' : 's') + ' in the docs">&#182;' +
+      '" aria-label="' + esc(t("page.docref.trigger", { count: refs.length })) + '">&#182;' +
       (refs.length > 1 ? '<span class="docn">' + refs.length + '</span>' : '') + '</span>';
   }
 

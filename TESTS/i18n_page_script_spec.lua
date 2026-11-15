@@ -122,6 +122,29 @@ return function(H)
       to = '    return out.join("");\n  }',
       task = "i18n-page-analysis-panels (the Checklist)",
     },
+    {
+      slice = "08_history_tree_treemap",
+      from = "  var histLoaded = false",
+      to = "  // Tree and Treemap: the Hierarchy",
+      task = "i18n-page-history-runtime-compare-features (History, a host that cannot answer)",
+    },
+    {
+      slice = "07_analysis_panels",
+      from = "  function drawAnalysisTelemetry(){",
+      task = "i18n-page-history-runtime-compare-features (Telemetry, Startup, Loaded)",
+    },
+    {
+      slice = "05_features_help_index",
+      from = "  function featureCountLine(feats, theme){",
+      to = "  var EXPLAIN = {",
+      task = "i18n-page-history-runtime-compare-features (Features)",
+    },
+    {
+      slice = "11_quicks_compare_init",
+      from = "  // Compare — the marked objects",
+      to = "  // Roving tabindex",
+      task = "i18n-page-history-runtime-compare-features (Compare, Compiler Explorer)",
+    },
   }
 
   -- Literals a region keeps although they read as text. Keyed by slice, then by the literal; the value says why.
@@ -169,7 +192,14 @@ return function(H)
       ["unsafe fn"] = "Rust's own words for an unsafe function",
       ["unsafe block"] = "Rust's own words for an unsafe block",
     },
+    ["07_analysis_panels"] = {
+      ["no namespace"] = "the host's reason, compared, never shown",
+      ["no map generated yet"] = "the host's reason, compared, never shown",
+      ["snapshot not found"] = "the host's reason, compared, never shown",
+      ["no single root module prefix for this tree"] = "the host's reason, compared, never shown",
+    },
     ["11_quicks_compare_init"] = {
+      ["Enter"] = KEYS,
       ["hedge hedge-dep sd-del"] = "class names of a lost edge",
     },
     ["05_features_help_index"] = {

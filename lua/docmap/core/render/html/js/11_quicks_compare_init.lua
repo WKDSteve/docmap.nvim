@@ -146,36 +146,38 @@ return [[
 
   // One row of the matrix. `get` returns a display string; rows where every
   // marked object returns the same string are not what the reader came for.
+  // `label` is the key of the row's name. A node's kind is the map's word for it and stays as it is.
+  function yesNo(v){ return t(v ? "page.an.yes" : "page.an.no"); }
   var CMP_ROWS = [
-    { label: "Kind", get: function(e){ return e.kind === "fn" ? "function" : e.node.kind; } },
-    { label: "Where", get: function(e){ return markWhere(e); } },
-    { label: "Summary", get: function(e){
+    { label: "page.compare.row.kind", get: function(e){ return e.kind === "fn" ? t("page.compare.function") : e.node.kind; } },
+    { label: "page.compare.row.where", get: function(e){ return markWhere(e); } },
+    { label: "page.compare.row.summary", get: function(e){
       return (e.kind === "fn" ? e.fn.summary : e.node.summary) || "—"; } },
-    { label: "Signature", get: function(e){
+    { label: "page.compare.row.signature", get: function(e){
       return e.kind === "fn" ? (e.fn.signature || "—") : "—"; } },
-    { label: "Params", get: function(e){
+    { label: "page.compare.row.params", get: function(e){
       return e.kind === "fn" ? String((e.fn.params || []).length) : "—"; } },
-    { label: "Returns", get: function(e){
+    { label: "page.compare.row.returns", get: function(e){
       return e.kind === "fn" ? String((e.fn.returns || []).length) : "—"; } },
-    { label: "Complexity", get: function(e){
+    { label: "page.compare.row.complexity", get: function(e){
       return e.kind === "fn" ? String(e.fn.complexity || 1) : "—"; } },
-    { label: "Lines", get: function(e){
+    { label: "page.compare.row.lines", get: function(e){
       if(e.kind !== "fn") return String((e.node.stats && e.node.stats.lines) || 0);
       return (e.fn.line_end && e.fn.line) ? String(e.fn.line_end - e.fn.line + 1) : "—"; } },
-    { label: "Tested", get: function(e){
-      return e.kind === "fn" ? (e.fn.tested ? "yes" : "no") : "—"; } },
-    { label: "Documented", get: function(e){
-      return e.kind === "fn" ? (e.fn.documented ? "yes" : "no") : "—"; } },
-    { label: "Internal", get: function(e){
-      return e.kind === "fn" ? (e.fn.internal ? "yes" : "no") : "—"; } },
-    { label: "Deprecated", get: function(e){
+    { label: "page.compare.row.tested", get: function(e){
+      return e.kind === "fn" ? yesNo(e.fn.tested) : "—"; } },
+    { label: "page.compare.row.documented", get: function(e){
+      return e.kind === "fn" ? yesNo(e.fn.documented) : "—"; } },
+    { label: "page.compare.row.internal", get: function(e){
+      return e.kind === "fn" ? yesNo(e.fn.internal) : "—"; } },
+    { label: "page.compare.row.deprecated", get: function(e){
       if(e.kind !== "fn") return "—";
-      return e.fn.deprecated !== undefined ? (e.fn.deprecated || "yes") : "no"; } },
-    { label: "Example", get: function(e){
-      return e.kind === "fn" ? (e.fn.example ? "yes" : "no") : "—"; } },
-    { label: "Requires", get: function(e){
+      return e.fn.deprecated !== undefined ? (e.fn.deprecated || yesNo(true)) : yesNo(false); } },
+    { label: "page.compare.row.example", get: function(e){
+      return e.kind === "fn" ? yesNo(e.fn.example) : "—"; } },
+    { label: "page.compare.row.requires", get: function(e){
       return String(((e.kind === "fn" ? e.node : e.node).requires || []).length); } },
-    { label: "Required by", get: function(e){
+    { label: "page.compare.row.required-by", get: function(e){
       return String(((e.kind === "fn" ? e.node : e.node).required_by || []).length); } }
   ];
 
@@ -184,14 +186,14 @@ return [[
     entries.forEach(function(e){
       h.push('<th>' + esc(markTitle(e)) +
         '<button class="cmp-drop" data-unmark="' + esc(e.key) +
-        '" title="Drop this one">&times;</button></th>');
+        '" title="' + esc(t("page.compare.drop")) + '">&times;</button></th>');
     });
     h.push("</tr></thead><tbody>");
     CMP_ROWS.forEach(function(row){
       var vals = entries.map(row.get);
       var differs = false;
       for(var i = 1; i < vals.length; i++){ if(vals[i] !== vals[0]){ differs = true; break; } }
-      h.push('<tr class="' + (differs ? "differs" : "") + '"><th>' + esc(row.label) + '</th>');
+      h.push('<tr class="' + (differs ? "differs" : "") + '"><th>' + esc(t(row.label)) + '</th>');
       vals.forEach(function(v){ h.push('<td>' + esc(v) + '</td>'); });
       h.push("</tr>");
     });
@@ -202,7 +204,7 @@ return [[
   function cmpCardHTML(e){
     var h = ['<div class="cmp-card">'];
     h.push('<div class="cmp-card-h"><span class="cmp-where">' + esc(markWhere(e)) + '</span>' +
-      '<button class="cmp-drop" data-unmark="' + esc(e.key) + '" title="Drop this one">&times;</button></div>');
+      '<button class="cmp-drop" data-unmark="' + esc(e.key) + '" title="' + esc(t("page.compare.drop")) + '">&times;</button></div>');
     if(e.kind === "fn"){
       // The same renderer the detail pane and the popup use. A third copy of
       // "how a function's annotations look" is exactly the drift this plugin
@@ -226,15 +228,11 @@ return [[
     var entries = state.marks.map(markEntry).filter(Boolean);
 
     if(!entries.length){
-      body.innerHTML = '<p class="ntext none">Nothing marked yet. The <code>+</code> ' +
-        'beside any function or module adds it here — mark two or more and this tab ' +
-        'shows them next to each other. Marks survive a reload and travel in the URL, ' +
-        'so a comparison is shareable.</p>';
+      body.innerHTML = '<p class="ntext none">' + rich(t("page.compare.none")) + '</p>';
       return;
     }
     if(view === "matrix" && entries.length === 1){
-      body.innerHTML = '<p class="nsub">One object marked — a matrix needs a second ' +
-        'to compare against. Shown as a card until then.</p>' +
+      body.innerHTML = '<p class="nsub">' + esc(t("page.compare.one")) + '</p>' +
         '<div class="cmp-stack">' + cmpCardHTML(entries[0]) + '</div>';
       return;
     }
@@ -280,21 +278,14 @@ return [[
 
     var h = ['<div class="cebar">'];
     if(usable.length >= 2){
-      h.push('<button type="button" class="cebtn" id="cego">⚙ Compile all ' +
-        usable.length + ' together ↗</button>');
+      h.push('<button type="button" class="cebtn" id="cego">' + esc(t("page.ce.compile-all", { count: usable.length })) +
+        '</button>');
       h.push('<span class="cenote">' +
-        (local
-          ? 'Opens ' + esc(base) + ' with one editor per function.'
-          : 'Opens godbolt.org with one editor per function — their source ' +
-            'travels inside the link, and it is still someone else’s server.') +
+        esc(local ? t("page.ce.opens.local", { base: base }) : t("page.ce.opens.remote")) +
         '</span>');
     } else {
-      h.push('<span class="cenote">Mark two or more <em>functions</em> to compile ' +
-        'them side by side. ' +
-        (entries.length > usable.length
-          ? 'Modules are left out: a module’s source here is its functions ' +
-            'concatenated, which answers a different question.'
-          : '') +
+      h.push('<span class="cenote">' + rich(t("page.ce.mark-more")) + ' ' +
+        (entries.length > usable.length ? esc(t("page.ce.modules-left-out")) : '') +
         '</span>');
     }
 
@@ -304,15 +295,11 @@ return [[
     // alone.
     h.push('<details class="cehost"' + (local ? " open" : "") + '>');
     h.push('<summary>' + (local ? esc(base) : "godbolt.org") + '</summary>');
-    h.push('<p class="cenote">Point this at a Compiler Explorer you run ' +
-      'yourself and nothing leaves your machine. Stored in this browser only ' +
-      '— never written into the generated page, because a committed map ' +
-      'that hard-wired one machine’s address would be a broken link for ' +
-      'everyone else who opens it.</p>');
+    h.push('<p class="cenote">' + esc(t("page.ce.host.note")) + '</p>');
     h.push('<input type="url" id="cehostin" class="cehostin" spellcheck="false" ' +
       'placeholder="http://localhost:10240" value="' + (local ? esc(base) : "") + '">');
-    h.push('<button type="button" class="cebtn" id="cehostsave">Use this</button>');
-    h.push('<button type="button" class="cebtn" id="cehostreset">Back to godbolt.org</button>');
+    h.push('<button type="button" class="cebtn" id="cehostsave">' + esc(t("page.ce.host.use")) + '</button>');
+    h.push('<button type="button" class="cebtn" id="cehostreset">' + esc(t("page.ce.host.reset")) + '</button>');
     h.push("</details></div>");
     return h.join("");
   }
@@ -326,10 +313,10 @@ return [[
   // `drawCompare` — binding them per draw is how a handler ends up attached
   // three times to the same button.
   document.addEventListener("click", function(ev){
-    var t = ev.target;
-    if(!t || !t.id) return;
+    var tg = ev.target;
+    if(!tg || !tg.id) return;
 
-    if(t.id === "cego"){
+    if(tg.id === "cego"){
       var usable = ceSources(state.marks.map(markEntry).filter(Boolean));
       if(usable.length < 2) return;
       var url = godboltUrl(usable.map(function(e){ return e.fn.snippet; }));
@@ -339,10 +326,7 @@ return [[
         // reader would have no way to connect it to the number of marks.
         var note = document.querySelector(".cebar .cenote");
         if(note){
-          note.textContent = "Too large for godbolt.org: " +
-            Math.round(url.length / 1024) + " KB of URL against their 8 KB " +
-            "limit. Unmark a few, or point this at a Compiler Explorer you " +
-            "run yourself — that limit is their front end's, not the tool's.";
+          note.textContent = t("page.ce.too-long", { kb: Math.round(url.length / 1024) });
         }
         return;
       }
@@ -350,14 +334,14 @@ return [[
       return;
     }
 
-    if(t.id === "cehostsave"){
+    if(tg.id === "cehostsave"){
       var input = document.getElementById("cehostin");
       var v = (input && input.value || "").trim().replace(/\/+$/, "");
       // Refused rather than stored-and-ignored. A value that silently does
       // nothing is worse than one that says why: `ceBase` would fall back to
       // godbolt.org and the reader would think they had switched.
       if(!/^https?:\/\//.test(v)){
-        if(input) input.setCustomValidity("Needs to start with http:// or https://");
+        if(input) input.setCustomValidity(t("page.ce.host.invalid"));
         if(input) input.reportValidity();
         return;
       }
@@ -366,7 +350,7 @@ return [[
       return;
     }
 
-    if(t.id === "cehostreset"){
+    if(tg.id === "cehostreset"){
       try { localStorage.removeItem(CE_LS_KEY); } catch(e){ void 0; }
       drawCompare();
       return;
@@ -722,7 +706,7 @@ return [[
         landed(shapeIndex(d));
       })
       .catch(function(e){
-        explainFetchFailure(e, t("page.shape.what")).then(function(msg){ landed({ error: msg }); });
+        explainFetchFailure(e, "comparison").then(function(msg){ landed({ error: msg }); });
       });
   }
 
@@ -744,7 +728,7 @@ return [[
         if(state.tab === "hierarchy") syncShape(state);
       })
       .catch(function(e){
-        explainFetchFailure(e, t("page.shape.what")).then(function(msg){
+        explainFetchFailure(e, "comparison").then(function(msg){
           shapeCommits = { error: msg };
           if(state.tab === "hierarchy") syncShape(state);
         });

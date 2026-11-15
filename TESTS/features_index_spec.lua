@@ -330,6 +330,8 @@ return function(H)
   end
   local slice = require("docmap.core.render.html.js.05_features_help_index")
   local program = table.concat({
+    -- First, so the stubs below (`esc`) stand in for the page's own; `prose` is the page's.
+    H.page_i18n_js(),
     "var listeners = {};",
     "var stub = new Proxy(function(){}, { get: function(t, k){",
     "  if(k === Symbol.toPrimitive) return function(){ return ''; };",
@@ -341,7 +343,7 @@ return function(H)
     "var window = { addEventListener: function(){} };",
     "var navigated = [];",
     "function navigate(p){ navigated.push(JSON.stringify(p)); }",
-    "function esc(s){ return String(s == null ? '' : s); } function prose(s){ return s; }",
+    "function esc(s){ return String(s == null ? '' : s); }",
     "function sigClose(){} function srcUrl(){ return null; } function rel(p){ return p; }",
     "function fenceHTML(c){ return c; }",
     "var state = { tab: 'features' };",

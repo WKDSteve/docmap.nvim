@@ -40,26 +40,34 @@ return [[
   // reader which of the two situations they are in. `/api/ping` answers
   // `{"docmap":true}`; a static host answers its own 404, and any other
   // origin answers something that is not that.
-  function explainFetchFailure(e, what){
-    var detail = esc(String(e));
+  //
+  // `subject` names what failed: "history", "comparison", "telemetry" or
+  // "loaded". The published-copy explanation is one whole message per
+  // subject (a sentence that starts with the subject cannot be glued in every
+  // language); the running-server one names the subject as a phrase.
+  var FETCH_SUBJECT = {
+    history: { what: "page.fetch.what.history", published: "page.fetch.published.history" },
+    comparison: { what: "page.fetch.what.comparison", published: "page.fetch.published.comparison" },
+    telemetry: { what: "page.fetch.what.telemetry", published: "page.fetch.published.telemetry" },
+    loaded: { what: "page.fetch.what.loaded", published: "page.fetch.published.loaded" }
+  };
+  // A message of several paragraphs: `\n\n` between them, as `<br><br>`.
+  function paragraphs(s){ return rich(s).replace(/\n/g, "<br>"); }
+  function explainFetchFailure(e, subject){
+    var keys = FETCH_SUBJECT[subject] || FETCH_SUBJECT.history;
     return fetch("/api/ping", { cache: "no-store" })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
         if(d && d.docmap === true){
           // A docmap server is there; this particular request still failed.
-          return '<p class="hmsg">The map server is running, but ' + what +
-            ' failed: ' + detail + '</p>';
+          return '<p class="hmsg">' + esc(t("page.fetch.running", { what: t(keys.what), detail: String(e) })) + '</p>';
         }
         return null;
       })
       .catch(function(){ return null; })
       .then(function(msg){
         if(msg) return msg;
-        return '<p class="hmsg">This is a published copy of the map, so ' + what +
-          ' has nothing to ask.<br><br>' + what.charAt(0).toUpperCase() + what.slice(1) +
-          ' is computed on demand by a local server — it reads your working tree, your ' +
-          'git history and your runtime data, none of which exist here.<br><br>' +
-          'Run <code>:DocMap serve</code> in the repository and open the URL it prints.</p>';
+        return '<p class="hmsg">' + paragraphs(t(keys.published)) + '</p>';
       });
   }
 
@@ -70,18 +78,12 @@ return [[
 
   function drawHistory(sha){
     if(!historyAvailable()){
-      histOffline(
-        '<p class="hmsg">This page was opened from a file, so the History tab has nothing to ask.<br><br>' +
-        'The commit analysis is computed on demand from <code>git</code> and the map committed at each ' +
-        'revision — that needs a server, because a <code>file://</code> page is not allowed to fetch ' +
-        'anything.<br><br>Run <code>:DocMap serve</code> and open the URL it prints ' +
-        '(or <code>:DocMap open</code> while it runs).</p>'
-      );
+      histOffline('<p class="hmsg">' + paragraphs(t("page.history.file")) + '</p>');
       return;
     }
     if(!histLoaded){
       histLoaded = true;
-      document.getElementById("hist-list").innerHTML = '<p class="hmsg">Loading commits…</p>';
+      document.getElementById("hist-list").innerHTML = '<p class="hmsg">' + esc(t("page.history.loading")) + '</p>';
       fetch("/api/commits?n=100")
         .then(function(r){ return r.json(); })
         .then(function(d){
@@ -91,7 +93,7 @@ return [[
         })
         .catch(function(e){
           histLoaded = false;
-          explainFetchFailure(e, "the History tab").then(histOffline);
+          explainFetchFailure(e, "history").then(histOffline);
         });
       return;
     }
@@ -102,7 +104,7 @@ return [[
   function renderHistList(){
     var host = document.getElementById("hist-list");
     if(!histCommits || histCommits.length === 0){
-      host.innerHTML = '<p class="hmsg">No commits.</p>';
+      host.innerHTML = '<p class="hmsg">' + esc(t("page.history.none")) + '</p>';
       return;
     }
     host.innerHTML = histCommits.map(function(c){
@@ -124,7 +126,7 @@ return [[
     histSelected = sha;
     renderHistList();
     var det = document.getElementById("hist-detail");
-    det.innerHTML = '<p class="hmsg">Analysing ' + esc(sha.slice(0, 8)) + "…</p>";
+    det.innerHTML = '<p class="hmsg">' + esc(t("page.history.analysing", { sha: sha.slice(0, 8) })) + "</p>";
     fetch("/api/commit/" + encodeURIComponent(sha))
       .then(function(r){ return r.json(); })
       .then(function(d){
@@ -134,7 +136,7 @@ return [[
         wireCommitDetail(det);
       })
       .catch(function(e){
-        explainFetchFailure(e, "the History tab").then(function(msg){ det.innerHTML = msg; });
+        explainFetchFailure(e, "history").then(function(msg){ det.innerHTML = msg; });
       });
   }
 
@@ -143,12 +145,12 @@ return [[
   // commit can name a module that has since been renamed or deleted, and a
   // link that navigates nowhere is worse than plain text saying so.
   function modChips(ids, names){
-    if(!ids || ids.length === 0) return '<p class="ntext none">None.</p>';
+    if(!ids || ids.length === 0) return '<p class="ntext none">' + esc(t("page.history.no-modules")) + '</p>';
     return '<div class="hist-mods">' + ids.map(function(id){
       var label = esc((names && names[id]) || id);
       return byId[id]
         ? '<a data-node="' + esc(id) + '">' + label + "</a>"
-        : '<span class="gone" title="not in the current map">' + label + "</span>";
+        : '<span class="gone" title="' + esc(t("page.history.gone")) + '">' + label + "</span>";
     }).join("") + "</div>";
   }
 
@@ -161,25 +163,21 @@ return [[
     if(c.body) out.push('<div class="prose">' + esc(c.body) + "</div>");
 
     if(!d.has_map){
-      out.push('<div class="hist-approx">This revision predates the committed map, so nothing ' +
-        "could be attributed to functions — only the changed files are known.</div>");
+      out.push('<div class="hist-approx">' + esc(t("page.history.no-map")) + '</div>');
     } else if(im.approximate){
-      out.push('<div class="hist-approx">Function spans were <b>approximated</b> for at least one ' +
-        "file: the map at this revision predates <code>line_end</code>, so a function's extent was " +
-        "taken as \"up to the next one\". Attribution errs toward over-reaching into the gaps " +
-        "between functions.</div>");
+      out.push('<div class="hist-approx">' + bold(t("page.history.approximate")).replace(/`([^`]+)`/g, "<code>$1</code>") + '</div>');
     }
 
-    out.push('<div class="sec">Touched functions <span class="sub">' + im.touched.length + "</span></div>");
+    out.push('<div class="sec">' + esc(t("page.history.touched")) + ' <span class="sub">' + im.touched.length + "</span></div>");
     if(im.touched.length === 0){
-      out.push('<p class="ntext none">No scanned function contains any of the changed lines.</p>');
+      out.push('<p class="ntext none">' + esc(t("page.history.touched.none")) + '</p>');
     } else {
-      im.touched.forEach(function(t){
-        var callers = (im.callers || {})[t.node + "#" + t.fn] || [];
-        out.push('<div class="hist-fn">' + esc(t.signature || t.fn) +
-          '  <span class="cmeta">' + esc(names[t.node] || t.node) + ":" + t.line + "</span></div>");
+      im.touched.forEach(function(tf){
+        var callers = (im.callers || {})[tf.node + "#" + tf.fn] || [];
+        out.push('<div class="hist-fn">' + esc(tf.signature || tf.fn) +
+          '  <span class="cmeta">' + esc(names[tf.node] || tf.node) + ":" + tf.line + "</span></div>");
         if(callers.length === 0){
-          out.push('<ul class="hist-callers"><li>no resolved caller in the tree</li></ul>');
+          out.push('<ul class="hist-callers"><li>' + esc(t("page.history.no-caller")) + '</li></ul>');
         } else {
           out.push('<ul class="hist-callers">' + callers.map(function(x){
             return "<li>← " + esc(x.fn || "?") + "  (" + esc(names[x.node] || x.node) + ")</li>";
@@ -188,20 +186,20 @@ return [[
       });
     }
 
-    out.push('<div class="sec">Calling modules <span class="sub">precise — they hold a call site</span></div>');
+    out.push('<div class="sec">' + esc(t("page.history.calling")) + ' <span class="sub">' + esc(t("page.history.calling.sub")) + '</span></div>');
     out.push(modChips(im.calling_modules, names));
-    out.push('<div class="sec">Impacted modules <span class="sub">transitive, via required_by</span></div>');
+    out.push('<div class="sec">' + esc(t("page.history.impacted")) + ' <span class="sub">' + esc(t("page.history.impacted.sub")) + '</span></div>');
     out.push(modChips(im.impacted_modules, names));
 
     if(im.unattributed && im.unattributed.length){
-      out.push('<div class="sec">Changed, nothing to trace <span class="sub">' +
+      out.push('<div class="sec">' + esc(t("page.history.unattributed")) + ' <span class="sub">' +
         im.unattributed.length + "</span></div>");
       out.push('<ul class="lst">' + im.unattributed.map(function(p){
         return "<li>" + esc(p) + "</li>";
       }).join("") + "</ul>");
     }
 
-    out.push('<div class="sec">Diff <span class="sub">generated map excluded</span></div>');
+    out.push('<div class="sec">' + esc(t("page.history.diff")) + ' <span class="sub">' + esc(t("page.history.diff.sub")) + '</span></div>');
     out.push('<div class="hist-diff">' + colorDiff(d.diff || "") + "</div>");
     return out.join("");
   }
@@ -210,7 +208,7 @@ return [[
   // than by parsing, because the only thing that matters visually here is
   // added / removed / hunk header.
   function colorDiff(text){
-    if(!text) return '<span class="dm">(empty)</span>';
+    if(!text) return '<span class="dm">' + esc(t("page.history.diff.empty")) + '</span>';
     return text.split("\n").map(function(l){
       var cls = "";
       if(l.charAt(0) === "+") cls = "da";
