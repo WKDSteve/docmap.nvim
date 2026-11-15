@@ -247,6 +247,7 @@ local specs = {
   "i18n_runtime_spec.lua",
   "i18n_catalog_spec.lua",
   "i18n_locale_spec.lua",
+  "i18n_page_spec.lua",
   "quicks_artifact_spec.lua",
   "check_overload_credit_spec.lua",
   "check_applicability_spec.lua",

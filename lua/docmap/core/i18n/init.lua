@@ -29,8 +29,15 @@ M.SOURCE = "en"
 
 ---The locales this build ships, in the order a picker shows them. The one place a locale is named:
 ---`i18n_catalog_spec.lua` fails when a `<code>.json` beside this file is missing here, or the other way round.
+local SHIPPED = { "en", "de" }
+
+---The shipped locales as the runtime goes by them: a copy of the list above, which a spec may replace
+---(`M._use`) and `M._reset` restores.
 ---@type string[]
-M.LOCALES = { "en" }
+M.LOCALES = {}
+for i, code in ipairs(SHIPPED) do
+  M.LOCALES[i] = code
+end
 
 ---@class Docmap.I18n.Catalog
 ---@field locale string The locale code, the file's own name without `.json`.
@@ -43,6 +50,10 @@ local cache = {}
 
 ---@type table<string, string> Why a catalog could not be read, by locale code.
 local problems = {}
+
+---The module the packaged binary carries its catalogs in. A name in a variable, not in the `require` below: the
+---module exists in no source tree, and the map's own check would report a require nothing declares.
+local BUNDLED = "docmap.core.i18n.bundled"
 
 local active = M.SOURCE
 local debug_mode = false
@@ -59,7 +70,7 @@ end
 ---@return string? text
 ---@return string? err
 local function read(code)
-  local has_bundle, bundle = pcall(require, "docmap.core.i18n.bundled")
+  local has_bundle, bundle = pcall(require, BUNDLED)
   if has_bundle and type(bundle) == "table" then
     if type(bundle[code]) == "string" then
       return bundle[code]
@@ -313,14 +324,23 @@ end
 ---
 ---`prefixes` narrows the messages to the namespaces the page reads; the editor's and the report's strings would
 ---be dead weight in every artifact.
+---
+---`offered` names the locales the page shows in its picker and takes from the browser; the others are embedded
+---all the same and reached by `?lang=` (the renderer says why: `core/render/html.lua`, `PAGE_OFFERED`).
 ---@param prefixes string[]
----@return { source: string, locales: { code: string, name: string, tier: string }[], catalogs: table<string, table<string, any>> }
-function M.for_page(prefixes)
+---@param offered table<string, true>? Locale codes; none offered when omitted.
+---@return { source: string, locales: { code: string, name: string, tier: string, offered: boolean }[], catalogs: table<string, table<string, any>> }
+function M.for_page(prefixes, offered)
   local locales, catalogs = {}, {}
   for _, code in ipairs(M.LOCALES) do
     local doc = M.catalog(code)
     if doc then
-      locales[#locales + 1] = { code = code, name = doc.name, tier = doc.tier }
+      locales[#locales + 1] = {
+        code = code,
+        name = doc.name,
+        tier = doc.tier,
+        offered = offered ~= nil and offered[code] == true,
+      }
       local messages = {}
       for key, entry in pairs(doc.messages) do
         for _, prefix in ipairs(prefixes) do
@@ -342,7 +362,10 @@ function M._reset()
   problems = {}
   active = M.SOURCE
   debug_mode = false
-  M.LOCALES = { "en" }
+  M.LOCALES = {}
+  for i, code in ipairs(SHIPPED) do
+    M.LOCALES[i] = code
+  end
 end
 
 ---Run on catalogs handed in, not on the files: what the golden cases need (`i18n_runtime_spec.lua`). For specs;

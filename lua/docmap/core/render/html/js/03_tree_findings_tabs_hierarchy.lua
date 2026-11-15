@@ -173,7 +173,7 @@ return [[
       // The severity badge is the trigger of the check's card (lookup kind
       // `check`): which check said this, what it compares and why.
       f.forEach(function(x){ h.push('<li><span class="sev '+x.severity+'" data-kw="'+esc(x.check)+
-        '" data-kwkind="check" tabindex="0">'+x.severity+'</span> '+esc(x.message)+'</li>'); });
+        '" data-kwkind="check" tabindex="0">'+x.severity+'</span> '+esc(findingText(x))+'</li>'); });
       h.push('</ul>');
     }
 

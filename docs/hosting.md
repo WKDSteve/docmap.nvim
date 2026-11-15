@@ -1,7 +1,7 @@
 # Hosting the map
 
 Everything this project exposes to a program that *embeds* it rather than
-reads it: the capability handshake, the API routes, the one URL parameter the
+reads it: the capability handshake, the API routes, the URL parameters the
 page reads, and the two-way message channel between the page and whatever
 frame it is in.
 
@@ -15,7 +15,7 @@ a second host would have to hold to.
 - [Why there is a host surface at all](#why-there-is-a-host-surface-at-all)
 - [`--capabilities`, the handshake](#--capabilities-the-handshake)
 - [`--api=<route>`, one question at a time](#--apiroute-one-question-at-a-time)
-- [`?theme=`, the one URL parameter](#theme-the-one-url-parameter)
+- [`?theme=`, and the other URL parameters](#theme-and-the-other-url-parameters)
 - [The page talks to its host](#the-page-talks-to-its-host)
 - [The host asks the page](#the-host-asks-the-page)
 - [The artifact is the extension point](#the-artifact-is-the-extension-point)
@@ -201,7 +201,7 @@ so the two hosts cannot disagree.
 
 ---
 
-## `?theme=`, the one URL parameter
+## `?theme=`, and the other URL parameters
 
 ```
 index.html?theme=dark
@@ -223,9 +223,23 @@ well.
 It is also a feature outside any host: it is a thing a person can type into a
 browser.
 
-`:DocMap serve` lets `?theme=light`, `?theme=dark` and `?theme=system` through
-to the page and refuses any other value or key with a 400: its routes are
-whitelists, and this is the one key the page itself reads.
+The page reads two more keys, both about its interface language
+([`i18n.md`](i18n.md#the-generated-page)):
+
+```
+index.html?lang=de
+index.html?i18n=debug
+```
+
+`?lang=` is the language a host asks for: a tag such as `de` or `de-AT`. A
+language the reader picks in the page wins over it, and a tag that names no
+shipped locale reads English. `?i18n=debug` marks every text that fell back to
+English.
+
+`:DocMap serve` lets `?theme=light`, `?theme=dark` and `?theme=system`,
+`?lang=<a language tag>` and `?i18n=debug` through to the page and refuses any
+other value or key with a 400: its routes are whitelists, and these are the
+keys the page itself reads.
 
 ---
 

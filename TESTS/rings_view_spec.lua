@@ -36,7 +36,7 @@ return function(H)
   has('"view.rings":', "the view explains itself")
   has('"hier.entry":', "the entry select explains itself")
   has(
-    '<select id="hentry" aria-label="The module the rings start at"></select>',
+    '<select id="hentry" data-i18n-aria-label="page.hier.entry.aria" aria-label="The module the rings start at"></select>',
     "an entry select with a name"
   )
   has(

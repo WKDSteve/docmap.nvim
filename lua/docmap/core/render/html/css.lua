@@ -62,6 +62,12 @@ body{margin:0;background:var(--bg);color:var(--ink);
 .topbar .brand{color:var(--muted);text-decoration:none;font-weight:600;letter-spacing:.02em}
 .topbar .brand:hover{color:var(--ink);text-decoration:underline}
 .topbar .tagline{opacity:.75}
+/* The language picker: at the far end of the bar, in the bar's own small type. `display` would undo `hidden`,
+   hence the second rule. */
+.topbar .langsel{margin-left:auto;display:inline-flex;align-items:baseline;gap:6px}
+.topbar .langsel[hidden]{display:none}
+.topbar .langsel select{font:inherit;color:var(--ink);background:var(--panel);
+  border:1px solid var(--line);border-radius:6px;padding:1px 4px}
 header{padding:20px 24px 14px;border-bottom:1px solid var(--line);
   display:flex;flex-wrap:wrap;gap:14px;align-items:baseline}
 h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.01em}

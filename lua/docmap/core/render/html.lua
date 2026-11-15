@@ -29,6 +29,22 @@ local CSS = require("docmap.core.render.html.css")
 
 local JS = require("docmap.core.render.html.js")
 
+-- The interface catalog and its JavaScript runtime (`docs/i18n.md`).
+local i18n = require("docmap.core.i18n")
+local I18N_JS = require("docmap.core.render.html.i18n_js")
+
+---The namespaces of the catalog the page reads. The editor's and the engine's texts stay out of the artifact.
+local PAGE_NAMESPACES = { "page.", "finding.", "report." }
+
+---The locales the page offers: in its picker, and to a reader whose browser asks for one.
+---
+---Every shipped catalog is embedded, and `?lang=` reaches each of them. But the page is being moved into the
+---catalog panel by panel, and a locale is offered only once the whole page speaks it: a reader whose browser
+---says German must not be handed a page that is German in its header and English in every panel below.
+---`i18n_page_spec.lua` holds this list against the shipped locales.
+---@type table<string, true>
+local PAGE_OFFERED = { en = true }
+
 ---@param ir Docmap.IR
 ---@param findings Docmap.Finding[]
 ---@param opts Docmap.Opts
@@ -63,7 +79,7 @@ function M.render(ir, findings, opts)
   local startup_graph_button, startup_graph_html = "", ""
   local graph = require("docmap.core.startup_graph").load(opts)
   if graph then
-    startup_graph_button = '<button class="anview-btn plugin-gated" data-atool="startup"'
+    startup_graph_button = '<button class="anview-btn plugin-gated" data-i18n="page.atool.startup" data-atool="startup"'
       .. ' data-explain="atool.startup">Startup</button>'
     -- The measurement's own date, not the generation's: a reader looking at
     -- a slow-startup graph needs to know whether it predates the change they
@@ -187,22 +203,31 @@ function M.render(ir, findings, opts)
   payload = payload:gsub("</", "<\\/")
 
   -- **This page is an edge, so this is where a finding becomes a
-  -- sentence.** The embedded array carries `message` rather than the
-  -- `params` the finding travels with, because the page's own JS reads
-  -- `x.message` and a committed artifact has to be readable without a
-  -- catalog beside it. Sending params and a catalog instead is I18N-3,
-  -- deliberately not this task: it changes what the artifact *is*, and
-  -- the point of I18N-0 is that it changes nothing anyone can see.
+  -- sentence**, and it becomes one twice. `message` is the English sentence:
+  -- what a reader without script sees, what a host that reads this block gets,
+  -- and all there is for a finding of `opts.extra_checks`, which brings its own
+  -- prose. `key` and `params` are the finding as it travels, so the page's
+  -- script can say it in the reader's language from the catalog embedded below
+  -- (`findingText`). A finding without a catalog entry carries no `key` and
+  -- keeps its `message` in every locale.
+  local findings_mod = require("docmap.core.findings")
   local rendered = {}
   for i, f in ipairs(findings) do
+    local key = not f.message and findings_mod.key(f) or nil
+    local known = key ~= nil and findings_mod.CATALOG[key] ~= nil
     rendered[i] = {
       severity = f.severity,
       check = f.check,
       node = f.node,
       message = fmt_finding(f, "en"),
+      key = known and key or nil,
+      params = known and f.params or nil,
     }
   end
   local findings_json = json.encode(rendered):gsub("</", "<\\/")
+
+  -- Every shipped catalog rides on the page (one artifact, every language), narrowed to what the page says.
+  local i18n_json = json.encode(i18n.for_page(PAGE_NAMESPACES, PAGE_OFFERED)):gsub("</", "<\\/")
 
   local c = ir.meta.counts
   local t = { error = 0, warn = 0, info = 0 }
@@ -216,14 +241,22 @@ function M.render(ir, findings, opts)
   -- byte-identical.
   local na_html = ""
   for _, na in ipairs(require("docmap.core.check").not_applicable(ir, opts)) do
+    -- The parameters ride along, so the script can say the line in the reader's language.
+    local params = json.encode({
+      check = na.check,
+      count = na.count,
+      needs = na.needs,
+      languages = table.concat(na.languages, ", "),
+    })
     na_html = na_html
-      .. ('<p class="na">%s</p>'):format(
-        esc(require("docmap.core.findings").format_not_applicable(na, "en"))
+      .. ('<p class="na" data-i18n="report.not-applicable" data-i18n-params="%s">%s</p>'):format(
+        esc(params),
+        esc(findings_mod.format_not_applicable(na, "en"))
       )
   end
 
   local rows = {}
-  for _, f in ipairs(findings) do
+  for i, f in ipairs(findings) do
     -- data-node drives the click-to-select wiring in JS. Left off entirely
     -- (rather than set to an empty string) when the finding has no node, or
     -- points at something that isn't a real IR node id (config.lua's
@@ -234,12 +267,15 @@ function M.render(ir, findings, opts)
     local node_attr = f.node and (' data-node="%s"'):format(esc(f.node)) or ""
     -- The check id is a trigger of the lookup layer (kind `check`): the card says what the check compares
     -- and why it exists. Focusable, so the keyboard reaches it like every other trigger.
-    rows[#rows + 1] = ([[<tr%s><td><span class="sev %s">%s</span></td><td class="msg"><span class="kw" data-kw="%s" data-kwkind="check" tabindex="0">%s</span></td><td class="msg">%s</td></tr>]]):format(
+    rows[#rows + 1] = ([[<tr%s><td><span class="sev %s">%s</span></td><td class="msg"><span class="kw" data-kw="%s" data-kwkind="check" tabindex="0">%s</span></td><td class="msg" data-finding="%d">%s</td></tr>]]):format(
       node_attr,
       f.severity,
       f.severity,
       esc(f.check),
       esc(f.check),
+      -- The index of this finding in the embedded array (zero-based, as the script counts): the cell is
+      -- written again from there when the reader's language is not English.
+      i - 1,
       esc(fmt_finding(f, "en"))
     )
   end
@@ -306,12 +342,17 @@ function M.render(ir, findings, opts)
     '<div class="topbar">'
       .. '<a class="brand" href="https://github.com/WKDSteve/docmap.nvim"'
       .. ' target="_blank" rel="noopener">docmap.nvim</a>'
-      .. '<span class="tagline">know your project</span>'
+      .. '<span class="tagline" data-i18n="page.topbar.tagline">know your project</span>'
+      -- The interface language. Hidden until the script finds more than one language to offer.
+      .. '<label class="langsel" id="langselwrap" hidden>'
+      .. '<span data-i18n="page.lang.label">Language</span>'
+      .. '<select id="langsel" data-i18n-aria-label="page.lang.aria" aria-label="Interface language"></select>'
+      .. "</label>"
       .. "</div>",
 
     "<header><h1>",
     esc(ir.meta.title),
-    '<span class="sub">module map</span></h1>',
+    '<span class="sub" data-i18n="page.header.sub">module map</span></h1>',
     -- Each count links to the view that shows that set. They were inert
     -- `<span>`s: five numbers naming sets the reader could see the size of and
     -- had no way to reach.
@@ -326,23 +367,23 @@ function M.render(ir, findings, opts)
     -- "0 warnings" that navigates somewhere empty is worse than a number that
     -- never claimed to be clickable.
     '<div class="stats">',
-    ('<button class="stat-link" data-goto="modules"%s><b>%d</b> modules</button>'):format(
+    ('<button class="stat-link" data-i18n-tail="page.stat.modules" data-goto="modules"%s><b>%d</b> modules</button>'):format(
       (c.module or 0) == 0 and " disabled" or "",
       c.module or 0
     ),
-    ('<button class="stat-link" data-goto="namespaces"%s><b>%d</b> namespaces</button>'):format(
+    ('<button class="stat-link" data-i18n-tail="page.stat.namespaces" data-goto="namespaces"%s><b>%d</b> namespaces</button>'):format(
       (c.namespace or 0) == 0 and " disabled" or "",
       c.namespace or 0
     ),
-    ('<button class="stat-link" data-goto="files"%s><b>%d</b> files</button>'):format(
+    ('<button class="stat-link" data-i18n-tail="page.stat.files" data-goto="files"%s><b>%d</b> files</button>'):format(
       (c.file or 0) == 0 and " disabled" or "",
       c.file or 0
     ),
-    ('<button class="stat-link" data-goto="errors"%s><b class="sev error">%d</b> errors</button>'):format(
+    ('<button class="stat-link" data-i18n-tail="page.stat.errors" data-goto="errors"%s><b class="sev error">%d</b> errors</button>'):format(
       t.error == 0 and " disabled" or "",
       t.error
     ),
-    ('<button class="stat-link" data-goto="warnings"%s><b class="sev warn">%d</b> warnings</button>'):format(
+    ('<button class="stat-link" data-i18n-tail="page.stat.warnings" data-goto="warnings"%s><b class="sev warn">%d</b> warnings</button>'):format(
       t.warn == 0 and " disabled" or "",
       t.warn
     ),
@@ -366,22 +407,22 @@ function M.render(ir, findings, opts)
     -- group is active. One strip, not one per owner: two strips in the same
     -- place that are never both visible are one strip with extra code.
     '<div class="tabs">',
-    '<button class="tab-btn active" data-tab="hierarchy" data-explain="tab.hierarchy">Hierarchy</button>',
-    '<button class="tab-btn" data-tab="index" data-explain="tab.index">Index</button>',
-    '<button class="tab-btn" data-tab="analysis" data-explain="tab.analysis">Analysis</button>',
-    '<button class="tab-btn" data-tab="compare" data-explain="tab.compare">Compare</button>',
-    '<button class="tab-btn" data-tab="features" data-explain="tab.features">Features</button>',
-    '<button class="tab-btn" data-tab="quicks" data-explain="tab.quicks">Quicks</button>',
-    '<button class="tab-btn" data-tab="notes" data-explain="tab.notes">Notes</button>',
-    '<button class="tab-btn" data-tab="history" data-explain="tab.history">History</button>',
-    '<button class="tab-btn" data-tab="findings" data-explain="tab.findings">Findings</button>',
+    '<button class="tab-btn active" data-i18n="page.tab.hierarchy" data-tab="hierarchy" data-explain="tab.hierarchy">Hierarchy</button>',
+    '<button class="tab-btn" data-i18n="page.tab.index" data-tab="index" data-explain="tab.index">Index</button>',
+    '<button class="tab-btn" data-i18n="page.tab.analysis" data-tab="analysis" data-explain="tab.analysis">Analysis</button>',
+    '<button class="tab-btn" data-i18n="page.tab.compare" data-tab="compare" data-explain="tab.compare">Compare</button>',
+    '<button class="tab-btn" data-i18n="page.tab.features" data-tab="features" data-explain="tab.features">Features</button>',
+    '<button class="tab-btn" data-i18n="page.tab.quicks" data-tab="quicks" data-explain="tab.quicks">Quicks</button>',
+    '<button class="tab-btn" data-i18n="page.tab.notes" data-tab="notes" data-explain="tab.notes">Notes</button>',
+    '<button class="tab-btn" data-i18n="page.tab.history" data-tab="history" data-explain="tab.history">History</button>',
+    '<button class="tab-btn" data-i18n="page.tab.findings" data-tab="findings" data-explain="tab.findings">Findings</button>',
     "</div>",
 
     '<div class="subtabs" id="subtabs" hidden></div>',
 
     '<div class="toolbar">',
-    '<input id="q" type="search" placeholder="Filter modules, paths, descriptions…" autocomplete="off">',
-    '<button id="expand">Expand all</button><button id="collapse">Collapse</button>',
+    '<input id="q" type="search" data-i18n-placeholder="page.toolbar.filter.placeholder" placeholder="Filter modules, paths, descriptions…" autocomplete="off">',
+    '<button id="expand" data-i18n="page.toolbar.expand">Expand all</button><button id="collapse" data-i18n="page.toolbar.collapse">Collapse</button>',
     -- Sits with the filter rather than inside any one tab: marks are collected
     -- while reading *any* list, so the control that says how many there are and
     -- opens them has to be visible from all of them.
@@ -390,7 +431,7 @@ function M.render(ir, findings, opts)
     -- copied is whatever tab, node, graph view and filter the reader is
     -- looking at right now, so the control belongs where it is reachable
     -- from all of them rather than inside one.
-    '<button id="copylink" title="Copy a link to exactly this view">Copy link</button>',
+    '<button id="copylink" data-i18n="page.toolbar.copy-link.label" data-i18n-title="page.toolbar.copy-link.title" title="Copy a link to exactly this view">Copy link</button>',
     "</div>",
 
     '<main id="view-tree" class="view active"><div id="langbar" class="langbar" hidden></div>'
@@ -398,45 +439,45 @@ function M.render(ir, findings, opts)
 
     '<div id="view-hierarchy" class="view">',
     '<div class="hctl">',
-    '<button id="hup">▲ Up</button><button id="hroot">⌂ Root</button>',
+    '<button id="hup" data-i18n="page.hier.up">▲ Up</button><button id="hroot" data-i18n="page.hier.root">⌂ Root</button>',
     -- Where the graph is rooted, and every level above it. `Up` and `Root`
     -- were the only way back and neither says where you are — after two
     -- recentres the reader knows they moved and not from where.
-    '<nav id="hcrumb" class="hcrumb" aria-label="Graph root"></nav>',
-    [[<button id="hlr" title="Lay the graph out left-to-right instead of top-down">&#8644; Sideways</button>]],
+    '<nav id="hcrumb" class="hcrumb" data-i18n-aria-label="page.hier.crumb.aria" aria-label="Graph root"></nav>',
+    [[<button id="hlr" data-i18n="page.hier.sideways.label" data-i18n-title="page.hier.sideways.title" title="Lay the graph out left-to-right instead of top-down">&#8644; Sideways</button>]],
     '<div class="hview-toggle">',
-    '<button class="hview-btn active" data-view="modules" data-explain="view.modules">Modules</button>',
-    '<button class="hview-btn" data-view="deps" data-explain="view.deps">Deps</button>',
-    '<button class="hview-btn" data-view="calls" data-explain="view.calls">Calls</button>',
-    '<button class="hview-btn" data-view="modulecalls" data-explain="view.modulecalls">Module Calls</button>',
-    '<button class="hview-btn" data-view="types" data-explain="view.types">Types</button>',
-    '<button class="hview-btn" data-view="inheritance" data-explain="view.inheritance">Inheritance</button>',
-    '<button class="hview-btn" data-view="tree" data-explain="view.tree">Tree</button>',
-    '<button class="hview-btn" data-view="treemap" data-explain="view.treemap">Treemap</button>',
-    '<button class="hview-btn" data-view="rings" data-explain="view.rings">Rings</button>',
-    '<button class="hview-btn" data-view="layers" data-explain="view.layers">Layers</button>',
-    '<button class="hview-btn" data-view="routes" data-explain="view.routes">Routes</button>',
-    '<button class="hview-btn" data-view="coupling" data-explain="view.coupling">Coupling</button>',
+    '<button class="hview-btn active" data-i18n="page.view.modules" data-view="modules" data-explain="view.modules">Modules</button>',
+    '<button class="hview-btn" data-i18n="page.view.deps" data-view="deps" data-explain="view.deps">Deps</button>',
+    '<button class="hview-btn" data-i18n="page.view.calls" data-view="calls" data-explain="view.calls">Calls</button>',
+    '<button class="hview-btn" data-i18n="page.view.modulecalls" data-view="modulecalls" data-explain="view.modulecalls">Module Calls</button>',
+    '<button class="hview-btn" data-i18n="page.view.types" data-view="types" data-explain="view.types">Types</button>',
+    '<button class="hview-btn" data-i18n="page.view.inheritance" data-view="inheritance" data-explain="view.inheritance">Inheritance</button>',
+    '<button class="hview-btn" data-i18n="page.view.tree" data-view="tree" data-explain="view.tree">Tree</button>',
+    '<button class="hview-btn" data-i18n="page.view.treemap" data-view="treemap" data-explain="view.treemap">Treemap</button>',
+    '<button class="hview-btn" data-i18n="page.view.rings" data-view="rings" data-explain="view.rings">Rings</button>',
+    '<button class="hview-btn" data-i18n="page.view.layers" data-view="layers" data-explain="view.layers">Layers</button>',
+    '<button class="hview-btn" data-i18n="page.view.routes" data-view="routes" data-explain="view.routes">Routes</button>',
+    '<button class="hview-btn" data-i18n="page.view.coupling" data-view="coupling" data-explain="view.coupling">Coupling</button>',
     "</div>",
     -- Direction and depth belong to the directed views only; `syncGraphControls`
     -- hides them in Modules/Types rather than leaving two control groups that
     -- do nothing.
     '<div class="hview-toggle" id="hdir">',
-    '<button class="hdir-btn" data-dir="in" title="What depends on / calls this">← In</button>',
-    '<button class="hdir-btn" data-dir="both" title="Both directions around the center">⇄ Both</button>',
-    '<button class="hdir-btn active" data-dir="out" title="What this depends on / calls">Out →</button>',
+    '<button class="hdir-btn" data-i18n="page.hier.dir.in.label" data-i18n-title="page.hier.dir.in.title" data-dir="in" title="What depends on / calls this">← In</button>',
+    '<button class="hdir-btn" data-i18n="page.hier.dir.both.label" data-i18n-title="page.hier.dir.both.title" data-dir="both" title="Both directions around the center">⇄ Both</button>',
+    '<button class="hdir-btn active" data-i18n="page.hier.dir.out.label" data-i18n-title="page.hier.dir.out.title" data-dir="out" title="What this depends on / calls">Out →</button>',
     "</div>",
     -- Not a zoom control -- the label exists because it read like one
     -- without it (see .hctl-label's own comment).
-    '<span class="hctl-label" title="How many hops from the centered node to draw">Depth</span>',
+    '<span class="hctl-label" data-i18n="page.hier.depth.label" data-i18n-title="page.hier.depth.title" title="How many hops from the centered node to draw">Depth</span>',
     '<div class="hview-toggle" id="hdepth">',
-    '<button class="hdepth-btn" data-depth="1" title="Depth 1">1</button>',
-    '<button class="hdepth-btn active" data-depth="2" title="Depth 2">2</button>',
-    '<button class="hdepth-btn" data-depth="3" title="Depth 3">3</button>',
-    '<button class="hdepth-btn" data-depth="0" title="Unbounded, still capped at 90 boxes">∞</button>',
+    '<button class="hdepth-btn" data-i18n-title="page.hier.depth.n" data-i18n-params="{&quot;depth&quot;:1}" data-depth="1" title="Depth 1">1</button>',
+    '<button class="hdepth-btn active" data-i18n-title="page.hier.depth.n" data-i18n-params="{&quot;depth&quot;:2}" data-depth="2" title="Depth 2">2</button>',
+    '<button class="hdepth-btn" data-i18n-title="page.hier.depth.n" data-i18n-params="{&quot;depth&quot;:3}" data-depth="3" title="Depth 3">3</button>',
+    '<button class="hdepth-btn" data-i18n-title="page.hier.depth.unbounded" data-depth="0" title="Unbounded, still capped at 90 boxes">∞</button>',
     "</div>",
     '<div class="hview-toggle" id="hext">',
-    '<button class="hext-btn" title="Also draw requires/calls that resolve outside this map">+ external</button>',
+    '<button class="hext-btn" data-i18n="page.hier.external.label" data-i18n-title="page.hier.external.title" title="Also draw requires/calls that resolve outside this map">+ external</button>',
     "</div>",
     -- Which gesture recentres and which one leaves the view. A toggle rather
     -- than a fixed choice because the two answers have genuinely different
@@ -446,28 +487,28 @@ function M.render(ir, findings, opts)
     -- Styled as a pill like `#hext` rather than as a bare checkbox, because a
     -- lone checkbox among nine pills reads as a different kind of control.
     '<div class="hview-toggle" id="hgest">',
-    '<button class="hgest-btn" title="Classic gestures: single click leaves for the Tree view, double click recentres. Off by default — a single click recentres and stays here.">⇵ Classic clicks</button>',
+    '<button class="hgest-btn" data-i18n="page.hier.classic.label" data-i18n-title="page.hier.classic.title" title="Classic gestures: single click leaves for the Tree view, double click recentres. Off by default — a single click recentres and stays here.">⇵ Classic clicks</button>',
     "</div>",
     -- One switch for every tint of the Modules view (documented, tested, marker density). Off by default:
     -- density on demand. A select rather than a row of pills, so four readings cost one control.
-    '<label class="htint" id="htintwrap" data-explain="hier.tint"><span class="hctl-label">Tint</span>',
-    '<select id="htint" aria-label="Tint the Modules boxes">',
-    '<option value="">off</option>',
-    '<option value="doc">documented</option>',
-    '<option value="test">tested</option>',
-    '<option value="fix">FIX markers</option>',
-    '<option value="debt">TODO / HACK / PERF</option>',
+    '<label class="htint" id="htintwrap" data-explain="hier.tint"><span class="hctl-label" data-i18n="page.hier.tint.label">Tint</span>',
+    '<select id="htint" data-i18n-aria-label="page.hier.tint.aria" aria-label="Tint the Modules boxes">',
+    '<option data-i18n="page.hier.tint.off" value="">off</option>',
+    '<option data-i18n="page.hier.tint.doc" value="doc">documented</option>',
+    '<option data-i18n="page.hier.tint.test" value="test">tested</option>',
+    '<option data-i18n="page.hier.tint.fix" value="fix">FIX markers</option>',
+    '<option data-i18n="page.hier.tint.debt" value="debt">TODO / HACK / PERF</option>',
     "</select></label>",
     -- The Rings view only: which module the rings are counted from. A select, because a tree may have
     -- several roots of its require graph and none of them has to be an `init.lua`.
-    '<label class="htint" id="hentrywrap" data-explain="hier.entry"><span class="hctl-label">Entry</span>',
-    '<select id="hentry" aria-label="The module the rings start at"></select></label>',
-    '<button id="hzoomreset" title="Reset zoom to 100% (or press 0)">⌕ 100%</button>',
+    '<label class="htint" id="hentrywrap" data-explain="hier.entry"><span class="hctl-label" data-i18n="page.hier.entry.label">Entry</span>',
+    '<select id="hentry" data-i18n-aria-label="page.hier.entry.aria" aria-label="The module the rings start at"></select></label>',
+    '<button id="hzoomreset" data-i18n-title="page.hier.zoom-reset.title" title="Reset zoom to 100% (or press 0)">⌕ 100%</button>',
     '<span class="hzoom" id="hzoomlabel">100%</span>',
-    '<button id="hexport" title="Download the current diagram as a standalone SVG">↓ SVG</button>',
+    '<button id="hexport" data-i18n="page.hier.export.label" data-i18n-title="page.hier.export.title" title="Download the current diagram as a standalone SVG">↓ SVG</button>',
     -- The shape diff: this map against the map of a commit, or two commits against each other, marked on
     -- the diagram. One button here; its bar (`#hshape`, below the controls) is there only while it is on.
-    '<button id="hshapebtn" aria-pressed="false" aria-controls="hshape" data-explain="hier.shape">± Compare maps</button>',
+    '<button id="hshapebtn" data-i18n="page.hier.shape.label" aria-pressed="false" aria-controls="hshape" data-explain="hier.shape">± Compare maps</button>',
     -- Right-click a box to dim/show it — see the context menu. This pill
     -- only says how many are dimmed right now and clears all of them,
     -- mirroring #markbar's own role for Compare marks.
@@ -485,11 +526,11 @@ function M.render(ir, findings, opts)
     -- its content. This outer div exists only to give the slider a
     -- positioned ancestor that never moves.
     '<div id="hgraph-outer">',
-    '<div class="hrootslider" id="hrootslider" title="Hide root levels — every node at that depth becomes its own root">',
-    '<span class="hrootslider-label">Levels</span>',
-    '<button class="hroot-btn" id="hrootplus" title="Hide one more root level">+</button>',
+    '<div class="hrootslider" id="hrootslider" data-i18n-title="page.hier.levels.title" title="Hide root levels — every node at that depth becomes its own root">',
+    '<span class="hrootslider-label" data-i18n="page.hier.levels.label">Levels</span>',
+    '<button class="hroot-btn" id="hrootplus" data-i18n-title="page.hier.levels.more" title="Hide one more root level">+</button>',
     '<input type="range" id="hrootrange" min="0" max="0" value="0" step="1">',
-    '<button class="hroot-btn" id="hrootminus" title="Show one more root level">−</button>',
+    '<button class="hroot-btn" id="hrootminus" data-i18n-title="page.hier.levels.fewer" title="Show one more root level">−</button>',
     "</div>",
     '<div id="hgraph-wrap"><div id="hgraph"><div id="hstage"></div></div></div>',
     -- Tree and Treemap (see isAltView): a list and an area, so they scroll
@@ -503,10 +544,10 @@ function M.render(ir, findings, opts)
 
     '<div id="view-compare" class="view">',
     '<div class="hview-toggle" id="cmptoggle">',
-    '<button class="cmpview-btn active" data-cview="matrix">Matrix</button>',
-    '<button class="cmpview-btn" data-cview="columns">Columns</button>',
-    '<button class="cmpview-btn" data-cview="stacked">Stacked</button>',
-    '<button id="cmpclear" title="Drop every mark">Clear all</button>',
+    '<button class="cmpview-btn active" data-i18n="page.compare.view.matrix" data-cview="matrix">Matrix</button>',
+    '<button class="cmpview-btn" data-i18n="page.compare.view.columns" data-cview="columns">Columns</button>',
+    '<button class="cmpview-btn" data-i18n="page.compare.view.stacked" data-cview="stacked">Stacked</button>',
+    '<button id="cmpclear" data-i18n="page.compare.clear.label" data-i18n-title="page.compare.clear.title" title="Drop every mark">Clear all</button>',
     "</div>",
     '<div id="cmpbody"></div>',
     "</div>",
@@ -525,30 +566,30 @@ function M.render(ir, findings, opts)
 
     '<div id="view-analysis" class="view">',
     '<div class="hview-toggle" id="antoggle">',
-    '<button class="anview-btn active" data-atool="test" data-explain="atool.test">Test coverage</button>',
-    '<button class="anview-btn" data-atool="doc" data-explain="atool.doc">Documentation</button>',
-    '<button class="anview-btn" data-atool="annotations" data-explain="atool.annotations">Annotations</button>',
-    '<button class="anview-btn" data-atool="api" data-explain="atool.api">API surface</button>',
-    '<button class="anview-btn" data-atool="deps" data-explain="atool.deps">Dependencies</button>',
-    '<button class="anview-btn" data-atool="complexity" data-explain="atool.complexity">Complexity</button>',
-    '<button class="anview-btn" data-atool="duplicates" data-explain="atool.duplicates">Duplicates</button>',
-    '<button class="anview-btn" data-atool="plugins" data-explain="atool.plugins">Plugins</button>',
-    '<button class="anview-btn" data-atool="lazy" data-explain="atool.lazy">Lazy loading</button>',
-    '<button class="anview-btn" data-atool="bindings" data-explain="atool.bindings">Bindings</button>',
-    '<button class="anview-btn plugin-gated" data-atool="tools" data-explain="atool.tools">Tools</button>',
-    '<button class="anview-btn" data-atool="checklist" data-explain="atool.checklist">Checklist</button>',
-    '<button class="anview-btn" data-atool="hooks" data-explain="atool.hooks">Hooks</button>',
-    '<button class="anview-btn" data-atool="decorators" data-explain="atool.decorators">Decorators</button>',
-    '<button class="anview-btn" data-atool="rust" data-explain="atool.rust">Rust</button>',
-    '<button class="anview-btn" data-atool="docs" data-explain="atool.docs">Docs</button>',
-    '<button class="anview-btn" data-atool="endpoints" data-explain="atool.endpoints">Endpoints</button>',
+    '<button class="anview-btn active" data-i18n="page.atool.test" data-atool="test" data-explain="atool.test">Test coverage</button>',
+    '<button class="anview-btn" data-i18n="page.atool.doc" data-atool="doc" data-explain="atool.doc">Documentation</button>',
+    '<button class="anview-btn" data-i18n="page.atool.annotations" data-atool="annotations" data-explain="atool.annotations">Annotations</button>',
+    '<button class="anview-btn" data-i18n="page.atool.api" data-atool="api" data-explain="atool.api">API surface</button>',
+    '<button class="anview-btn" data-i18n="page.atool.deps" data-atool="deps" data-explain="atool.deps">Dependencies</button>',
+    '<button class="anview-btn" data-i18n="page.atool.complexity" data-atool="complexity" data-explain="atool.complexity">Complexity</button>',
+    '<button class="anview-btn" data-i18n="page.atool.duplicates" data-atool="duplicates" data-explain="atool.duplicates">Duplicates</button>',
+    '<button class="anview-btn" data-i18n="page.atool.plugins" data-atool="plugins" data-explain="atool.plugins">Plugins</button>',
+    '<button class="anview-btn" data-i18n="page.atool.lazy" data-atool="lazy" data-explain="atool.lazy">Lazy loading</button>',
+    '<button class="anview-btn" data-i18n="page.atool.bindings" data-atool="bindings" data-explain="atool.bindings">Bindings</button>',
+    '<button class="anview-btn plugin-gated" data-i18n="page.atool.tools" data-atool="tools" data-explain="atool.tools">Tools</button>',
+    '<button class="anview-btn" data-i18n="page.atool.checklist" data-atool="checklist" data-explain="atool.checklist">Checklist</button>',
+    '<button class="anview-btn" data-i18n="page.atool.hooks" data-atool="hooks" data-explain="atool.hooks">Hooks</button>',
+    '<button class="anview-btn" data-i18n="page.atool.decorators" data-atool="decorators" data-explain="atool.decorators">Decorators</button>',
+    '<button class="anview-btn" data-i18n="page.atool.rust" data-atool="rust" data-explain="atool.rust">Rust</button>',
+    '<button class="anview-btn" data-i18n="page.atool.docs" data-atool="docs" data-explain="atool.docs">Docs</button>',
+    '<button class="anview-btn" data-i18n="page.atool.endpoints" data-atool="endpoints" data-explain="atool.endpoints">Endpoints</button>',
     -- The runtime-fed tools as one group at the end of the toolbar: what ran, as opposed to what the
     -- source says. A group inside the same toolbar rather than a tab of its own, so `#tab=analysis&atool=…`
     -- links and the selection logic (`#antoggle .anview-btn`) keep working unchanged.
     '<span class="anview-group" role="group" aria-labelledby="anview-runtime-label">',
-    '<span class="anview-group-label" id="anview-runtime-label">Runtime</span>',
-    '<button class="anview-btn plugin-gated" data-atool="telemetry" data-explain="atool.telemetry">Telemetry</button>',
-    '<button class="anview-btn plugin-gated" data-atool="loaded" data-explain="atool.loaded">Loaded</button>',
+    '<span class="anview-group-label" id="anview-runtime-label" data-i18n="page.atool.group.runtime">Runtime</span>',
+    '<button class="anview-btn plugin-gated" data-i18n="page.atool.telemetry" data-atool="telemetry" data-explain="atool.telemetry">Telemetry</button>',
+    '<button class="anview-btn plugin-gated" data-i18n="page.atool.loaded" data-atool="loaded" data-explain="atool.loaded">Loaded</button>',
     -- `plugin-gated` like its two neighbours, and for the same reason — the
     -- data comes from runtime-analysis.nvim — but it is the one of the three
     -- that needs no server: see `core/startup_graph.lua` for why startup
@@ -562,10 +603,15 @@ function M.render(ir, findings, opts)
     '<div id="anbody"></div>',
     "</div>",
 
-    '<div id="view-findings" class="view"><div id="findings"><details open><summary>Drift findings (',
+    '<div id="view-findings" class="view"><div id="findings"><details open>'
+      .. '<summary data-i18n="page.findings.summary" data-i18n-params="{&quot;count&quot;:',
+    tostring(#findings),
+    '}">Drift findings (',
     tostring(#findings),
     ')</summary><div class="wrap"><table>',
-    "<thead><tr><th>Severity</th><th>Check</th><th>Message</th></tr></thead><tbody>",
+    '<thead><tr><th data-i18n="page.findings.col.severity">Severity</th>'
+      .. '<th data-i18n="page.findings.col.check">Check</th>'
+      .. '<th data-i18n="page.findings.col.message">Message</th></tr></thead><tbody>',
     table.concat(rows),
     "</tbody></table>",
     na_html,
@@ -588,7 +634,11 @@ function M.render(ir, findings, opts)
     '<script type="application/json" id="findings-data">',
     findings_json,
     "</script>",
+    '<script type="application/json" id="i18n">',
+    i18n_json,
+    "</script>",
     "<script>",
+    I18N_JS,
     JS,
     "</script>",
     "</body></html>",

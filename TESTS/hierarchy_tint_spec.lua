@@ -20,10 +20,13 @@ return function(H)
 
   -- ── The wiring ───────────────────────────────────────────────────────────
   has(
-    '<select id="htint" aria-label="Tint the Modules boxes">',
+    '<select id="htint" data-i18n-aria-label="page.hier.tint.aria" aria-label="Tint the Modules boxes">',
     "one switch, a native select (keyboard for free)"
   )
-  has('<option value="">off</option>', "off is a choice, and the first one")
+  has(
+    '<option data-i18n="page.hier.tint.off" value="">off</option>',
+    "off is a choice, and the first one"
+  )
   has("tint: null,", "off is the default state")
   has(
     'if((s.view || "modules") === "modules" && s.tint) parts.push("tint=" + encodeURIComponent(s.tint));',

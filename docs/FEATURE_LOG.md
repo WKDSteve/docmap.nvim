@@ -3794,3 +3794,11 @@ public address stays the default until you set one.
 **`--breaking=<ref>` (2026-10-23, `125d43f`).** Fails a branch that removes or changes a published
 function, compared with the committed map at `<ref>`. Exit 0, 1, or 2 for no verdict. It runs instead
 of the map check, so `--check` needs its own step. See [`pipeline.md`](pipeline.md).
+
+**Interface languages, the catalog and the first layer of the page (2026-11-15).** The interface speaks
+through one JSON catalog per locale (`lua/docmap/core/i18n/`), read by a Lua and a JavaScript runtime held to
+the same golden cases. The sentences of the findings and the static chrome of the page are in it, in
+English and German; a finding is rendered in the reader's language on an interactive surface and in English
+wherever a committed file is written, so `--check` never depends on the machine's `LANG`. The page embeds
+every catalog and switches without a reload, but offers a language only once the whole page speaks it. See
+[`i18n.md`](i18n.md).

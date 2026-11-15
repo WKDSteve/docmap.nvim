@@ -357,7 +357,12 @@ function M.start(cfg)
       -- `?theme=` is the page's own way to be told its theme from outside (the script in `<head>` of
       -- `render/html.lua`), so the route has to let it through: the server refuses every query key a route does not
       -- declare, and `/?theme=light` was a 400. The page only reads `light` and `dark`; `system` is its third
-      -- state (follow the OS) and is accepted for that reason. Nothing else is.
+      -- state (follow the OS) and is accepted for that reason.
+      --
+      -- `?lang=` and `?i18n=debug` are the page's other two (`docs/i18n.md`, "The generated page"): the
+      -- interface language a host asks for, and the marks on texts that fell back to English. `lang` is let
+      -- through as anything shaped like a language tag; which tags mean a shipped locale is the page's to say,
+      -- and one that means none reads English there. Nothing else is accepted.
       {
         pattern = "^/([^/]*)$",
         captures = {
@@ -368,6 +373,12 @@ function M.start(cfg)
         query = {
           theme = function(v)
             return v == "light" or v == "dark" or v == "system"
+          end,
+          lang = function(v)
+            return #v <= 35 and v:match("^%a[%w_.@-]*$") ~= nil
+          end,
+          i18n = function(v)
+            return v == "debug"
           end,
         },
         handler = function(req)

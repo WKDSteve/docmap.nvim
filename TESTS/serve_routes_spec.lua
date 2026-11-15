@@ -95,8 +95,8 @@ return function(H)
       -- `?theme=` is how the page is told its theme from outside; an undeclared key is a 400 from the server.
       eq(
         vim.tbl_count(static.query or {}),
-        1,
-        "serve: the static route declares exactly one query key"
+        3,
+        "serve: the static route declares the three query keys the page reads"
       )
       for _, v in ipairs({ "light", "dark", "system" }) do
         ok(static.query.theme(v), "serve: ?theme=" .. v .. " is let through")
@@ -104,6 +104,18 @@ return function(H)
       for _, v in ipairs({ "", "Light", "blue", "light;x" }) do
         ok(not static.query.theme(v), "serve: ?theme=" .. v .. " is refused")
       end
+      -- `?lang=` and `?i18n=debug`: the interface language a host asks for, and the fallback marks.
+      for _, v in ipairs({ "de", "de-AT", "pt_BR", "de_DE.UTF-8", "en" }) do
+        ok(static.query.lang(v), "serve: ?lang=" .. v .. " is let through")
+      end
+      for _, v in ipairs({ "", "-de", "de;x", "de/../x", "<de>", ("d"):rep(36) }) do
+        ok(not static.query.lang(v), "serve: ?lang=" .. v .. " is refused")
+      end
+      ok(static.query.i18n("debug"), "serve: ?i18n=debug is let through")
+      ok(
+        not static.query.i18n("on") and not static.query.i18n(""),
+        "serve: any other ?i18n= is refused"
+      )
       local icode, itype, ibody = static.handler({ params = { "" }, query = {} })
       eq(icode, 200, "serve: the index is served")
       eq(itype, "text/html; charset=utf-8", "serve: ...as html")

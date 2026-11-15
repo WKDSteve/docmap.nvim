@@ -780,10 +780,10 @@ return [[
     var group = topTab(tab);
     if(group === "index"){
       return [
-        { tab: "tree", label: "Tree", explain: "sub.tree" },
-        { tab: "index", iview: "functions", label: "Functions",
+        { tab: "tree", label: t("page.sub.tree"), explain: "sub.tree" },
+        { tab: "index", iview: "functions", label: t("page.sub.functions"),
           explain: "sub.functions" },
-        { tab: "index", iview: "modules", label: "Modules",
+        { tab: "index", iview: "modules", label: t("page.sub.modules"),
           explain: "sub.modules" }
       ];
     }
@@ -791,7 +791,7 @@ return [[
       // "All features" first: without it, opening a promoted feature would
       // leave no way back to the index of them except the browser's Back
       // button.
-      var out = [{ tab: "features", label: "All features",
+      var out = [{ tab: "features", label: t("page.sub.features-all"),
                    explain: "sub.features.all" }];
       collectPromotedFeatures().forEach(function(p){
         out.push({ tab: p.slug, label: tabLabel(p.entry.name), title: p.entry.name });

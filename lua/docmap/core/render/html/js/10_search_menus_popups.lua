@@ -41,13 +41,15 @@ return [[
   // The two tabs that do nothing say so in the placeholder rather than
   // sitting there with a stale prompt — a box that invites typing and then
   // ignores it reads as broken, which is what this used to do on four tabs.
+  // Catalog keys, not texts: the placeholder is said again at every change of
+  // tab, and of language.
   var PLACEHOLDERS = {
-    tree: "Filter modules, paths, descriptions…",
-    hierarchy: "Jump to a module — Enter commits",
-    analysis: "Filter this panel's rows…",
-    notes: "Filter is not used on Notes",
-    index: "Filter is not used on the Index",
-    history: "Filter is not used on History"
+    tree: "page.toolbar.filter.placeholder",
+    hierarchy: "page.toolbar.filter.hierarchy",
+    analysis: "page.toolbar.filter.analysis",
+    notes: "page.toolbar.filter.notes",
+    index: "page.toolbar.filter.index",
+    history: "page.toolbar.filter.history"
   };
   var FILTERING_TABS = { tree: true, hierarchy: true, analysis: true };
 
@@ -59,7 +61,7 @@ return [[
   var lastSearchTab = null;
 
   function syncSearchBox(s){
-    q.placeholder = PLACEHOLDERS[s.tab] || PLACEHOLDERS.tree;
+    q.placeholder = t(PLACEHOLDERS[s.tab] || PLACEHOLDERS.tree);
     q.disabled = !FILTERING_TABS[s.tab];
 
     if(s.tab !== lastSearchTab){
@@ -314,7 +316,7 @@ return [[
   function flashCopy(text){
     if(copyTimer) clearTimeout(copyTimer);
     copyBtn.textContent = text;
-    copyTimer = setTimeout(function(){ copyBtn.textContent = "Copy link"; copyTimer = null; }, 1400);
+    copyTimer = setTimeout(function(){ copyBtn.textContent = t("page.toolbar.copy-link.label"); copyTimer = null; }, 1400);
   }
 
   copyBtn.addEventListener("click", function(){
@@ -323,7 +325,7 @@ return [[
     // includes the `file://` case this page is most often opened as. The
     // fallback is the old `execCommand` route, and if even that fails the
     // reader is told rather than left looking at a button that did nothing.
-    var done = function(){ flashCopy("Copied"); };
+    var done = function(){ flashCopy(t("page.toolbar.copy-link.copied")); };
     var failed = function(){
       try {
         var ta = document.createElement("textarea");
@@ -335,9 +337,9 @@ return [[
         ta.select();
         var okExec = document.execCommand && document.execCommand("copy");
         document.body.removeChild(ta);
-        flashCopy(okExec ? "Copied" : "Press Ctrl+C");
+        flashCopy(t(okExec ? "page.toolbar.copy-link.copied" : "page.toolbar.copy-link.manual"));
       } catch(e){
-        flashCopy("Press Ctrl+C");
+        flashCopy(t("page.toolbar.copy-link.manual"));
       }
     };
     if(navigator.clipboard && navigator.clipboard.writeText){

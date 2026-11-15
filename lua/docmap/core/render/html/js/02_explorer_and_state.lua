@@ -717,6 +717,10 @@ return [[
     tab: "hierarchy", id: null, center: null, view: "modules",
     dir: "out", depth: 2, fn: null, ext: false, iview: "functions", atool: "test",
     sha: null,
+    // The interface language the reader chose, or "" for whatever
+    // `wantedLocale` finds without one. In the hash on every tab, like
+    // `marks`: it belongs to the reader, not to a view.
+    lang: "",
     // Modules view only: how many top layers of the real tree are peeled
     // off, so every node that used to sit at that depth renders as its own
     // parallel root instead — a "forest" view, not a re-center on any one
@@ -895,6 +899,9 @@ return [[
     // Only when non-empty, so the common case is not a link with a trailing
     // `&marks=` in it.
     if(s.marks && s.marks.length) parts.push("marks=" + encodeURIComponent(s.marks.join(",")));
+    // Only a choice, and only one this build can honour: a link never
+    // carries a language nobody picked.
+    if(s.lang && I18N.normalize(s.lang)) parts.push("lang=" + encodeURIComponent(I18N.normalize(s.lang)));
     return "#" + parts.join("&");
   }
 
@@ -985,6 +992,7 @@ return [[
       else if(k === "marks"){
         s.marks = v.split(",").filter(function(key){ return key && markExists(key); });
       }
+      else if(k === "lang") s.lang = v;
       else if(k === "hidden"){
         s.hidden = v.split(",").filter(function(key){ return key && hiddenKeyExists(key); });
       }
@@ -1009,6 +1017,9 @@ return [[
       s.tab = "features";
     }
     state = s;
+
+    // Before any draw: every panel below reads its texts through `t()`.
+    syncLocale(s);
 
     var group = topTab(s.tab);
     document.querySelectorAll(".tab-btn").forEach(function(b){

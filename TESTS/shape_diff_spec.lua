@@ -299,7 +299,7 @@ return function(H)
     ok(src:find(needle, 1, true) ~= nil, "shape page: " .. msg)
   end
   has(
-    '<button id="hshapebtn" aria-pressed="false" aria-controls="hshape" data-explain="hier.shape">',
+    '<button id="hshapebtn" data-i18n="page.hier.shape.label" aria-pressed="false" aria-controls="hshape" data-explain="hier.shape">',
     "one button in the Hierarchy controls, explained like the others"
   )
   has(

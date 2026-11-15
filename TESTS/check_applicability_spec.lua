@@ -133,7 +133,8 @@ return function(H)
     "CLI reports the skip"
   )
   ok(
-    page:find('<p class="na">Not applicable: missing-module-tag', 1, true),
+    page:find('<p class="na" data-i18n="report.not-applicable" data-i18n-params="', 1, true)
+      and page:find('">Not applicable: missing-module-tag on 1 node(s)', 1, true),
     "page reports the skip"
   )
 

@@ -10,6 +10,165 @@ return [[
   var FIND = JSON.parse(document.getElementById("findings-data").textContent);
   var byId = {}; IR.nodes.forEach(function(n){ byId[n.id] = n; });
 
+  // =====================================================================
+  // The interface language (docs/i18n.md).
+  //
+  // Every shipped catalog is embedded in `#i18n`, and `docmapI18n` (the
+  // script in front of this one) is the runtime: `t(key, params)` is the
+  // only way this page says anything of its own. The subject -- module
+  // names, paths, docstring prose -- never goes through it.
+  //
+  // Which locale, first match wins:
+  //   1. `lang=` in the hash: the reader chose it here, and a link keeps it;
+  //   2. `?lang=` in the query: the host that embeds the page says it, the
+  //      way it says `?theme=`;
+  //   3. the choice this browser stored;
+  //   4. the browser's own languages, in their order;
+  //   5. English.
+  // 1 and 2 reach every shipped locale. 3 and 4 only the *offered* ones
+  // (`core/render/html.lua`, `PAGE_OFFERED`): a locale the page does not
+  // speak in every panel yet is there for whoever asks for it by name, and
+  // is not handed to a reader because of their browser.
+  //
+  // `?i18n=debug` marks every text that fell back to English.
+  // =====================================================================
+  var I18N = docmapI18n(JSON.parse(document.getElementById("i18n").textContent));
+  var I18N_QUERY = (function(){
+    try { return new URLSearchParams(location.search); } catch(e){ return null; }
+  })();
+  if(I18N_QUERY && I18N_QUERY.get("i18n") === "debug") I18N.configure({ debug: true });
+  // One key for every map in this browser, unlike the marks: the language is
+  // the reader's, not the artifact's.
+  var LANG_LS_KEY = "docmap.lang";
+
+  function t(key, params){ return I18N.t(key, params); }
+
+  function offeredLocale(tag){
+    var code = I18N.normalize(tag);
+    var ok = code && I18N.locales.some(function(l){ return l.code === code && l.offered; });
+    return ok ? code : null;
+  }
+  function storedLang(){
+    try { return localStorage.getItem(LANG_LS_KEY); } catch(e){ return null; }
+  }
+  function storeLang(code){
+    try {
+      if(code) localStorage.setItem(LANG_LS_KEY, code);
+      else localStorage.removeItem(LANG_LS_KEY);
+    } catch(e){ void 0; }
+  }
+  function wantedLocale(s){
+    var explicit = I18N.normalize(s.lang) || I18N.normalize(I18N_QUERY && I18N_QUERY.get("lang"));
+    if(explicit) return explicit;
+    var stored = offeredLocale(storedLang());
+    if(stored) return stored;
+    var langs = navigator.languages || [navigator.language];
+    for(var i = 0; i < langs.length; i++){
+      var code = offeredLocale(langs[i]);
+      if(code) return code;
+    }
+    return I18N.source;
+  }
+
+  // A finding in the reader's language: from its key and parameters when the
+  // catalog has the sentence, else the English `message` it came with (a
+  // finding of `opts.extra_checks` brings prose of its own and no key).
+  function findingText(f){
+    if(f.key && I18N.has("finding." + f.key)) return t("finding." + f.key, f.params);
+    return f.message;
+  }
+
+  function i18nParams(el){
+    var raw = el.getAttribute("data-i18n-params");
+    if(!raw) return null;
+    try { return JSON.parse(raw); } catch(e){ return null; }
+  }
+
+  // The static markup says which text it holds (`core/render/html.lua`):
+  //   data-i18n="key"              the element's text
+  //   data-i18n-title / -placeholder / -aria-label="key"   that attribute
+  //   data-i18n-params='{...}'     the parameters of both
+  //   data-i18n-tail="key"         the text behind the count in a `<b>`
+  //   data-finding="i"             finding number i of `#findings-data`
+  // Written in English by the renderer, so the page reads without script,
+  // and written again from here: once at load and at every change of locale.
+  var I18N_ATTRS = ["title", "placeholder", "aria-label"];
+  function applyI18n(root){
+    root.querySelectorAll("[data-i18n]").forEach(function(el){
+      el.textContent = t(el.getAttribute("data-i18n"), i18nParams(el));
+    });
+    I18N_ATTRS.forEach(function(attr){
+      root.querySelectorAll("[data-i18n-" + attr + "]").forEach(function(el){
+        el.setAttribute(attr, t(el.getAttribute("data-i18n-" + attr), i18nParams(el)));
+      });
+    });
+    root.querySelectorAll("[data-i18n-tail]").forEach(function(el){
+      var count = el.querySelector("b");
+      var tail = el.lastChild;
+      if(!count || !tail || tail.nodeType !== 3) return;
+      tail.nodeValue = " " + t(el.getAttribute("data-i18n-tail"), { count: Number(count.textContent) });
+    });
+    root.querySelectorAll("[data-finding]").forEach(function(el){
+      var f = FIND[Number(el.getAttribute("data-finding"))];
+      if(f) el.textContent = findingText(f);
+    });
+  }
+
+  // The picker in the top bar: the offered locales by their own names, and
+  // "Browser language" to hand the choice back. Hidden while there is nothing
+  // to choose. A locale that is active without being offered (someone opened
+  // `?lang=` for it) is listed too, so the control never shows a language the
+  // page is not in.
+  function syncLangPicker(s){
+    var wrap = document.getElementById("langselwrap");
+    var sel = document.getElementById("langsel");
+    if(!wrap || !sel) return;
+    var listed = I18N.locales.filter(function(l){ return l.offered || l.code === I18N.locale(); });
+    wrap.hidden = listed.length < 2;
+    sel.innerHTML = "";
+    var auto = document.createElement("option");
+    auto.value = "";
+    auto.textContent = t("page.lang.auto");
+    sel.append(auto);
+    listed.forEach(function(l){
+      var o = document.createElement("option");
+      o.value = l.code;
+      // The endonym, in every locale: a reader looks for the name of their
+      // language in their language.
+      o.textContent = l.name;
+      sel.append(o);
+    });
+    sel.value = I18N.normalize(s.lang) || I18N.normalize(I18N_QUERY && I18N_QUERY.get("lang")) ||
+      offeredLocale(storedLang()) || "";
+  }
+
+  var appliedLocale = null;
+  // Called by `applyState` before anything is drawn. Does nothing unless the
+  // locale this state asks for differs from the one on screen.
+  function syncLocale(s){
+    var want = wantedLocale(s);
+    if(want === appliedLocale) return;
+    appliedLocale = want;
+    I18N.configure({ locale: want });
+    document.documentElement.lang = want;
+    document.title = t(
+      IR.meta.title !== "docmap.nvim" ? "page.doc-title.credited" : "page.doc-title.plain",
+      { title: IR.meta.title });
+    applyI18n(document);
+    syncLangPicker(s);
+  }
+
+  (function(){
+    var sel = document.getElementById("langsel");
+    if(!sel) return;
+    sel.addEventListener("change", function(){
+      // Stored as well as written into the link: the next map opened in this
+      // browser starts in the language chosen here.
+      storeLang(sel.value || null);
+      navigate({ lang: sel.value });
+    });
+  })();
+
   var findByNode = {};
   FIND.forEach(function(f){ if(!f.node) return;
     (findByNode[f.node] = findByNode[f.node] || []).push(f); });
@@ -136,8 +295,8 @@ return [[
     var n = state.marks.length;
     bar.hidden = n === 0;
     bar.classList.toggle("has", n > 0);
-    bar.textContent = "Compare (" + n + ")";
-    bar.title = n + " marked object" + (n === 1 ? "" : "s") + " — open the Compare tab";
+    bar.textContent = t("page.marks.bar", { count: n });
+    bar.title = t("page.marks.title", { count: n });
   }
 
   // Same "paint whatever is on screen" role as syncMarks, over `hboxes`
@@ -167,9 +326,8 @@ return [[
     var n = state.hidden.length;
     bar.hidden = n === 0;
     bar.classList.toggle("has", n > 0);
-    bar.textContent = "Hidden (" + n + ") — show all";
-    bar.title = n + " box" + (n === 1 ? "" : "es") +
-      " dimmed in the Hierarchy view — click to show them again";
+    bar.textContent = t("page.hidden.bar", { count: n });
+    bar.title = t("page.hidden.title", { count: n });
   }
 
   // =====================================================================
