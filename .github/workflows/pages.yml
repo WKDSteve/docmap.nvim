@@ -24,12 +24,14 @@
 
 name: Pages
 
+# Publishing is an act, not a side effect (decided 2026-11-15). This used to
+# run on every push to main that touched `docs/map/**`, and `docs/map` belongs
+# in every commit that changes what the map shows (the `map` step of
+# `testing ci` and the `map` job check exactly that), so every such push
+# published. Now it runs when somebody starts it, or with a release tag.
 on:
   push:
-    branches: [main]
-    paths:
-      - "docs/map/**"
-      - ".github/workflows/pages.yml"
+    tags: ["v*"]
   workflow_dispatch:
 
 # One concurrent deployment; a queued run supersedes an older one rather
