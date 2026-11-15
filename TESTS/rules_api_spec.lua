@@ -502,6 +502,246 @@ return function(H)
     eq(checked_rule.available, false, "validate: a rule with a check is refused")
     local unknown = validate("NOPE-01", "violation.json")
     eq(unknown.unknown, { "NOPE-01" }, "validate: an unknown id is named")
+
+    -- accept and waive: they write, so into a copy of the agent fixture in a throwaway folder
+    ok(rules_api.write_engine() ~= nil, "write: rules.nvim's writers load")
+    local scratch = (vim.fn.tempname():gsub("\\", "/")) .. "-rules-write"
+    vim.fn.mkdir(scratch, "p")
+    for _, part in ipairs({ "project", "ruleset" }) do
+      local from = fixtures .. "/rules_api/agent/" .. part
+      for name, kind in vim.fs.dir(from, { depth = 10 }) do
+        local src, dst = from .. "/" .. name, scratch .. "/" .. part .. "/" .. name
+        if kind == "directory" then
+          vim.fn.mkdir(dst, "p")
+        else
+          vim.fn.mkdir(vim.fs.dirname(dst), "p")
+          vim.fn.writefile(vim.fn.readfile(src, "b"), dst, "b")
+        end
+      end
+    end
+    local wproject = scratch .. "/project"
+    local verdicts_file = wproject .. "/.rules-verdicts.json"
+    local waivers_file = wproject .. "/.rules-waivers.json"
+    local function bytes(path)
+      local fh = io.open(path, "rb")
+      if not fh then
+        return nil
+      end
+      local text = fh:read("*a")
+      fh:close()
+      return text
+    end
+    local function accept(id, proposal, extra)
+      local o = vim.tbl_extend("force", { root = wproject, rules_proposal = proposal }, extra or {})
+      return api.answer("rules/accept", o, id)
+    end
+    local proposal = vim.deepcopy(v.proposal)
+
+    local written =
+      accept("AGT-01", proposal, { rules_by = "Tester", rules_note = "checked a.lua" })
+    eq(written.available, true, "accept: a violation that held up is written")
+    eq(written.written, true, "accept: says it wrote")
+    eq(written.file, ".rules-verdicts.json", "accept: names the file")
+    eq(written.verdict.verdict, "violation", "accept: the verdict is what was proposed")
+    eq(written.verdict.by, "Tester", "accept: by the person the host named")
+    eq(written.verdict.note, "checked a.lua", "accept: with the note")
+    eq(
+      written.verdict.evidence,
+      { { file = "lua/a.lua", line = 4 } },
+      "accept: the finding is the evidence"
+    )
+    eq(written.verdict.scope.count, 2, "accept: the scope of the request, planned again")
+    eq(written.verdict.date, os.date("%Y-%m-%d"), "accept: dated today, not by the host")
+    local on_disk = vim.json.decode(bytes(verdicts_file))
+    eq(on_disk["AGT-01"].by, "Tester", "accept: the file holds the verdict")
+
+    -- the proposal as a file, the way the command line hands it over
+    local proposal_file = scratch .. "/proposal.json"
+    vim.fn.writefile({ vim.json.encode(proposal) }, proposal_file)
+    local again = api.answer(
+      "rules/accept",
+      { root = wproject, rules_proposal_file = proposal_file, rules_by = "Other" },
+      "AGT-01"
+    )
+    eq(
+      again.verdict.by,
+      "Other",
+      "accept: a later acceptance of the same rule replaces the verdict"
+    )
+
+    -- refusals: the file stays as it is
+    local before = bytes(verdicts_file)
+    local function refused(answer, pattern, msg)
+      eq(answer.available, false, msg .. ": refused")
+      ok(
+        tostring(answer.reason):find(pattern) ~= nil,
+        msg .. ": says why (" .. tostring(answer.reason) .. ")"
+      )
+      eq(bytes(verdicts_file), before, msg .. ": the verdicts file is unchanged")
+    end
+    refused(
+      accept("AGT-01", unsent.proposal, { rules_by = "Tester" }),
+      "unclear is not a verdict",
+      "accept: an unclear proposal"
+    )
+    local verified = vim.deepcopy(proposal)
+    verified.verified = true
+    refused(
+      accept("AGT-01", verified, { rules_by = "Tester" }),
+      "verified is refused",
+      "accept: a proposal that says it is verified"
+    )
+    refused(accept("AGT-01", proposal, {}), "^by is required", "accept: without a person")
+    refused(
+      accept("AGT-01", proposal, { rules_by = "  " }),
+      "must name a person",
+      "accept: with a blank person"
+    )
+    refused(
+      accept("SCP-01", proposal, { rules_by = "Tester" }),
+      "is about AGT%-01, not SCP%-01",
+      "accept: a proposal about another rule"
+    )
+    -- the host cannot widen what was sent: its own `sent` is replaced by the plan's
+    local forged = vim.deepcopy(proposal)
+    forged.sent = { "lua/a.lua", "lua/b.lua", ".env" }
+    forged.findings = { { file = ".env", line = 1, quote = "x" } }
+    refused(
+      accept("AGT-01", forged, { rules_by = "Tester" }),
+      "was not sent",
+      "accept: evidence in a file the request did not carry"
+    )
+    refused(
+      accept(
+        "AGT-06",
+        vim.tbl_extend("force", proposal, { rule_id = "AGT-06" }),
+        { rules_by = "T" }
+      ),
+      "has a check",
+      "accept: a rule with a check"
+    )
+    refused(
+      accept(
+        "AGT-02",
+        vim.tbl_extend("force", proposal, { rule_id = "AGT-02" }),
+        { rules_by = "T" }
+      ),
+      "is not sent",
+      "accept: a rule that is not sent"
+    )
+    refused(
+      api.answer(
+        "rules/accept",
+        { root = wproject, rules_proposal = "[1, 2]", rules_by = "T" },
+        "AGT-01"
+      ),
+      "not a JSON object",
+      "accept: a proposal that is not an object"
+    )
+    refused(
+      api.answer("rules/accept", { root = wproject, rules_by = "T" }, "AGT-01"),
+      "no proposal given",
+      "accept: no proposal"
+    )
+    refused(accept("AGT-01,SCP-01", proposal, { rules_by = "T" }), "exactly one", "accept: two ids")
+
+    -- a verdicts file that exists and cannot be used is never overwritten
+    vim.fn.writefile({ "{ not json" }, verdicts_file)
+    before = bytes(verdicts_file)
+    refused(
+      accept("AGT-01", proposal, { rules_by = "Tester" }),
+      "could not parse",
+      "accept: a broken verdicts file"
+    )
+
+    -- waive. `rules.ops` shows the settings' warnings (the fixture's ruleset lies outside the project) as a toast
+    -- of the editor, a window this suite would leave behind; the answer carries them in `warnings` anyway. Held
+    -- back here: `restore()` drops this module again, it was not loaded before this block.
+    require("rules.util.notify").warn = function() end
+    local function waive(id, extra)
+      return api.answer(
+        "rules/waive",
+        vim.tbl_extend("force", { root = wproject }, extra or {}),
+        id
+      )
+    end
+    local w = waive("AGT-02", {
+      rules_reason = "out of scope here",
+      rules_expires = "2099-01-31",
+      rules_paths = "lua/a.lua, lua/b.lua",
+    })
+    eq(w.available, true, "waive: written")
+    eq(w.outcome, "waived", "waive: the outcome of rules.ops")
+    eq(w.written, true, "waive: says it wrote")
+    eq(w.waiver, {
+      reason = "out of scope here",
+      expires = "2099-01-31",
+      paths = { "lua/a.lua", "lua/b.lua" },
+    }, "waive: the waiver as the file now holds it")
+    local wbefore = bytes(waivers_file)
+    eq(
+      vim.json.decode(wbefore)["AGT-02"].reason,
+      "out of scope here",
+      "waive: the file holds the waiver"
+    )
+    local same = waive("AGT-02", {
+      rules_reason = "out of scope here",
+      rules_expires = "2099-01-31",
+      rules_paths = "lua/a.lua,lua/b.lua",
+    })
+    eq(
+      { same.available, same.outcome, same.written },
+      { true, "unchanged", false },
+      "waive: the same again changes nothing"
+    )
+    local function wrefused(answer, pattern, msg)
+      eq(answer.available, false, msg .. ": refused")
+      ok(
+        tostring(answer.reason):find(pattern) ~= nil,
+        msg .. ": says why (" .. tostring(answer.reason) .. ")"
+      )
+      eq(bytes(waivers_file), wbefore, msg .. ": the waivers file is unchanged")
+    end
+    wrefused(
+      waive("AGT-02", { rules_reason = "other" }),
+      "waived already",
+      "waive: a waiver that is there"
+    )
+    wrefused(
+      waive("NOPE-01", { rules_reason = "x" }),
+      "no loaded rule",
+      "waive: an id no ruleset has"
+    )
+    wrefused(waive("AGT-03", {}), "^reason is required", "waive: without a reason")
+    wrefused(
+      waive("AGT-03", { rules_reason = "x", rules_expires = "2027-13-01" }),
+      "calendar date",
+      "waive: an expiry that is no date"
+    )
+    wrefused(
+      waive("AGT-03", { rules_reason = "x", rules_paths = "../outside" }),
+      "",
+      "waive: a path that leaves the project"
+    )
+    vim.fn.writefile({ "[1" }, waivers_file)
+    wbefore = bytes(waivers_file)
+    wrefused(
+      waive("AGT-03", { rules_reason = "x" }),
+      "cannot be used",
+      "waive: a broken waivers file"
+    )
+
+    -- the flags of the command line, read the same way by both hosts
+    eq({ rules_api.write_flag("--by=Stefan") }, { "rules_by", "Stefan" }, "write_flag: --by")
+    eq({ rules_api.write_flag("--note=") }, { "rules_note", "" }, "write_flag: an empty value")
+    eq({ rules_api.write_flag("--paths=a,b") }, { "rules_paths", "a,b" }, "write_flag: --paths")
+    eq({ rules_api.write_flag("--select=X") }, { nil, nil }, "write_flag: not one of its flags")
+    eq(
+      api.WRITES,
+      { ["rules/accept"] = true, ["rules/waive"] = true },
+      "routes: the two that write"
+    )
+    vim.fn.delete(scratch, "rf")
   end)
   restore()
   if not ok_all then

@@ -60,7 +60,7 @@ binary with anything.
 
 | Field | What it says |
 |---|---|
-| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, `rules` when `rules.nvim`'s engine is part of it, and `rules-agent` when its agent functions are too (`rules/plan`, `rules/validate`). The `rules/*` routes are listed in `routes` either way and answer with a reason without the engine; an older engine lacks the route names, so a missing route is read off this answer, never from an error. A host that wants one thing can test for it without parsing the rest. |
+| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, `rules` when `rules.nvim`'s engine is part of it, `rules-agent` when its agent functions are too (`rules/plan`, `rules/validate`), and `rules-write` when its two writers are too (`rules/accept`, `rules/waive`). The `rules/*` routes are listed in `routes` either way and answer with a reason without the engine; an older engine lacks the route names, so a missing route is read off this answer, never from an error. A host that wants one thing can test for it without parsing the rest. |
 | `schema` | The artifact schema this build writes. The release is rolling (`standalone-latest`), so there is no version number to report that would not be fiction; the schema is what actually decides whether two artifacts are comparable, and it is bumped deliberately. |
 | `build` | Commit, commit date, and whether the tree it was built from was clean. **Present only in a bundled binary** — `scripts/package.lua` writes it at bundle time and never into the source tree, so a run from a checkout answers `null` rather than claiming a provenance it does not have. |
 | `routes` | Every `/api/*` route name this build answers, read from `core/api.routes`. A route added there is advertised here without this being told. |
@@ -118,6 +118,8 @@ instead of generating anything. Today's routes:
 | `rules/run` | The mechanical run of a selection: one result per rule, `pass`, `fail`, `error`, `manual` or `waived`, with findings. See below. |
 | `rules/plan` | What an agent run over a selection would send: the requests (`system`, `prompt`, files, rules), what is not sent and why, sizes and a token estimate. Sends nothing. See below. |
 | `rules/validate` | One model answer about one rule, checked against the tree: a proposal with the findings whose quotes hold up. See below. |
+| `rules/accept` | **Writes.** One proposal of `rules/validate`, accepted by a person: the verdict goes into the project's `.rules-verdicts.json`. See below. |
+| `rules/waive` | **Writes.** A waiver of one rule into the project's `.rules-waivers.json`. See below. |
 
 **One route per invocation, deliberately.** A request is one question, and a
 process that answered several would need a protocol to say which answer is
@@ -193,6 +195,51 @@ exist once. Neither route sends anything or opens a connection; sending a reques
 - `:DocMap serve` answers `/api/rules/plan?select=...` by GET and `POST /api/rules/validate?select=<ID>` with the
   model's answer as the request body (required, at most 1 MiB; a GET there still says that a query is no place for an
   answer). Validating only compares the answer with the tree and returns a proposal: nothing is written or run.
+
+### `rules/accept` and `rules/waive`
+
+```bash
+docmap /path/to/project --api=rules/accept --select=DEP-07 --proposal=/tmp/proposal.json --by="A. Person" [--note=...]
+docmap /path/to/project --api=rules/waive --select=DEP-07 --reason="..." [--expires=2027-01-31] [--paths=lua/a.lua,lua/b/*]
+```
+
+**Decided 2026-11-15: the engine writes these two files, and only through `rules.nvim`'s own writers.** Every other
+route reads. These two are the first that change the project, because the desktop app has no editor and the
+alternative was worse: a second writer of `.rules-verdicts.json` and `.rules-waivers.json` in Rust would have had to
+rebuild what `rules.nvim` guarantees, and would drift from it. So:
+
+- `rules/accept` calls `rules.engine.verdicts.accept`, the only function that writes `.rules-verdicts.json`. Its
+  guarantees are `rules.nvim`'s: one proposal at a time (there is no "accept all"), a proposal that says `verified` is
+  refused (the one who proposes does not confirm), an `unclear` one is not a verdict, the person comes from the caller
+  and never from the proposal, the verdict is what was proposed, a verdicts file that exists and cannot be used (or is
+  a link) is never overwritten, and a file that changed between read and write stops the write. What the route adds
+  is what a host must not decide: the rule must be the one `--select` names and one without a check, and the files
+  the request carried (`sent`, against which the evidence is held) are **planned again here** and replace whatever the
+  proposal says, as in `rules/validate`. The verdict is dated today.
+- `rules/waive` runs the `waive` operation of `rules.nvim`'s write door (`rules.ops`, `rules-ops/1`), the code
+  `:Rules waive` runs: a loaded rule, a one-line reason that says something, a calendar date, relative paths; a waiver
+  that is there already is refused (renew or remove it with `:Rules`), the same one again is `unchanged`; the file is
+  written canonically, under its lock, never through a link.
+- `--proposal=<file>` is the `proposal` object of a `rules/validate` answer, as it came back (at most 1 MiB, a file
+  and not stdin, as `--answer=`). `--by=` is required and is the person at the host, never anything from the
+  proposal. `--paths=` is comma-separated.
+- The answer: `{ "available": true, "written": true, "file", "id", "verdict" }` (the entry as the file now holds it)
+  for `rules/accept`; `{ "available": true, "written", "outcome", "file", "id", "waiver" }` for `rules/waive`
+  (`outcome` is `waived` or `unchanged`). A refusal is `{ "available": false, "reason" }`, for `rules/waive` with the
+  `code` of the door (`invalid_argument`, `forbidden`, ...); the file is then as it was.
+- `--capabilities` lists `rules-write` when both writers are part of the build (after `rules` and `rules-agent`;
+  `rules/accept` needs the agent functions to plan the request again).
+- **`:DocMap serve` does not offer them**, by any method: it answers whatever can reach loopback, a page in a browser
+  included, and a route that writes into the project is not something a page may ask for. Both answer 404 there, as a
+  route that does not exist. In the editor, `:Rules` writes the same two files.
+- **In the standalone build** the writers run under `standalone/vim_shim.lua`, which now has a write half. It is
+  weaker than libuv in four places, each said where it is implemented: creating a file exclusively (`wx`, the lock
+  file and the temp file) is a look-then-create, not `O_EXCL`; the flush before the rename does not reach the disk;
+  replacing a file on Windows renames the old one aside first, so for a moment the name is missing; and off Linux the
+  process number in a temp name is not the pid. The writers re-read the file before writing (`verdicts.accept`) or
+  compare its etag (`rules.ops`), so a race between two writers can lose a write that was not yet checked, never
+  overwrite one that was. The `standalone` gate of `scripts/ci.lua` runs both routes on both hosts and compares the
+  answers and the written files byte for byte.
 
 **The join logic stays in Lua.** `docmap-desktop` runs a small HTTP server
 that forwards `/api/*` here; its Rust side is transport only. `core/api.lua`

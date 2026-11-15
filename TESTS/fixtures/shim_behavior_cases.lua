@@ -886,6 +886,25 @@ M.cases = {
   },
   { id = "tbl_contains/not-a-table", path = "tbl_contains", args = { "x", "x" } },
 
+  -- ------------------------- tbl_keys, tbl_count, list_slice, deep_equal
+  -- (one key, or a list: `pairs` order is not a promise, so a case with two keys would compare an accident)
+  { id = "tbl_keys/one", path = "tbl_keys", args = { { a = 1 } } },
+  { id = "tbl_keys/list", path = "tbl_keys", args = { { "x", "y" } } },
+  { id = "tbl_keys/empty", path = "tbl_keys", args = { {} } },
+  { id = "tbl_count/mixed", path = "tbl_count", args = { { 1, 2, a = 3 } } },
+  { id = "tbl_count/empty", path = "tbl_count", args = { {} } },
+  { id = "list_slice/middle", path = "list_slice", args = { { 1, 2, 3, 4 }, 2, 3 } },
+  { id = "list_slice/defaults", path = "list_slice", args = { { "a", "b" } } },
+  { id = "list_slice/from", path = "list_slice", args = { { 1, 2, 3 }, 2 } },
+  { id = "list_slice/past-end", path = "list_slice", args = { { 1, 2 }, 2, 5 } },
+  { id = "list_slice/empty-range", path = "list_slice", args = { { 1, 2 }, 3, 2 } },
+  { id = "deep_equal/nested", path = "deep_equal", args = { { a = { 1, 2 } }, { a = { 1, 2 } } } },
+  { id = "deep_equal/extra-key", path = "deep_equal", args = { { a = 1 }, { a = 1, b = 2 } } },
+  { id = "deep_equal/missing-key", path = "deep_equal", args = { { a = 1, b = 2 }, { a = 1 } } },
+  { id = "deep_equal/scalars", path = "deep_equal", args = { 1, 1 } },
+  { id = "deep_equal/types", path = "deep_equal", args = { "1", 1 } },
+  { id = "deep_equal/empty", path = "deep_equal", args = { {}, {} } },
+
   -- ------------------------------------------------------------ fs.basename
   { id = "fs.basename/simple", path = "fs.basename", args = { "a/b/c.lua" } },
   { id = "fs.basename/no-separator", path = "fs.basename", args = { "abc" } },
@@ -1198,6 +1217,20 @@ M.cases = {
   },
 
   -- --------------------------------------------------------- fn.strchars
+  -- ------------------------------------------------------------- fn.sha256
+  { id = "fn.sha256/empty", path = "fn.sha256", args = { "" } },
+  { id = "fn.sha256/abc", path = "fn.sha256", args = { "abc" } },
+  {
+    id = "fn.sha256/two-blocks",
+    path = "fn.sha256",
+    args = { "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" },
+    why = "56 bytes: the padding takes a second block",
+  },
+  { id = "fn.sha256/55-bytes", path = "fn.sha256", args = { string.rep("a", 55) } },
+  { id = "fn.sha256/64-bytes", path = "fn.sha256", args = { string.rep("x", 64) } },
+  { id = "fn.sha256/high-bytes", path = "fn.sha256", args = { "\255\254\128\1 paths\n" } },
+  { id = "fn.sha256/long", path = "fn.sha256", args = { string.rep("lua/a.lua\n", 300) } },
+
   { id = "fn.strchars/ascii", path = "fn.strchars", args = { "abc" } },
   { id = "fn.strchars/empty", path = "fn.strchars", args = { "" } },
   { id = "fn.strchars/two-byte", path = "fn.strchars", args = { "a\195\169b" } },

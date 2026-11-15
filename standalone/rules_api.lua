@@ -4,6 +4,9 @@
 ---   nvim --headless -u NONE -l standalone/rules_api.lua <project> <route> [--select=...] [--trust=<folder>]... [--answer=<file>]
 ---   lua standalone/rules_api.lua <project> <route> [--select=...] [--trust=<folder>]... [--answer=<file>]
 ---
+--- and, for `rules/accept` and `rules/waive`, their flags (`rules_api.WRITE_FLAGS`): `--proposal=<file>`, `--by=`,
+--- `--note=`, `--reason=`, `--expires=`, `--paths=`.
+---
 --- Under Neovim it uses the real `vim.*`; under plain Lua it installs `standalone.vim_shim` first. The JSON is
 --- encoded by `docmap.core.json` (sorted keys), so the same input prints the same bytes on both hosts: that is what
 --- `scripts/ci.lua`'s `standalone` gate compares, and it compares this script under Neovim with the real entry point
@@ -50,11 +53,16 @@ end
 
 local project, route, selection, answer_file
 local trust = {}
+-- the flags of `rules/accept` and `rules/waive` (`--proposal=`, `--by=`, ...), read by `rules_api.write_flag` once
+-- `lua/` is on the path below; kept here as they came
+local write_args = {}
 for _, a in ipairs(arg) do
   local sel = a:match("^%-%-select=(.+)$")
   local tr = a:match("^%-%-trust=(.+)$")
   local ans = a:match("^%-%-answer=(.+)$")
-  if sel then
+  if a:match("^%-%-(%a+)=") and not (sel or tr or ans) then
+    write_args[#write_args + 1] = a
+  elseif sel then
     selection = sel
   elseif ans then
     answer_file = ans
@@ -87,12 +95,22 @@ if not rawget(_G, "vim") then
   require("standalone.vim_shim")
 end
 
-local result, err = require("docmap.core.api").answer(route, {
+local route_opts = {
   root = project,
   rules_trust = trust,
   rules_answer_file = answer_file,
   rules_today = "2026-01-01",
-}, selection)
+}
+local rules_api = require("docmap.core.rules_api")
+for _, a in ipairs(write_args) do
+  local key, value = rules_api.write_flag(a)
+  if not key then
+    io.stderr:write("standalone/rules_api.lua: unknown flag " .. a .. "\n")
+    os.exit(2)
+  end
+  route_opts[key] = value
+end
+local result, err = require("docmap.core.api").answer(route, route_opts, selection)
 if not result then
   io.stderr:write("standalone/rules_api.lua: " .. tostring(err) .. "\n")
   os.exit(2)

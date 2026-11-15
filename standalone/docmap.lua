@@ -205,6 +205,11 @@ if capabilities_only then
     -- `rules-agent`: `rules/plan` and `rules/validate` can answer (`rules.nvim`'s agent functions are here too)
     if rules_api.agent_engine() then
       caps[#caps + 1] = "rules-agent"
+      -- `rules-write`: `rules/accept` and `rules/waive` can write a verdict and a waiver into the project, through
+      -- `rules.nvim`'s own writers (`docs/hosting.md`, "rules/accept and rules/waive")
+      if rules_api.write_engine() then
+        caps[#caps + 1] = "rules-write"
+      end
     end
   end
   print(require("docmap.core.json").encode({
@@ -259,6 +264,10 @@ local argv = {}
 local source, repo_url, branch, out_dir, api_route, api_snapshot
 local exclude, languages, trust = {}, {}, {}
 local answer_file
+-- the options the flags of `rules/accept` and `rules/waive` fill (`rules_api.WRITE_FLAGS`), read the same way as in
+-- `standalone/rules_api.lua`
+local write_opts = {}
+local write_flag = require("docmap.core.rules_api").write_flag
 for i = 2, #arg do
   local a = arg[i]
   local src = a:match("^%-%-source=(.+)$")
@@ -289,6 +298,9 @@ for i = 2, #arg do
   local answer = a:match("^%-%-answer=(.+)$")
   if trusted then
     trust[#trust + 1] = trusted
+  elseif write_flag(a) then
+    local key, value = write_flag(a)
+    write_opts[key] = value
   elseif answer then
     answer_file = answer
   elseif src then
@@ -465,6 +477,9 @@ if api_route then
   opts.git = popen_git
   opts.rules_trust = trust
   opts.rules_answer_file = answer_file
+  for key, value in pairs(write_opts) do
+    opts[key] = value
+  end
 
   local api = require("docmap.core.api")
   local result, api_err = api.answer(api_route, opts, api_snapshot)

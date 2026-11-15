@@ -207,6 +207,66 @@ probe(agent_fixture .. "/project", {
   "--answer=" .. agent_fixture .. "/answers/violation.json",
 })
 
+-- The two routes that write (`rules/accept`, `rules/waive`) reach what none of the
+-- above does: `rules.ops` and everything its door requires, the writer of
+-- `rules.engine.verdicts`, and `lib.nvim`'s atomic write, lock and etag. They
+-- write, so into a copy of the agent fixture under `.deps/` (gitignored, made
+-- again each time), and both have to succeed to reach the write itself.
+local write_copy = repo .. "/.deps/bundle-manifest-write"
+---@param from string
+---@param to string
+local function copy_tree(from, to)
+  lfs.mkdir(to)
+  for name in lfs.dir(from) do
+    if name ~= "." and name ~= ".." then
+      local src, dst = from .. "/" .. name, to .. "/" .. name
+      if lfs.attributes(src, "mode") == "directory" then
+        copy_tree(src, dst)
+      else
+        local fi = assert(io.open(src, "rb"))
+        local fo = assert(io.open(dst, "wb"))
+        fo:write(fi:read("*a"))
+        fi:close()
+        fo:close()
+      end
+    end
+  end
+end
+lfs.mkdir(write_copy)
+copy_tree(agent_fixture .. "/project", write_copy .. "/project")
+copy_tree(agent_fixture .. "/ruleset", write_copy .. "/ruleset")
+os.remove(write_copy .. "/project/.rules-verdicts.json")
+os.remove(write_copy .. "/project/.rules-waivers.json")
+local proposal_file = write_copy .. "/proposal.json"
+local pf = assert(io.open(proposal_file, "wb"))
+pf:write(
+  '{"rule_id":"AGT-01","status":"violation","proposed":true,"verified":false,'
+    .. '"findings":[{"file":"lua/a.lua","line":4}],"checked":["lua/a.lua","lua/b.lua"]}'
+)
+pf:close()
+probe(write_copy .. "/project", {
+  "--api=rules/accept",
+  "--select=AGT-01",
+  "--proposal=" .. proposal_file,
+  "--by=bundle-manifest",
+})
+probe(write_copy .. "/project", { "--api=rules/waive", "--select=AGT-02", "--reason=probe" })
+-- A refusal exits 0 as well, and would measure the half of the writers that refuses: the files are the proof.
+if package.loaded["rules.settings"] then
+  for _, name in ipairs({ ".rules-verdicts.json", ".rules-waivers.json" }) do
+    local written = io.open(write_copy .. "/project/" .. name, "rb")
+    if not written then
+      io.stderr:write(
+        "bundle_manifest: the write probe did not write "
+          .. name
+          .. ", so its modules are not measured\n"
+      )
+      os.exit(1)
+    end
+    written:close()
+  end
+end
+
 -- **`rules.env`, which no probe reaches.** `rules.settings.resolve` requires
 -- it lazily, only when `$RULES_TRUST` is set (`trust_paths`), and these probes
 -- run with whatever environment the build has -- normally without it, and PUC

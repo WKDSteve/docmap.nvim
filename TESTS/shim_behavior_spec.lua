@@ -82,8 +82,9 @@ return function(H)
             or what == "ino"
             or what == "dev"
             or what == "size"
-            or what == "modification",
-          "lfs adapter: only the `mode`, `ino`, `dev`, `size` and `modification` attributes are implemented"
+            or what == "modification"
+            or what == "permissions",
+          "lfs adapter: only the `mode`, `ino`, `dev`, `size`, `modification` and `permissions` attributes are implemented"
         )
         local st = vim.uv.fs_stat(path)
         if not st then
@@ -93,6 +94,15 @@ return function(H)
           return st.type
         elseif what == "modification" then
           return st.mtime.sec
+        elseif what == "permissions" then
+          -- `rwxr-xr-x`, as lfs spells it, out of libuv's own bits
+          local out, bits = {}, st.mode % 512
+          for i = 8, 0, -1 do
+            local on = math.floor(bits / 2 ^ i) % 2 == 1
+            local letter = ("rwx"):sub(3 - i % 3, 3 - i % 3)
+            out[#out + 1] = on and letter or "-"
+          end
+          return table.concat(out)
         end
         return st[what]
       end,
@@ -179,6 +189,7 @@ return function(H)
   -- The shim reads this module on Windows (`pcall`-required, so absent here
   -- it would only degrade); on a Windows host it must be there for the
   -- listing cases below to mean anything.
+  local saved_popup = package.preload["lib.nvim.notify.popup"]
   local saved_win_links = package.preload["standalone.win_links"]
   local saved_win_links_loaded = package.loaded["standalone.win_links"]
   package.loaded["standalone.win_links"] = nil
@@ -200,6 +211,8 @@ return function(H)
     package.loaded.dkjson = saved_loaded.dkjson
     package.preload["standalone.win_links"] = saved_win_links
     package.loaded["standalone.win_links"] = saved_win_links_loaded
+    -- the shim preloads a stand-in for the editor's toast; this is the editor, keep its own
+    package.preload["lib.nvim.notify.popup"] = saved_popup
     ok(ran, "shim behavior: vim_shim.lua runs on the uv-backed lfs — " .. tostring(result))
     if ran then
       shim = result
@@ -404,6 +417,114 @@ return function(H)
   )
   vim.fn.delete(scratch, "rf")
 
+  -- The writing half (`rules/accept`, `rules/waive`), outside the corpus for the same reason as `fs_mkdir`: each
+  -- step changes the disk. One script of steps, run on each surface in a folder of its own, the answers compared
+  -- step by step: a new file made exclusively, written, flushed, closed and read back; `wx` on a name that exists;
+  -- `w` over it; a rename over an existing file and onto a new name; an unlink of a file and of a missing one; the
+  -- `mode` of the file `lib.nvim.fs.write.atomic` replaces (`% 4096`). Errors are compared by their code (the part
+  -- before the colon), not their wording.
+  local function code_of(err)
+    return err and tostring(err):match("^(%u+)") or nil
+  end
+  local function read_all(path)
+    local fh = io.open(path, "rb")
+    if not fh then
+      return nil
+    end
+    local text = fh:read("*a")
+    fh:close()
+    return text
+  end
+  local function write_answers(surface, dir)
+    local uv = surface.uv
+    vim.fn.mkdir(dir, "p")
+    local out = {}
+    local function step(name, ...)
+      out[#out + 1] = name .. " = " .. cases.canon({ ... })
+    end
+    local fd, err = uv.fs_open(dir .. "/a.txt", "wx", 420)
+    step("open wx new", fd ~= nil, code_of(err))
+    if fd then
+      step("write", uv.fs_write(fd, "abc", 0))
+      step("fsync", uv.fs_fsync(fd) and true or false)
+      step("close", uv.fs_close(fd))
+    end
+    step("read back", read_all(dir .. "/a.txt"))
+    local again, again_err = uv.fs_open(dir .. "/a.txt", "wx", 420)
+    step("open wx existing", again ~= nil, code_of(again_err))
+    local fd2 = uv.fs_open(dir .. "/a.txt", "w", 420)
+    if fd2 then
+      uv.fs_write(fd2, "xy", 0)
+      uv.fs_close(fd2)
+    end
+    step("open w truncates", read_all(dir .. "/a.txt"))
+    step("mode of a file", uv.fs_stat(dir .. "/a.txt").mode % 4096)
+    local fd3 = uv.fs_open(dir .. "/b.txt", "wx", 420)
+    if fd3 then
+      uv.fs_write(fd3, "new", 0)
+      uv.fs_close(fd3)
+    end
+    local renamed, rename_err = uv.fs_rename(dir .. "/b.txt", dir .. "/a.txt")
+    step(
+      "rename over a file",
+      renamed and true or false,
+      code_of(rename_err),
+      read_all(dir .. "/a.txt")
+    )
+    step("rename left no source", uv.fs_stat(dir .. "/b.txt") == nil)
+    local moved = uv.fs_rename(dir .. "/a.txt", dir .. "/c.txt")
+    step("rename to a new name", moved and true or false, read_all(dir .. "/c.txt"))
+    local listing = {}
+    for name in vim.fs.dir(dir) do
+      listing[#listing + 1] = name
+    end
+    table.sort(listing)
+    step("nothing left beside it", table.concat(listing, ","))
+    local unlinked = uv.fs_unlink(dir .. "/c.txt")
+    step("unlink", unlinked and true or false)
+    local gone, gone_err = uv.fs_unlink(dir .. "/c.txt")
+    step("unlink missing", gone and true or false, code_of(gone_err))
+    local nowhere, nowhere_err = uv.fs_open(dir .. "/no/such/d.txt", "wx", 420)
+    step("open wx in a missing folder", nowhere ~= nil, code_of(nowhere_err))
+    return out
+  end
+  local write_scratch = vim.fn.tempname() .. "-shim-write"
+  local shim_steps = write_answers(shim, write_scratch .. "/shim")
+  local real_steps = write_answers(vim, write_scratch .. "/real")
+  for i = 1, math.max(#shim_steps, #real_steps) do
+    eq(shim_steps[i], real_steps[i], "shim behavior: write step " .. i)
+  end
+  vim.fn.delete(write_scratch, "rf")
+
+  -- What the writers ask of the process and the host, compared where an answer can be: `os_getpid` is a positive
+  -- whole number that stays the same, `os_uname().sysname` is the editor's on Windows and Linux (the two systems
+  -- the engine is built for), `in_fast_event` is false outside a callback, `wait` with a condition that holds
+  -- answers at once and one that never holds answers `false, -1` after its time.
+  local pid = shim.uv.os_getpid()
+  ok(
+    type(pid) == "number" and pid > 0 and pid % 1 == 0,
+    "shim behavior: uv.os_getpid is a positive whole number"
+  )
+  eq(shim.uv.os_getpid(), pid, "shim behavior: uv.os_getpid stays the same in one process")
+  eq(shim.uv.os_uname().sysname, vim.uv.os_uname().sysname, "shim behavior: uv.os_uname().sysname")
+  eq(shim.in_fast_event(), vim.in_fast_event(), "shim behavior: in_fast_event outside a callback")
+  local function always()
+    return true
+  end
+  local function never()
+    return false
+  end
+  eq(
+    cases.canon({ shim.wait(50, always, 10) }),
+    cases.canon({ vim.wait(50, always, 10) }),
+    "shim behavior: wait with a condition that holds"
+  )
+  eq(
+    cases.canon({ shim.wait(30, never, 10) }),
+    cases.canon({ vim.wait(30, never, 10) }),
+    "shim behavior: wait with a condition that never holds"
+  )
+
   -- ---------------------------------------------------------------------
   -- Every shim function reachable from the corpus. A new entry in the shim
   -- with no case is a function nobody has compared — the same argument
@@ -422,6 +543,16 @@ return function(H)
     ["uv.fs_read"] = "run by the `read_fd` cases of uv.fs_open, in blocks, to the empty read",
     ["uv.fs_close"] = "run by the `read_fd` cases of uv.fs_open, which compare what it returns",
     ["empty_dict"] = "run by the islist/decoded-empty-object case (PUC runner), against a decoded {}",
+    ["uv.fs_write"] = "compared above, outside the corpus: the write steps",
+    ["uv.fs_fsync"] = "compared above, outside the corpus: the write steps (a flush, said in the shim)",
+    ["uv.fs_unlink"] = "compared above, outside the corpus: the write steps",
+    ["uv.fs_rename"] = "compared above, outside the corpus: the write steps",
+    ["uv.os_getpid"] = "a number of this process: held to its shape above, not to the editor's own pid",
+    ["uv.os_uname"] = "compared above: sysname",
+    ["in_fast_event"] = "compared above, outside a callback",
+    ["wait"] = "compared above: a condition that holds and one that never does",
+    ["notify"] = "writes a line to stderr: an output, not an answer to compare",
+    ["version"] = "this is not a Neovim and says so (`none`): an intended difference",
   }
   -- The entries above that name a *table*: the walk stops at them instead of
   -- listing what is inside.
@@ -543,6 +674,7 @@ return function(H)
         dkjson = package.preload.dkjson,
         lfs_loaded = package.loaded.lfs,
         dkjson_loaded = package.loaded.dkjson,
+        popup = package.preload["lib.nvim.notify.popup"],
       }
       local asked = 0
       local ran, answer = pcall(function()
@@ -579,6 +711,7 @@ return function(H)
       io.popen = saved.popen
       package.preload.lfs, package.preload.dkjson = saved.lfs, saved.dkjson
       package.loaded.lfs, package.loaded.dkjson = saved.lfs_loaded, saved.dkjson_loaded
+      package.preload["lib.nvim.notify.popup"] = saved.popup
       return ran and answer or ("raised: " .. tostring(answer)), asked
     end
 

@@ -84,6 +84,27 @@ return function(H)
       eq(nope_code, 404, "serve: an unknown api route is a 404 from core.api")
       local bad_commit = api.handler({ params = { "commit/not-a-sha" }, query = {} })
       eq(bad_commit, 404, "serve: a commit name that is no sha never reaches git")
+      -- the routes that write into the project are not offered here at all: a 404 before core.api is asked
+      local asked = {}
+      ---@diagnostic disable-next-line: duplicate-set-field
+      core_api.answer = function(name)
+        asked[#asked + 1] = name
+        return { available = true }
+      end
+      for _, name in ipairs({ "rules/accept", "rules/waive" }) do
+        local wcode, _, wbody = api.handler({ params = { name }, query = { select = "DEP-07" } })
+        eq(wcode, 404, "serve: " .. name .. " is not offered")
+        ok(
+          not tostring(wbody):find("rules", 1, true),
+          "serve: ...and the answer does not say it exists"
+        )
+      end
+      core_api.answer = real_answer
+      eq(#asked, 0, "serve: the writing routes never reach core.api")
+      ok(
+        core_api.WRITES["rules/accept"] and core_api.WRITES["rules/waive"],
+        "serve: WRITES names both"
+      )
 
       -- the static route
       local static = routes[4]

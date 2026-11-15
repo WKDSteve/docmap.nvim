@@ -43,6 +43,18 @@
 ---   fs_read, fs_close, constants} (`lib.nvim.fs.read_bounded`, `lib.nvim.fs.normkey`); and vim.fs.find (downward
 ---   only), which predicates of the real Lua ruleset walk a project with.
 ---
+--- and, added for the two routes that write (`rules/accept`, `rules/waive`), which run `rules.nvim`'s own writers
+--- (`rules.engine.verdicts.accept`, `rules.ops`) and through them `lib.nvim`'s atomic write, lock and etag --
+--- measured by running both routes under this shim on Linux and Windows until they wrote what the editor writes:
+---
+---   vim.fn.sha256, vim.tbl_keys, vim.tbl_count, vim.list_slice, vim.deep_equal, vim.wait (a busy wait),
+---   vim.notify (stderr; `lib.nvim.notify.popup` is preloaded to the same), vim.in_fast_event, vim.version (`none`),
+---   the stat field `mode`, and vim.uv.{fs_open ("w", "wx"), fs_write, fs_fsync (a flush), fs_unlink, fs_rename,
+---   os_getpid, os_uname}. What is weaker than libuv is said at each: `wx` is not exclusive against a racing
+---   process, `fs_fsync` does not reach the disk, `fs_rename` over a file is not atomic on Windows, `os_getpid` is a
+---   per-process number but not the pid off Linux. `docs/hosting.md` ("rules/accept and rules/waive") states what that
+---   means for the two routes.
+---
 --- `TESTS/shim_contract_spec.lua` holds this list to the file: a `vim.fn`,
 --- `vim.fs` or `vim.uv` function defined below and missing here fails it.
 ---
@@ -402,6 +414,69 @@ function vim.tbl_contains(t, value, opts)
   return false
 end
 
+-- `vim.tbl_keys`, `vim.tbl_count`, `vim.list_slice` and `vim.deep_equal`: added for `rules.nvim`'s write door
+-- (`rules/waive`: `rules.waiver_ops`, `rules.ops`, `lib.nvim.contract.doc`), as Neovim 0.12 defines them.
+
+---The keys of a table, in `pairs` order.
+---@param t table
+---@return any[]
+function vim.tbl_keys(t)
+  local keys = {}
+  for k in pairs(t) do
+    keys[#keys + 1] = k
+  end
+  return keys
+end
+
+---How many keys a table has.
+---@param t table
+---@return integer
+function vim.tbl_count(t)
+  local n = 0
+  for _ in pairs(t) do
+    n = n + 1
+  end
+  return n
+end
+
+---A copy of `list[start..finish]` (defaults: the whole list).
+---@param list any[]
+---@param start integer|nil
+---@param finish integer|nil
+---@return any[]
+function vim.list_slice(list, start, finish)
+  local out = {}
+  for i = start or 1, finish or #list do
+    out[#out + 1] = list[i]
+  end
+  return out
+end
+
+---Whether two values are equal, tables by their contents (recursively, both directions). Two numbers that are
+---equal are equal, and so are two tables that hold the same keys with deep-equal values.
+---@param a any
+---@param b any
+---@return boolean
+function vim.deep_equal(a, b)
+  if a == b then
+    return true
+  end
+  if type(a) ~= "table" or type(b) ~= "table" then
+    return false
+  end
+  for k, v in pairs(a) do
+    if not vim.deep_equal(v, b[k]) then
+      return false
+    end
+  end
+  for k in pairs(b) do
+    if a[k] == nil then
+      return false
+    end
+  end
+  return true
+end
+
 ---The severity numbers, as Neovim 0.12 defines them. Nothing here logs: it is
 ---a lookup table, there because a `lib.nvim` module reads
 ---`vim.log.levels.INFO` at *load* time to fill a config default — and the
@@ -410,6 +485,43 @@ end
 vim.log = {
   levels = { TRACE = 0, DEBUG = 1, INFO = 2, WARN = 3, ERROR = 4, OFF = 5 },
 }
+
+---`vim.notify`: one line on stderr, as a headless Neovim writes a message -- stdout carries only the answer.
+---Added for `rules.nvim`'s write door (`rules/waive`), whose settings warn through `lib.nvim.notify`.
+---@param msg any
+---@param _level integer|nil
+---@param _opts table|nil
+function vim.notify(msg, _level, _opts)
+  io.stderr:write(tostring(msg), "\n")
+end
+
+---`vim.version()`: this is not a Neovim, and says so -- `0.0.0`, printed as `none`. `lib.nvim.contract.doc` puts it
+---into the head of a document (`engine.nvim`) of `rules.nvim`'s write door; no answer of this engine shows that head.
+---@return table
+function vim.version()
+  return setmetatable({ major = 0, minor = 0, patch = 0 }, {
+    __tostring = function()
+      return "none"
+    end,
+  })
+end
+
+---Never: this is not an editor, there is no event loop whose callback could be running.
+---@return boolean
+function vim.in_fast_event()
+  return false
+end
+
+-- `lib.nvim.notify`'s toast (`popup = true`, which `rules.nvim` asks for) is a window of the editor: here its
+-- `deliver` is the same line on stderr as `vim.notify`. Preloaded, so the editor's module (windows, highlights, a
+-- message history) is never loaded by this host.
+package.preload["lib.nvim.notify.popup"] = function()
+  return {
+    deliver = function(message)
+      vim.notify(message)
+    end,
+  }
+end
 
 ---The process environment, read-only. `vim.env.NAME` is `nil` when unset.
 ---
@@ -470,6 +582,39 @@ end
 ---@return any
 function vim.deepcopy(orig, noref)
   return deepcopy(orig, not noref and {} or nil)
+end
+
+---`vim.wait(timeout, condition, interval)`: wait until `condition()` is true or `timeout` milliseconds passed;
+---`true` then, else `false, -1`. Without a condition it waits the whole time. Added for `lib.nvim`'s lock and retry
+---(`with_lock` waits on a lock another process holds, `cross.fs.mutate` backs off before a second try).
+---
+---**A busy wait.** This is not an editor: there is no event loop to process meanwhile, and plain Lua has no sleep.
+---It measures with `os.clock` (CPU time, which a busy loop spends at the rate of wall time) and asks the condition
+---every `interval` milliseconds of it. Its callers wait milliseconds, at most two seconds on a contended lock.
+---@param timeout integer milliseconds
+---@param condition (fun(): boolean)|nil
+---@param interval integer|nil milliseconds between two asks (default 200, as the editor's)
+---@return boolean met
+---@return integer|nil code `-1` when the time ran out
+function vim.wait(timeout, condition, interval)
+  local step = (interval or 200) / 1000
+  local deadline = os.clock() + (timeout or 0) / 1000
+  local next_ask = os.clock()
+  while true do
+    local now = os.clock()
+    if condition and now >= next_ask then
+      if condition() then
+        return true
+      end
+      next_ask = now + step
+    end
+    if now >= deadline then
+      if condition then
+        return false, -1
+      end
+      return true
+    end
+  end
 end
 
 -- ------------------------------------------------------------------ json
@@ -896,6 +1041,184 @@ local function folds_case()
     end
   end
   return folds_case_cache
+end
+
+-- ---------------------------------------------------------------- sha256
+
+---The 32-bit operations SHA-256 needs, on whichever interpreter loads this file: the native operators of Lua 5.3+
+---(compiled from a string, so LuaJIT -- which loads this file in `TESTS/shim_behavior_spec.lua` -- never parses them),
+---else LuaJIT's `bit` (signed results, made unsigned here). Every result is an integer in `[0, 2^32)`.
+---@return { band: fun(a: integer, b: integer): integer, bxor: fun(...): integer, bnot: fun(a: integer): integer, ror: fun(a: integer, n: integer): integer, shr: fun(a: integer, n: integer): integer }
+local function u32_ops()
+  local native = load
+    and load([[
+    return {
+      band = function(a, b) return a & b end,
+      bxor = function(a, b, c) if c then return a ~ b ~ c end return a ~ b end,
+      bnot = function(a) return ~a & 0xffffffff end,
+      ror = function(a, n) return ((a >> n) | (a << (32 - n))) & 0xffffffff end,
+      shr = function(a, n) return a >> n end,
+    }
+  ]])
+  if native and math.type then
+    return native()
+  end
+  local bit = require("bit")
+  local function u(x)
+    return x % 4294967296
+  end
+  return {
+    band = function(a, b)
+      return u(bit.band(a, b))
+    end,
+    bxor = function(a, b, c)
+      return u(c and bit.bxor(a, b, c) or bit.bxor(a, b))
+    end,
+    bnot = function(a)
+      return u(bit.bnot(a))
+    end,
+    ror = function(a, n)
+      return u(bit.ror(a, n))
+    end,
+    shr = function(a, n)
+      return u(bit.rshift(a, n))
+    end,
+  }
+end
+
+local SHA256_K = {
+  0x428a2f98,
+  0x71374491,
+  0xb5c0fbcf,
+  0xe9b5dba5,
+  0x3956c25b,
+  0x59f111f1,
+  0x923f82a4,
+  0xab1c5ed5,
+  0xd807aa98,
+  0x12835b01,
+  0x243185be,
+  0x550c7dc3,
+  0x72be5d74,
+  0x80deb1fe,
+  0x9bdc06a7,
+  0xc19bf174,
+  0xe49b69c1,
+  0xefbe4786,
+  0x0fc19dc6,
+  0x240ca1cc,
+  0x2de92c6f,
+  0x4a7484aa,
+  0x5cb0a9dc,
+  0x76f988da,
+  0x983e5152,
+  0xa831c66d,
+  0xb00327c8,
+  0xbf597fc7,
+  0xc6e00bf3,
+  0xd5a79147,
+  0x06ca6351,
+  0x14292967,
+  0x27b70a85,
+  0x2e1b2138,
+  0x4d2c6dfc,
+  0x53380d13,
+  0x650a7354,
+  0x766a0abb,
+  0x81c2c92e,
+  0x92722c85,
+  0xa2bfe8a1,
+  0xa81a664b,
+  0xc24b8b70,
+  0xc76c51a3,
+  0xd192e819,
+  0xd6990624,
+  0xf40e3585,
+  0x106aa070,
+  0x19a4c116,
+  0x1e376c08,
+  0x2748774c,
+  0x34b0bcb5,
+  0x391c0cb3,
+  0x4ed8aa4a,
+  0x5b9cca4f,
+  0x682e6ff3,
+  0x748f82ee,
+  0x78a5636f,
+  0x84c87814,
+  0x8cc70208,
+  0x90befffa,
+  0xa4506ceb,
+  0xbef9a3f7,
+  0xc67178f2,
+}
+
+---`vim.fn.sha256`: the SHA-256 of a string as 64 lowercase hex digits, as the editor answers. Added for
+---`rules.nvim`'s writers (`rules/accept`, `rules/waive`): the verdict store keeps the hash of the files a request
+---carried, and `lib.nvim.fs.etag` versions the waivers file by it. Pure Lua (FIPS 180-4), byte by byte; the texts it
+---hashes here are a list of paths and a waivers file, kilobytes, not a corpus.
+---@param text string
+---@return string
+function vim.fn.sha256(text)
+  local op = u32_ops()
+  local band, bxor, bnot, ror, shr = op.band, op.bxor, op.bnot, op.ror, op.shr
+  local h = {
+    0x6a09e667,
+    0xbb67ae85,
+    0x3c6ef372,
+    0xa54ff53a,
+    0x510e527f,
+    0x9b05688c,
+    0x1f83d9ab,
+    0x5be0cd19,
+  }
+  local len = #text
+  -- the padding: 0x80, zeros up to 56 mod 64, then the length in bits as 64 bits big-endian
+  local bits = len * 8
+  local tail = { "\128", string.rep("\0", (55 - len) % 64) }
+  local len_bytes = {}
+  for i = 8, 1, -1 do
+    len_bytes[i] = string.char(bits % 256)
+    bits = math.floor(bits / 256)
+  end
+  local msg = text .. table.concat(tail) .. table.concat(len_bytes)
+  local w = {}
+  for block = 1, #msg, 64 do
+    for i = 0, 15 do
+      local b1, b2, b3, b4 = msg:byte(block + i * 4, block + i * 4 + 3)
+      w[i] = ((b1 * 256 + b2) * 256 + b3) * 256 + b4
+    end
+    for i = 16, 63 do
+      local s0 = bxor(ror(w[i - 15], 7), ror(w[i - 15], 18), shr(w[i - 15], 3))
+      local s1 = bxor(ror(w[i - 2], 17), ror(w[i - 2], 19), shr(w[i - 2], 10))
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) % 4294967296
+    end
+    local a, b, c, d, e, f, g, hh = h[1], h[2], h[3], h[4], h[5], h[6], h[7], h[8]
+    for i = 0, 63 do
+      local s1 = bxor(ror(e, 6), ror(e, 11), ror(e, 25))
+      local ch = bxor(band(e, f), band(bnot(e), g))
+      local t1 = (hh + s1 + ch + SHA256_K[i + 1] + w[i]) % 4294967296
+      local s0 = bxor(ror(a, 2), ror(a, 13), ror(a, 22))
+      local maj = bxor(band(a, b), band(a, c), band(b, c))
+      local t2 = (s0 + maj) % 4294967296
+      hh, g, f, e, d, c, b, a = g, f, e, (d + t1) % 4294967296, c, b, a, (t1 + t2) % 4294967296
+    end
+    h[1], h[2], h[3], h[4] =
+      (h[1] + a) % 4294967296,
+      (h[2] + b) % 4294967296,
+      (h[3] + c) % 4294967296,
+      (h[4] + d) % 4294967296
+    h[5], h[6], h[7], h[8] =
+      (h[5] + e) % 4294967296,
+      (h[6] + f) % 4294967296,
+      (h[7] + g) % 4294967296,
+      (h[8] + hh) % 4294967296
+  end
+  local out = {}
+  for i = 1, 8 do
+    out[i] = string.format("%08x", h[i])
+  end
+  return table.concat(out)
 end
 
 ---`vim.fn.has` for the three host features a library may branch on: `win32`,
@@ -1983,7 +2306,9 @@ local uv = {}
 
 ---The stat fields beside `type` that a caller here reads, asked for on first use and then kept: `ino` and
 ---`dev` (`lib.nvim.fs.read_bounded` compares them), `size` (the same module's limit) and `mtime` as `{ sec, nsec }`
----(`rules.contract`'s cache signature). `lfs` knows whole seconds only, so `nsec` is always 0.
+---(`rules.contract`'s cache signature). `lfs` knows whole seconds only, so `nsec` is always 0. And `mode`, the way
+---libuv answers it (the type bits and the permission bits, `rwxr-xr-x` from `lfs`): `lib.nvim.fs.write.atomic`
+---reads the permissions of the file it replaces (`mode % 4096`).
 ---@param path string
 ---@param stat table
 ---@param key string
@@ -1995,6 +2320,20 @@ local function lazy_stat_field(path, stat, key)
   elseif key == "mtime" then
     local sec = lfs.attributes(path, "modification")
     value = sec and { sec = sec, nsec = 0 } or nil
+  elseif key == "mode" then
+    local perms = lfs.attributes(path, "permissions")
+    if not perms then
+      return nil
+    end
+    -- libuv on Windows derives the bits from the read-only attribute and never sets an execute bit (a folder is
+    -- `0666`); `lfs` says `rwx` there. Measured against the editor on both systems.
+    local bits = 0
+    for i = 1, 9 do
+      local set = perms:sub(i, i) ~= "-" and not (IS_WINDOWS and i % 3 == 0)
+      bits = bits * 2 + (set and 1 or 0)
+    end
+    local type_bits = { file = 0x8000, directory = 0x4000, link = 0xA000 }
+    value = (type_bits[stat.type] or 0) + bits
   else
     return nil
   end
@@ -2024,6 +2363,120 @@ end
 ---`fs_open` below implements.
 uv.constants = { O_RDONLY = 0 }
 
+---Open a file for writing (`"w"`: create or truncate; `"wx"`: create, refusing a name that exists), as a handle
+---`fs_write`, `fs_fsync` and `fs_close` take. Added for `rules.nvim`'s writers (`lib.nvim.fs.write.atomic`, the lock
+---of `lib.nvim.fs.with_lock`).
+---
+---**`wx` is not atomic here.** Plain Lua has no `O_EXCL`: the name is looked at (`fs_lstat`, so a link counts as
+---there, as with `O_EXCL`) and then created. Two processes that create the same name within that gap both succeed.
+---Its users here are a lock file and a temp name with a per-process number in it; the writers behind them re-read
+---the file before writing (`rules.engine.verdicts.accept`) or hold an etag (`rules.waiver_ops`), so the gap can
+---lose a race, not a write that was checked.
+---@param path string
+---@param flags "w"|"wx"
+---@return table|nil fd
+---@return string|nil err
+---@return string|nil code
+local function open_for_writing(path, flags)
+  if flags == "wx" and uv.fs_lstat(path) then
+    return nil, "EEXIST: file already exists: " .. path, "EEXIST"
+  end
+  local dir = split_parent(path)
+  if lfs.attributes(dir, "mode") ~= "directory" then
+    return nil, "ENOENT: no such file or directory: " .. path, "ENOENT"
+  end
+  if lfs.attributes(path, "mode") == "directory" then
+    return nil, "EISDIR: illegal operation on a directory: " .. path, "EISDIR"
+  end
+  local fh = io.open(path, "wb")
+  if not fh then
+    return nil, "EACCES: permission denied: " .. path, "EACCES"
+  end
+  return { fh = fh, path = path, writable = true }
+end
+
+---Write `data` at `offset` (from the start when given) of a handle opened for writing.
+---@param fd table
+---@param data string
+---@param offset integer|nil
+---@return integer|nil written
+---@return string|nil err
+---@return string|nil code
+function uv.fs_write(fd, data, offset)
+  if type(fd) ~= "table" or not fd.fh or not fd.writable then
+    return nil, "EBADF: bad file descriptor", "EBADF"
+  end
+  if offset and offset >= 0 then
+    fd.fh:seek("set", offset)
+  end
+  local ok, err = fd.fh:write(data)
+  if not ok then
+    return nil, "EIO: " .. tostring(err), "EIO"
+  end
+  return #data
+end
+
+---Hand the bytes of a handle to the operating system. **Not an `fsync`**: plain Lua has `flush` only, so the bytes
+---reach the OS's cache, not necessarily the disk. `lib.nvim.fs.write.atomic` calls it best-effort and still renames
+---a complete temp file; what a crash of the machine (not of this process) between the two leaves is the OS's.
+---@param fd table
+---@return boolean|nil
+function uv.fs_fsync(fd)
+  if type(fd) ~= "table" or not fd.fh then
+    return nil, "EBADF: bad file descriptor", "EBADF"
+  end
+  fd.fh:flush()
+  return true
+end
+
+---Delete a file.
+---@param path string
+---@return boolean|nil ok
+---@return string|nil err
+---@return string|nil code
+function uv.fs_unlink(path)
+  if not uv.fs_lstat(path) then
+    return nil, "ENOENT: no such file or directory: " .. path, "ENOENT"
+  end
+  local ok, err = os.remove(path)
+  if not ok then
+    return nil, "EPERM: " .. tostring(err), "EPERM"
+  end
+  return true
+end
+
+---Rename `src` to `dst`, replacing a file at `dst`, as libuv does. On POSIX `os.rename` is `rename(2)`: atomic. On
+---Windows it is `MoveFile`, which refuses an existing target; there the old file is first renamed aside (a name with
+---a per-process number), the new one takes its name, and the old one is deleted -- or put back when the second step
+---fails. **Not atomic on Windows**: between the two renames the name does not exist (the bytes do, beside it), so a
+---reader in that gap finds no file, and a crash in it leaves the old file under the aside name.
+---@param src string
+---@param dst string
+---@return boolean|nil ok
+---@return string|nil err
+---@return string|nil code
+function uv.fs_rename(src, dst)
+  local ok, err = os.rename(src, dst)
+  if ok then
+    return true
+  end
+  if not (IS_WINDOWS and lfs.attributes(src, "mode") and lfs.attributes(dst, "mode") == "file") then
+    return nil, "EPERM: " .. tostring(err), "EPERM"
+  end
+  local aside = ("%s.replaced.%d"):format(dst, uv.os_getpid())
+  local moved, move_err = os.rename(dst, aside)
+  if not moved then
+    return nil, "EPERM: " .. tostring(move_err), "EPERM"
+  end
+  local placed, place_err = os.rename(src, dst)
+  if not placed then
+    os.rename(aside, dst)
+    return nil, "EPERM: " .. tostring(place_err), "EPERM"
+  end
+  os.remove(aside)
+  return true
+end
+
 ---Open a file for reading, as a handle `fs_fstat`, `fs_read` and `fs_close` take. Read-only: any other flag raises
 ---instead of opening something the caller did not ask for. A directory is refused the way libuv refuses it
 ---(`EISDIR`), because `io.open` opens one on some platforms and the read then fails somewhere else.
@@ -2034,8 +2487,14 @@ uv.constants = { O_RDONLY = 0 }
 ---@return string|nil err
 ---@return string|nil code
 function uv.fs_open(path, flags, _mode)
+  if flags == "w" or flags == "wx" then
+    return open_for_writing(path, flags)
+  end
   if flags ~= 0 and flags ~= "r" then
-    error("standalone vim_shim: vim.uv.fs_open only opens read-only, got " .. tostring(flags), 2)
+    error(
+      "standalone vim_shim: vim.uv.fs_open opens read-only, w or wx, got " .. tostring(flags),
+      2
+    )
   end
   local mode = lfs.attributes(path, "mode")
   if not mode then
@@ -2409,9 +2868,57 @@ end
 ---Approximated with `os.clock()` (process CPU time) — see this file's
 ---header for why that is an honest, disclosed substitution rather than a
 ---silent one, and what it costs (cosmetic drift in scan-stage timing only).
----@return number nanoseconds
+---A whole number, as libuv's is: `lib.nvim.fs.write.atomic` formats it with `%d` into a temp name, which Lua 5.4
+---refuses for a float with a fraction.
+---@return integer nanoseconds
 function uv.hrtime()
-  return os.clock() * 1e9
+  return math.floor(os.clock() * 1e9)
+end
+
+---The number of this process, cached. Linux answers the real pid (`/proc/self/stat`); plain Lua has no other way to
+---ask, so elsewhere (Windows) it is **a per-process number, not the pid**: drawn once from the clock and the address
+---of a fresh table. Its users here put it into a temp name and a lock file (`lib.nvim.fs.write.atomic`,
+---`lib.nvim.fs.with_lock`), where it only has to differ between two processes, and the lock file's own token decides
+---who holds it.
+---@return integer
+local pid
+function uv.os_getpid()
+  if pid then
+    return pid
+  end
+  local fh = io.open("/proc/self/stat", "r")
+  local text = fh and fh:read("*l")
+  if fh then
+    fh:close()
+  end
+  pid = tonumber(text and text:match("^(%d+)"))
+  if not pid then
+    local address = tonumber(tostring({}):match("0x(%x+)") or "0", 16) or 0
+    pid = math.floor((os.time() * 1000 + os.clock() * 1e6 + address) % 2147483647)
+  end
+  return pid
+end
+
+---`sysname` only, the one field asked (`lib.nvim.contract.doc` tells macOS by it): `Windows_NT` on Windows, else
+---`uname -s`, asked once. A host where that cannot run answers `Linux`, the only other system the engine is built for.
+---@return { sysname: string }
+local uname
+function uv.os_uname()
+  if not uname then
+    local sysname = "Windows_NT"
+    if not IS_WINDOWS then
+      local pipe = io.popen("uname -s 2>/dev/null", "r")
+      sysname = pipe and pipe:read("*l") or ""
+      if pipe then
+        pipe:close()
+      end
+      if sysname == "" then
+        sysname = "Linux"
+      end
+    end
+    uname = { sysname = sysname }
+  end
+  return uname
 end
 
 vim.uv = uv

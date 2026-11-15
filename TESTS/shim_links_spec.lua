@@ -36,6 +36,7 @@ return function(H)
         lfs = package.preload.lfs,
         dkjson = package.preload.dkjson,
         win_links = package.preload["standalone.win_links"],
+        popup = package.preload["lib.nvim.notify.popup"],
       },
       loaded = {
         lfs = package.loaded.lfs,
@@ -68,6 +69,7 @@ return function(H)
     package.preload.lfs = saved.preload.lfs
     package.preload.dkjson = saved.preload.dkjson
     package.preload["standalone.win_links"] = saved.preload.win_links
+    package.preload["lib.nvim.notify.popup"] = saved.preload.popup
     package.loaded.lfs = saved.loaded.lfs
     package.loaded.dkjson = saved.loaded.dkjson
     package.loaded["standalone.win_links"] = saved.loaded.win_links

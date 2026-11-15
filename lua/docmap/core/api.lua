@@ -538,7 +538,21 @@ M.routes = {
   ["rules/validate"] = function(opts, param)
     return require("docmap.core.rules_api").validate(opts, param)
   end,
+  -- The two routes that write into the project (`docs/hosting.md`, "rules/accept and rules/waive"): a verdict
+  -- accepted from one proposal (`rules.engine.verdicts.accept`) and a waiver (`rules.ops`, `:Rules waive`'s code).
+  -- `param` the rule id. Listed in `M.WRITES` as well: a host that serves routes to a page must not offer them.
+  ["rules/accept"] = function(opts, param)
+    return require("docmap.core.rules_api").accept(opts, param)
+  end,
+  ["rules/waive"] = function(opts, param)
+    return require("docmap.core.rules_api").waive(opts, param)
+  end,
 }
+
+---The routes of `M.routes` that write into the project. The command line answers them (one person, one process,
+---their own folder); `editor/serve.lua` refuses them, because anything that can send a request to loopback could ask.
+---@type table<string, true>
+M.WRITES = { ["rules/accept"] = true, ["rules/waive"] = true }
 
 ---Answer one route by name.
 ---@param name string

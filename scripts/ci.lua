@@ -863,6 +863,256 @@ function GATES.standalone()
     say(("  ok: rules route, %s: identical on both hosts and as expected"):format(case.label))
   end
 
+  -- The two routes that write (`rules/accept`, `rules/waive`), run through `rules.nvim`'s own writers and, under
+  -- PUC Lua, through the shim's write half (`fs_open "wx"`, `fs_rename`, the lock, `sha256`). Each host gets its own
+  -- copy of the agent fixture (in `.deps/`, a throwaway folder) and the same steps; after each step the answers
+  -- must be the same, and at the end the two verdicts files and the two waivers files byte for byte. The proposals
+  -- are the `rules/validate` answers of this Neovim, written to files, as a host hands them over.
+  local write_root = root .. "/.deps/rules-write"
+  vim.fn.delete(write_root, "rf")
+  ---@param from string
+  ---@param to string
+  local function copy_tree(from, to)
+    vim.fn.mkdir(to, "p")
+    for name, kind in vim.fs.dir(from) do
+      if kind == "directory" then
+        copy_tree(from .. "/" .. name, to .. "/" .. name)
+      else
+        vim.fn.writefile(vim.fn.readfile(from .. "/" .. name, "b"), to .. "/" .. name, "b")
+      end
+    end
+  end
+  for _, host in ipairs({ "nvim", "binary" }) do
+    copy_tree(api_fixtures .. "/agent/project", write_root .. "/" .. host .. "/project")
+    copy_tree(api_fixtures .. "/agent/ruleset", write_root .. "/" .. host .. "/ruleset")
+  end
+  local proposals = {}
+  for name, answer_file in pairs({ violation = "violation.json", unclear = "unsent.json" }) do
+    local v = api_answer({
+      vim.v.progpath,
+      "-n",
+      "--headless",
+      "-u",
+      "NONE",
+      "-l",
+      "standalone/rules_api.lua",
+      agent_project_api,
+      "rules/validate",
+      "--select=AGT-01",
+      "--answer=" .. agent_answers .. "/" .. answer_file,
+    })
+    if not v then
+      return
+    end
+    proposals[name] = v.proposal
+  end
+  proposals.verified = vim.deepcopy(proposals.violation)
+  proposals.verified.verified = true
+  for name, proposal in pairs(proposals) do
+    vim.fn.writefile({ vim.json.encode(proposal) }, write_root .. "/" .. name .. ".json")
+  end
+  local function bytes(file_path)
+    local fh = io.open(file_path, "rb")
+    if not fh then
+      return nil
+    end
+    local text = fh:read("*a")
+    fh:close()
+    return text
+  end
+  local write_steps = {
+    {
+      label = "accept a violation",
+      args = {
+        "rules/accept",
+        "--select=AGT-01",
+        "--proposal=violation",
+        "--by=Tester",
+        "--note=ok",
+      },
+      check = function(r)
+        return r.written == true
+          and r.verdict.verdict == "violation"
+          and r.verdict.by == "Tester"
+          and vim.deep_equal(r.verdict.evidence, { { file = "lua/a.lua", line = 4 } })
+          and r.verdict.scope.count == 2
+      end,
+    },
+    {
+      label = "accept again, replacing it",
+      args = { "rules/accept", "--select=AGT-01", "--proposal=violation", "--by=Other" },
+      check = function(r)
+        return r.written == true and r.verdict.by == "Other"
+      end,
+    },
+    {
+      label = "accept an unclear proposal",
+      args = { "rules/accept", "--select=AGT-01", "--proposal=unclear", "--by=Tester" },
+      check = function(r)
+        return r.available == false and tostring(r.reason):find("not a verdict", 1, true) ~= nil
+      end,
+    },
+    {
+      label = "accept a proposal that says it is verified",
+      args = { "rules/accept", "--select=AGT-01", "--proposal=verified", "--by=Tester" },
+      check = function(r)
+        return r.available == false and tostring(r.reason):find("verified", 1, true) ~= nil
+      end,
+    },
+    {
+      label = "waive",
+      args = {
+        "rules/waive",
+        "--select=AGT-02",
+        "--reason=not here",
+        "--expires=2099-01-31",
+        "--paths=lua/a.lua,lua/b.lua",
+      },
+      check = function(r)
+        return r.written == true
+          and r.outcome == "waived"
+          and vim.deep_equal(r.waiver.paths, { "lua/a.lua", "lua/b.lua" })
+      end,
+    },
+    {
+      label = "waive the same again",
+      args = {
+        "rules/waive",
+        "--select=AGT-02",
+        "--reason=not here",
+        "--expires=2099-01-31",
+        "--paths=lua/a.lua,lua/b.lua",
+      },
+      check = function(r)
+        return r.written == false and r.outcome == "unchanged"
+      end,
+    },
+    {
+      label = "waive a rule that is waived already",
+      args = { "rules/waive", "--select=AGT-02", "--reason=other" },
+      check = function(r)
+        return r.available == false and tostring(r.reason):find("waived already", 1, true) ~= nil
+      end,
+    },
+  }
+  for _, case in ipairs(write_steps) do
+    local route, extra = case.args[1], vim.list_slice(case.args, 2)
+    ---@return string[]
+    local function host_args()
+      local out = {}
+      for _, a in ipairs(extra) do
+        local name = a:match("^%-%-proposal=(.+)$")
+        out[#out + 1] = name and ("--proposal=" .. write_root .. "/" .. name .. ".json") or a
+      end
+      return out
+    end
+    local in_nvim = api_answer(vim.list_extend({
+      vim.v.progpath,
+      "-n",
+      "--headless",
+      "-u",
+      "NONE",
+      "-l",
+      "standalone/rules_api.lua",
+      write_root .. "/nvim/project",
+      route,
+    }, host_args()))
+    local in_binary = api_answer(
+      vim.list_extend(
+        { lua, "standalone/docmap.lua", write_root .. "/binary/project", "--api=" .. route },
+        host_args()
+      )
+    )
+    if not in_nvim or not in_binary then
+      return
+    end
+    if not vim.deep_equal(in_nvim, in_binary) then
+      fail(
+        ("rules write route differs between Neovim and the standalone build (%s):\n--- neovim\n%s\n--- standalone\n%s"):format(
+          case.label,
+          vim.inspect(in_nvim),
+          vim.inspect(in_binary)
+        )
+      )
+      return
+    end
+    if not case.check(in_nvim) then
+      fail(
+        ("rules write route does not say what it means (%s):\n%s"):format(
+          case.label,
+          vim.inspect(in_nvim)
+        )
+      )
+      return
+    end
+    say(("  ok: rules write route, %s: identical on both hosts and as expected"):format(case.label))
+  end
+  for _, file in ipairs({ ".rules-verdicts.json", ".rules-waivers.json" }) do
+    local a = bytes(write_root .. "/nvim/project/" .. file)
+    local b = bytes(write_root .. "/binary/project/" .. file)
+    if a == nil or a ~= b then
+      fail(
+        ("the two hosts wrote different %s:\n--- neovim\n%s\n--- standalone\n%s"):format(
+          file,
+          tostring(a),
+          tostring(b)
+        )
+      )
+      return
+    end
+  end
+  -- what is beside the files: no temp file and no lock left behind by either host
+  for _, host in ipairs({ "nvim", "binary" }) do
+    for name in vim.fs.dir(write_root .. "/" .. host .. "/project") do
+      if
+        name:find("atomic-tmp", 1, true)
+        or name:find("%.lock$")
+        or name:find("replaced", 1, true)
+      then
+        fail(("rules write route left %s behind in the %s project"):format(name, host))
+        return
+      end
+    end
+  end
+  say(
+    "  ok: rules write routes: both hosts wrote the same verdicts and waivers files, and nothing else"
+  )
+  -- a verdicts file that exists and cannot be used is not overwritten, on either host
+  for _, host in ipairs({ "nvim", "binary" }) do
+    local broken = write_root .. "/" .. host .. "/project/.rules-verdicts.json"
+    vim.fn.writefile({ "{ broken" }, broken)
+    local cmd = host == "nvim"
+        and {
+          vim.v.progpath,
+          "-n",
+          "--headless",
+          "-u",
+          "NONE",
+          "-l",
+          "standalone/rules_api.lua",
+          write_root .. "/nvim/project",
+          "rules/accept",
+        }
+      or { lua, "standalone/docmap.lua", write_root .. "/binary/project", "--api=rules/accept" }
+    local r = api_answer(
+      vim.list_extend(
+        cmd,
+        { "--select=AGT-01", "--proposal=" .. write_root .. "/violation.json", "--by=T" }
+      )
+    )
+    if not r then
+      return
+    end
+    if r.available ~= false or bytes(broken) ~= "{ broken\n" then
+      fail(("a broken verdicts file was not left alone (%s): %s"):format(host, vim.inspect(r)))
+      return
+    end
+  end
+  say(
+    "  ok: rules write routes: a broken verdicts file is refused and left as it is, on both hosts"
+  )
+  vim.fn.delete(write_root, "rf")
+
   -- The same two routes over a real corpus, when there is one: `rules/catalog` and `rules/run` of every family of
   -- `$RULES_VAULT`, in a project without a `.rules.json` (so the vault is what `rules.settings` resolves). The
   -- fixture above has a dozen rules written to hit known cases; a vault has hundreds nobody wrote for this gate,

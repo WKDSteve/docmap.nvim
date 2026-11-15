@@ -104,7 +104,11 @@ return function(H)
   -- What `vim_shim.lua` provides — asked of the file, not declared here.
   -- ---------------------------------------------------------------------
   local saved_vim = _G.vim
-  local saved_preload = { lfs = package.preload.lfs, dkjson = package.preload.dkjson }
+  local saved_preload = {
+    lfs = package.preload.lfs,
+    dkjson = package.preload.dkjson,
+    popup = package.preload["lib.nvim.notify.popup"],
+  }
   package.preload.lfs = function()
     return {
       attributes = function()
@@ -142,6 +146,8 @@ return function(H)
     _G.vim = saved_vim
     package.preload.lfs = saved_preload.lfs
     package.preload.dkjson = saved_preload.dkjson
+    -- the shim preloads a stand-in for the editor's toast; this is the editor, keep its own
+    package.preload["lib.nvim.notify.popup"] = saved_preload.popup
     ok(ok_run, "shim contract: vim_shim.lua runs with lfs/dkjson faked — " .. tostring(result))
     if ok_run then
       shim = result
@@ -179,7 +185,6 @@ return function(H)
   local ALLOWED_ABSENT = {
     ["vim.fn.executable"] = "core/luals.lua — probes for lua-language-server; --full is Neovim-only",
     ["vim.fn.tempname"] = "core/luals.lua — scratch dir for the --doc run, same reason",
-    ["vim.wait"] = "core/luals.lua — bounded wait around the spawn, same reason",
   }
 
   local unprovided = {}

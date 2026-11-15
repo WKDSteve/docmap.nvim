@@ -774,6 +774,342 @@ local function validate(opts, param)
   }
 end
 
+-- ── the two routes that write ────────────────────────────────────────────────────
+
+---What `rules/accept` and `rules/waive` answer when `rules.nvim` is there but cannot write (an older one, or a
+---bundle that did not stage its writers).
+M.NO_WRITER =
+  "the rules.nvim of this engine cannot write verdicts or waivers (rules.engine.verdicts.accept, rules.ops)"
+
+---The longest `by` a host may pass (`rules.engine.verdicts` keeps the same limit in characters; this one is bytes,
+---checked first so an absurd value is never decoded or written).
+M.MAX_BY_BYTES = 400
+
+---The command-line flags of the two writing routes, by name, and the option each one fills. One table for both
+---hosts (`standalone/docmap.lua`, `standalone/rules_api.lua`), so they read the same flags the same way.
+M.WRITE_FLAGS = {
+  proposal = "rules_proposal_file",
+  by = "rules_by",
+  note = "rules_note",
+  reason = "rules_reason",
+  expires = "rules_expires",
+  paths = "rules_paths",
+}
+
+---The option one argument fills, when it is a flag of `M.WRITE_FLAGS` (`--by=Stefan` -> `"rules_by", "Stefan"`).
+---@param a string
+---@return string|nil key
+---@return string|nil value
+function M.write_flag(a)
+  local name, value = a:match("^%-%-(%a+)=(.*)$")
+  local key = name and M.WRITE_FLAGS[name]
+  if key then
+    return key, value
+  end
+  return nil, nil
+end
+
+---`rules.nvim`'s two writers, or nil: `rules.engine.verdicts.accept` (the only function that writes
+---`.rules-verdicts.json`) and `rules.ops.run` (the `rules-ops/1` door, whose `waive` is the code of `:Rules waive`).
+---@return table|nil writer `{ verdicts, ops }`
+function M.write_engine()
+  local probe = require("docmap.core.soft_require").probe
+  local verdicts = probe("rules.engine.verdicts")
+  local ops = probe("rules.ops")
+  if
+    not (verdicts and type(verdicts.accept) == "function" and ops and type(ops.run) == "function")
+  then
+    return nil
+  end
+  return { verdicts = verdicts, ops = ops }
+end
+
+---One rule id and nothing else, the way `rules/validate` takes it.
+---@param param string|nil
+---@return string|nil id
+---@return string|nil reason
+local function one_id(param)
+  local id = tostring(param or ""):match("^%s*(.-)%s*$")
+  if id == "" or id:find("[,%s]") then
+    return nil, "name exactly one rule id (--select=<ID>)"
+  end
+  return id, nil
+end
+
+---The loaded rule with this id, or the answer that says there is none.
+---@param loaded table
+---@param id string
+---@return table|nil rule
+---@return table|nil answer
+local function rule_of(loaded, id)
+  for _, candidate in ipairs(loaded.rules) do
+    if candidate.id == id then
+      return candidate, nil
+    end
+  end
+  return nil,
+    {
+      available = false,
+      unknown = { id },
+      reason = "no rule of the configured rulesets has this id",
+    }
+end
+
+---The proposal a host hands `rules/accept`: `opts.rules_proposal` (a table or its JSON text, an in-process host) or
+---`opts.rules_proposal_file` (a path, `--proposal=<file>`), bounded like an answer. It is the `proposal` object of a
+---`rules/validate` answer, as it came back.
+---@param opts table
+---@return table|nil proposal
+---@return string|nil reason
+local function proposal_of(opts)
+  local given = opts.rules_proposal
+  if type(given) == "table" then
+    return given, nil
+  end
+  local text = given
+  if text == nil and opts.rules_proposal_file then
+    local path = tostring(opts.rules_proposal_file)
+    local fh = io.open(path, "rb")
+    if not fh then
+      return nil, "the proposal file cannot be read: " .. path
+    end
+    text = fh:read(M.MAX_ANSWER_BYTES + 1) or ""
+    fh:close()
+  end
+  if type(text) ~= "string" then
+    return nil,
+      "no proposal given: pass the proposal of rules/validate as a file (--proposal=<file>)"
+  end
+  if #text > M.MAX_ANSWER_BYTES then
+    return nil, ("the proposal is too large (more than %d bytes)"):format(M.MAX_ANSWER_BYTES)
+  end
+  local ok, decoded = pcall(vim.json.decode, text, { luanil = { object = true, array = true } })
+  if not ok or type(decoded) ~= "table" or (next(decoded) ~= nil and vim.islist(decoded)) then
+    return nil, "the proposal is not a JSON object (the proposal of a rules/validate answer)"
+  end
+  return decoded, nil
+end
+
+---A one-line text a host passes on (`by`, `note`, `reason`), or the reason it cannot be one.
+---@param value any
+---@param what string
+---@param required boolean
+---@return string|nil text
+---@return string|nil reason
+local function given_text(value, what, required)
+  if value == nil or value == "" then
+    if required then
+      return nil, ("%s is required (--%s=...)"):format(what, what)
+    end
+    return nil, nil
+  end
+  if type(value) ~= "string" then
+    return nil, what .. " must be a text"
+  end
+  if #value > M.MAX_ANSWER_BYTES then
+    return nil, what .. " is too long"
+  end
+  return value, nil
+end
+
+---`rules/accept`, `param` one rule id -- accept the agent's proposal about that rule as a verdict: written to the
+---project's `.rules-verdicts.json` by `rules.engine.verdicts.accept`, the only function that writes that file.
+---
+---Its guarantees are `rules.nvim`'s and are not repeated here: one proposal at a time, no `verified` and no
+---`unclear` proposal, the evidence held against the tree, a verdicts file that exists and cannot be used (or is a
+---link) is never overwritten, a change of the file between read and write stops it. What this route adds is what a
+---host must not decide: the files the request carried (`sent`) are planned again here and replace whatever the
+---proposal says, the rule must be the one named and one an agent answers (no check), and the person (`by`) comes from
+---the host, never from the proposal. The date is today's: a host does not date a verdict.
+---@param opts table A resolved `Docmap.Opts`; `rules_proposal[_file]`, `rules_by`, `rules_note`.
+---@param param string|nil
+---@return table
+local function accept(opts, param)
+  local engine = M.engine()
+  if not engine then
+    return { available = false, reason = M.NO_ENGINE }
+  end
+  local agent = M.agent_engine()
+  if not agent then
+    return { available = false, reason = M.NO_AGENT }
+  end
+  local writer = M.write_engine()
+  if not writer then
+    return { available = false, reason = M.NO_WRITER }
+  end
+  local id, bad_id = one_id(param)
+  if not id then
+    return { available = false, reason = bad_id }
+  end
+  local by, bad_by = given_text(opts.rules_by, "by", true)
+  if not by then
+    return { available = false, reason = bad_by }
+  end
+  if #by > M.MAX_BY_BYTES then
+    return { available = false, reason = "by is too long" }
+  end
+  local note, bad_note = given_text(opts.rules_note, "note", false)
+  if bad_note then
+    return { available = false, reason = bad_note }
+  end
+  local proposal, refused = proposal_of(opts)
+  if not proposal then
+    return { available = false, reason = refused }
+  end
+  if proposal.rule_id ~= id then
+    return {
+      available = false,
+      reason = ("the proposal is about %s, not %s"):format(tostring(proposal.rule_id), id),
+    }
+  end
+  local loaded, reason = load(engine, opts)
+  if not loaded then
+    return { available = false, reason = reason }
+  end
+  local rule, none = rule_of(loaded, id)
+  if not rule then
+    return none --[[@as table]]
+  end
+  if rule.check ~= nil then
+    return {
+      available = false,
+      reason = ("%s has a check: rules/run answers it, a verdict is for a rule without one"):format(
+        id
+      ),
+    }
+  end
+
+  -- What the request of this rule carried, planned again: the evidence is held against this list, not the host's.
+  local planned = agent.plan.plan({ rule }, loaded.root, { agent = agent_config(loaded) })
+  if planned.skipped[1] then
+    return {
+      available = false,
+      reason = ("%s is not sent (%s): no answer about it can be accepted"):format(
+        id,
+        planned.skipped[1].reason
+      ),
+    }
+  end
+  local req, build_err = agent.request.build(planned.batches[1], loaded.root)
+  if not req then
+    return { available = false, reason = ("%s is not sent (%s)"):format(id, tostring(build_err)) }
+  end
+  local candidate = vim.deepcopy(proposal)
+  candidate.sent = req.sent
+
+  local ok, err = writer.verdicts.accept(loaded.root, candidate, { by = by, note = note })
+  if not ok then
+    return { available = false, reason = err }
+  end
+  local entries, load_err = writer.verdicts.load(loaded.root)
+  local entry = entries[id]
+  if load_err or not entry then
+    return {
+      available = false,
+      reason = load_err or "the verdict was written but cannot be read back",
+    }
+  end
+  return {
+    available = true,
+    written = true,
+    file = writer.verdicts.FILE,
+    id = id,
+    verdict = entry,
+    warnings = warnings_of(engine, loaded.res),
+  }
+end
+
+---The paths a host passes to `rules/waive`: a list (an in-process host) or a comma-separated text (`--paths=`).
+---@param value any
+---@return string[]|nil paths
+local function paths_of(value)
+  if type(value) == "table" then
+    return value
+  end
+  if type(value) ~= "string" or value == "" then
+    return nil
+  end
+  local out = {}
+  for item in value:gmatch("[^,]+") do
+    local trimmed = item:match("^%s*(.-)%s*$")
+    if trimmed ~= "" then
+      out[#out + 1] = trimmed
+    end
+  end
+  return #out > 0 and out or nil
+end
+
+---`rules/waive`, `param` one rule id -- add a waiver of that rule to the project's `.rules-waivers.json` through the
+---`waive` operation of `rules.nvim`'s write door (`rules.ops`, the code `:Rules waive` runs): the rule must be loaded,
+---the reason one line that says something, the expiry a date, the paths relative globs; a waiver that is there
+---already is refused (renew or remove it in the editor), the same one again is `unchanged`; the file is written under
+---its lock, canonically, and never through a link. Nothing here re-decides any of that.
+---@param opts table A resolved `Docmap.Opts`; `rules_reason`, `rules_expires`, `rules_paths`.
+---@param param string|nil
+---@return table
+local function waive(opts, param)
+  local engine = M.engine()
+  if not engine then
+    return { available = false, reason = M.NO_ENGINE }
+  end
+  local writer = M.write_engine()
+  if not writer then
+    return { available = false, reason = M.NO_WRITER }
+  end
+  local id, bad_id = one_id(param)
+  if not id then
+    return { available = false, reason = bad_id }
+  end
+  local reason_text, bad_reason = given_text(opts.rules_reason, "reason", true)
+  if not reason_text then
+    return { available = false, reason = bad_reason }
+  end
+  local expires, bad_expires = given_text(opts.rules_expires, "expires", false)
+  if bad_expires then
+    return { available = false, reason = bad_expires }
+  end
+  -- The project and its settings, as for every other route: a `.rules.json` that cannot be used is told here, in
+  -- the words the other routes use, before the door is asked.
+  local loaded, why = load(engine, opts)
+  if not loaded then
+    return { available = false, reason = why }
+  end
+  local doc, err = writer.ops.run({
+    ops = {
+      {
+        op = "waive",
+        id = id,
+        reason = reason_text,
+        expires = expires,
+        paths = paths_of(opts.rules_paths),
+      },
+    },
+  }, { project = loaded.root })
+  if not doc then
+    return { available = false, reason = err and err.message or "the waiver was not written" }
+  end
+  local entry = (doc.results or {})[1] or {}
+  if entry.ok ~= true then
+    local e = entry.error or {}
+    return { available = false, reason = e.message or "the waiver was not written", code = e.code }
+  end
+  local entries = engine.waivers.load_entries(loaded.root) or {}
+  local waiver = entries[id] or {}
+  local out = {
+    available = true,
+    written = entry.outcome ~= "unchanged",
+    outcome = entry.outcome,
+    file = engine.waivers.FILE,
+    id = id,
+    waiver = { reason = waiver.reason, expires = waiver.expires, paths = waiver.paths },
+    warnings = warnings_of(engine, loaded.res),
+  }
+  for _, text in ipairs(entry.warnings or {}) do
+    out.warnings[#out.warnings + 1] = text
+  end
+  return out
+end
+
 -- Exported guarded: whatever `rules.nvim` raises comes back as `{ available = false, reason }`.
 
 ---`/api/rules/catalog` (see `catalog` above).
@@ -791,5 +1127,13 @@ M.plan = guarded(plan)
 ---`/api/rules/validate` (see `validate` above).
 ---@type fun(opts: table, param: string|nil): table
 M.validate = guarded(validate)
+
+---`rules/accept` (see `accept` above).
+---@type fun(opts: table, param: string|nil): table
+M.accept = guarded(accept)
+
+---`rules/waive` (see `waive` above).
+---@type fun(opts: table, param: string|nil): table
+M.waive = guarded(waive)
 
 return M
