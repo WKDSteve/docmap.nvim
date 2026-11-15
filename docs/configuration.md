@@ -73,6 +73,8 @@ per-field documentation is in
 
     checks = {},          -- switch a check off, or re-grade it
     theme = "system",     -- theme baked into the generated page
+    locale = nil,         -- interface language of the editor ("de");
+                          -- default: $DOCMAP_LOCALE, then v:lang
     serve_port = 0,       -- 0 lets the OS pick; set it for a stable URL
 
     features_dir = nil,   -- default: docs/FEATURES, then docs/features

@@ -225,7 +225,7 @@ function M.render(ir, findings, opts)
           ("| %s | `%s` | %s |"):format(
             f.severity,
             f.check,
-            cell(require("docmap.core.findings").format(f))
+            cell(require("docmap.core.findings").format(f, "en"))
           )
         )
       end
@@ -238,7 +238,9 @@ function M.render(ir, findings, opts)
     put("|---|---|")
     for _, f in ipairs(findings) do
       if f.severity == "info" then
-        put(("| `%s` | %s |"):format(f.check, cell(require("docmap.core.findings").format(f))))
+        put(
+          ("| `%s` | %s |"):format(f.check, cell(require("docmap.core.findings").format(f, "en")))
+        )
       end
     end
     put("\n</details>")

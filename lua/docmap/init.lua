@@ -709,6 +709,14 @@ end
 ---@param opts Docmap.Opts?
 ---@return Docmap.Handle
 function M.setup(opts)
+  -- The language this editor is spoken to in, before the first message can be shown: the option, then the
+  -- environment, then Neovim's own message language (`docs/i18n.md`, "Which locale"). A tag no catalog answers
+  -- leaves English.
+  local i18n = require("docmap.core.i18n")
+  i18n.configure({
+    locale = i18n.resolve(opts and opts.locale, vim.env.DOCMAP_LOCALE, vim.v.lang, vim.env.LANG),
+  })
+
   -- Tell hover.nvim what a dotted module name under the cursor is, out of the
   -- map this plugin already writes. Soft: without hover.nvim it does nothing,
   -- and hover.nvim never names this plugin -- the contribution goes through

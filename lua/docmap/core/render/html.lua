@@ -199,7 +199,7 @@ function M.render(ir, findings, opts)
       severity = f.severity,
       check = f.check,
       node = f.node,
-      message = fmt_finding(f),
+      message = fmt_finding(f, "en"),
     }
   end
   local findings_json = json.encode(rendered):gsub("</", "<\\/")
@@ -218,7 +218,7 @@ function M.render(ir, findings, opts)
   for _, na in ipairs(require("docmap.core.check").not_applicable(ir, opts)) do
     na_html = na_html
       .. ('<p class="na">%s</p>'):format(
-        esc(require("docmap.core.findings").format_not_applicable(na))
+        esc(require("docmap.core.findings").format_not_applicable(na, "en"))
       )
   end
 
@@ -240,7 +240,7 @@ function M.render(ir, findings, opts)
       f.severity,
       esc(f.check),
       esc(f.check),
-      esc(fmt_finding(f))
+      esc(fmt_finding(f, "en"))
     )
   end
 

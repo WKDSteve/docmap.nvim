@@ -11,6 +11,10 @@
 --   4. stdpath('data')/lazy/<name>  (what a plugin manager installed)
 -- An override (1) that is set but wrong decides alone; it is never skipped.
 
+-- The suite speaks English, whatever the machine does: the specs compare messages as text, and the plugin would
+-- answer in the language of `v:lang` (docs/i18n.md, "Which locale"). A spec that tests another locale names it.
+vim.env.DOCMAP_LOCALE = "en"
+
 local this = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p")
 local root = vim.fs.dirname(vim.fs.dirname(vim.fs.normalize(this)))
 

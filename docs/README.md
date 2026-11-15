@@ -17,6 +17,7 @@ were lifted out of it into the pages below rather than kept in two places.
 | [`quickstart.md`](quickstart.md) | The first thing to run after installing. |
 | [`what-you-get.md`](what-you-get.md) | The artifacts it writes, and how this repository's own published map shows what a consumer sees. |
 | [`configuration.md`](configuration.md) | Every option `setup()` takes, the `.docmap.json` a repository states about itself and which options it is refused, switching a check off or re-grading it, and rebinding the browser's keys by action. |
+| [`i18n.md`](i18n.md) | **Interface languages**: how a language is chosen in the editor and the engine, where the catalogs live and what a catalog file looks like, what is never translated, and what a missing text renders as. The contract a host reads too. |
 | [`health.md`](health.md) | What `:checkhealth documentation` asks — and why the interesting half is the configuration a `:DocMap` would act on right now, not the dependency list. |
 | [`around-it.md`](around-it.md) | How this plugin's scope differs from its siblings in the collection. |
 

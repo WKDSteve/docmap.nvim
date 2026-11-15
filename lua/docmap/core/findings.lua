@@ -38,9 +38,17 @@
 --- schema bump. The English sentences that *are* in the artifact live in
 --- `quicks`, which is its own task.
 
+local i18n = require("docmap.core.i18n")
+
 local M = {}
 
----Message templates, keyed by finding id.
+---The namespace of the findings in the interface catalog (`core/i18n/en.json`): the template of the check
+---`missing-readme` is the message `finding.missing-readme`.
+local PREFIX = "finding."
+
+---Message templates of the source locale, keyed by finding id: the `finding.*` messages of the interface
+---catalog, read once. The sentences live in `core/i18n/en.json` since the general catalog exists; this table
+---is the view of them the specs, the check card of the page and `M.format` go by.
 ---
 ---The id is the finding's `check` name, except where one check has to say
 ---materially different things: `dead-function` reports three genuinely
@@ -50,46 +58,25 @@ local M = {}
 ---what a translator needs to see as a separate entry.
 ---
 ---Every template is byte-identical to the sentence the check produced
----before this table existed. That is the acceptance criterion `I18N.md`
----sets for this task, and it is checked two ways: `findings_spec.lua`
+---before a catalog existed. That is the acceptance criterion `I18N.md`
+---sets, and it is checked two ways: `findings_spec.lua`
 ---renders one finding per key, and the whole existing suite asserts on
 ---these strings in twenty-one places.
+---
+---The quotes in `require-not-declared` are the template's, not a value's: the check used `%q` there and the
+---criterion is byte-identity. A module name has nothing `%q` would escape beyond wrapping it.
 ---@type table<string, string>
-M.CATALOG = {
-  ["missing-module-tag"] = "{file} has no ---@module annotation",
-  ["missing-summary"] = "{file} has no description line",
-  ["module-path-mismatch"] = "{file} declares @module '{declared}' but lives at '{expected}'",
-  ["file-holds-many-modules"] = "{file} holds {count} module identities the map cannot separate: {modules}",
-  ["missing-readme"] = "{path} has no README.md",
-  ["dead-readme-link"] = "{file} links to '{target}' which does not exist",
-  ["placeholder-readme-link"] = "{file} links to '{target}', which starts with the placeholder ${var}: no Markdown viewer expands it",
-  ["doc-references-missing"] = "{doc}:{line} references '{text}', but {module} has no '{missing}'",
-  ["sibling-reference-missing"] = "{file} references '{target}', which does not exist in the {repo} checkout",
-  ["tools-spec-invalid"] = "{source}: entry #{index} is invalid — {reason}",
-  ["feature-module-missing"] = "{file}:{line} names '{text}' as the module of '{feature}', but this tree has no such file or module",
-  ["tag-require-missing"] = "{module} is required by {who} but {prefix}'s own map does not declare it — either that require is broken, or that map predates a rename",
-  ["tag-file-unavailable"] = "tag_files['{prefix}'] points at {dir}, which has no readable module_map.json — requires under '{prefix}' were not checked",
-  ["unreferenced-module"] = "{module} is required by no other file in the tree",
-  ["orphaned-class-alias"] = "{kind} {name} is declared in {file} and referenced by nothing in the tree",
-  ["test-references-missing"] = "{file}:{line} references '{alias}.{field}', but {module} has no '{field}'",
-  ["binding-conflict"] = "{what} is registered {count} times; the last one wins: {where}",
-  ["unused-require"] = "{file}:{line} binds require('{module}') to '{alias}' and never uses it",
-  ["example-does-not-parse"] = "{fn}'s @example is not valid Lua: {error}",
-  ["consumer-require-missing"] = "{module} is required by {who} but no module here declares it — either they are broken, or their map predates a rename",
-  ["require-cycle"] = "require cycle across {count} modules: {members}",
-  -- The quotes are the template's, not a value's: the check used `%q` here
-  -- and the acceptance criterion is byte-identity. A module name has
-  -- nothing `%q` would escape beyond wrapping it.
-  ["require-not-declared"] = 'requires "{module}" (line {line}), which no file in this tree declares',
-  ["layer-violation"] = "{from} requires {to}, but {from_layer} must not reach into {to_layer}{why}",
-  ["dead-see-target"] = "{fn}: @see target '{target}' does not resolve to a known module or function",
-  ["type-vs-class"] = '{module}: local "{name}" annotated ---@type {type}, but {count} field(s) are assigned to it after its literal — LuaLS reports missing-fields/"fields cannot be injected" for this shape; use ---@class instead (---@class {module} : {type}, plus @see the type definition, if {type} should still be checked against it)',
-  ["undocumented-param"] = "{fn} has {declared} parameter(s) but only {documented} @param line(s)",
-  ["param-name-mismatch"] = "{fn}: @param #{index} is documented as '{documented}' but the signature declares '{actual}' at that position",
-  ["dead-function.file-local"] = "{fn} is file-local and nothing in its own file mentions it",
-  ["dead-function.internal"] = "{fn} is marked @internal and nothing in the tree calls it",
-  ["dead-function.no-caller"] = "{fn} has no caller anywhere in the tree",
-}
+M.CATALOG = {}
+do
+  local source = i18n.catalog(i18n.SOURCE)
+  for _, key in ipairs(i18n.keys(PREFIX)) do
+    -- A finding says one sentence per key; a plural table here would be a catalog defect the spec reports.
+    local template = source and source.messages[key]
+    if type(template) == "string" then
+      M.CATALOG[key:sub(#PREFIX + 1)] = template
+    end
+  end
+end
 
 ---One explanation per check: what it compares, how severe a hit is by default, and why the check exists.
 ---
@@ -309,53 +296,26 @@ function M.key(finding)
   return finding.check
 end
 
----Substitute `{name}` placeholders from `params`.
----
----A placeholder with no matching parameter is left standing rather than
----replaced with the empty string: a template and its call site drifting
----apart is a defect, and `{who}` sitting visibly in the output says so
----where a silent gap would not. Same reasoning as rule 2.3 one level down.
----
----Values are substituted literally, and a **function** replacement is what
----makes that true: `gsub` interprets `%1`/`%%` only in a replacement
----*string*, never in what a replacement function returns. An earlier
----version escaped the value defensively and so turned a `%s` inside an
----`@example` parse error into `%%s`. Found by this module's own spec, not
----by the three-repository byte comparison — no real finding happened to
----carry a percent sign.
----@param template string
----@param params table<string, any>?
----@return string
-local function interpolate(template, params)
-  if not params then
-    return template
-  end
-  return (
-    template:gsub("{([%w_]+)}", function(name)
-      local value = params[name]
-      if value == nil then
-        return "{" .. name .. "}"
-      end
-      return tostring(value)
-    end)
-  )
-end
-
 ---Render one finding as a sentence.
 ---
 ---The single entry point every surface calls. Three cases, in order:
 ---a finding that already carries prose (an `opts.extra_checks` finding)
----keeps it; a known key is interpolated; an unknown key renders visibly
----rather than blank.
+---keeps it; a known key is rendered from the interface catalog; an unknown
+---key renders visibly rather than blank.
+---
+---`locale` decides the language. An interactive surface (quickfix, diagnostics, the report on a terminal) leaves
+---it out and gets the active locale; a renderer of a committed artifact (`overview.md`, SARIF, the static rows of
+---the page) passes `i18n.SOURCE`, because a file that `--check` compares must not depend on the `LANG` of the
+---machine that wrote it (`docs/i18n.md`, "The artifact never contains translated text").
 ---@param finding Docmap.Finding
+---@param locale string? A shipped locale code; the active locale when omitted.
 ---@return string
-function M.format(finding)
+function M.format(finding, locale)
   if finding.message then
     return finding.message
   end
   local key = M.key(finding)
-  local template = M.CATALOG[key]
-  if not template then
+  if not M.CATALOG[key] then
     -- Deliberately not an error: a missing catalog entry must not take down
     -- a scan, and it must not be invisible either. `findings_spec.lua` is
     -- what makes it fail loudly at development time.
@@ -368,25 +328,27 @@ function M.format(finding)
     table.sort(parts)
     return ("<%s>%s"):format(key, #parts > 0 and (" " .. table.concat(parts, " ")) or "")
   end
-  return interpolate(template, finding.params)
+  return i18n.t(PREFIX .. key, finding.params, locale)
 end
 
 ---Catalog entry for a check that skipped nodes because their language lacks
----the convention it needs (`check.not_applicable`). Plural-neutral on purpose:
+---the convention it needs (`check.not_applicable`), in the source locale. Plural-neutral on purpose:
 ---`{languages}` is a list.
-M.NOT_APPLICABLE = "Not applicable: {check} on {count} node(s); no {needs} in {languages}"
+---@type string
+M.NOT_APPLICABLE = i18n.t("report.not-applicable", nil, i18n.SOURCE)
 
 ---Render one `Docmap.NotApplicable` as a sentence, for the CLI report and the
 ---page alike.
 ---@param na Docmap.NotApplicable
+---@param locale string? As in `M.format`.
 ---@return string
-function M.format_not_applicable(na)
-  return interpolate(M.NOT_APPLICABLE, {
+function M.format_not_applicable(na, locale)
+  return i18n.t("report.not-applicable", {
     check = na.check,
     count = na.count,
     needs = na.needs,
     languages = table.concat(na.languages, ", "),
-  })
+  }, locale)
 end
 
 return M

@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/WKDSteve/docmap.nvim/blob/main/docs/i18n-catalog.schema.json",
+  "title": "docmap.nvim interface catalog",
+  "description": "One locale of the interface: lua/docmap/core/i18n/<locale>.json. The contract is docs/i18n.md; TESTS/i18n_catalog_spec.lua checks what a schema cannot (sorted keys written once, placeholders and plural shape against the source, completeness per tier).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["locale", "name", "tier", "messages"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "locale": {
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+      "description": "The locale code, the same as the file name without .json: a language (de) or a language with a region (pt-BR)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The endonym a language picker shows: Deutsch, never German."
+    },
+    "tier": {
+      "enum": ["source", "maintained", "contributed", "machine"],
+      "description": "source: en, every text is written here first. maintained and contributed: someone who reads the language reviews changes; such a catalog is complete. machine: generated and unreviewed; shipped only behind an opt-in and marked as such in the interface."
+    },
+    "messages": {
+      "type": "object",
+      "description": "Key to message. One message per line, the keys sorted.",
+      "propertyNames": {
+        "pattern": "^(finding|report|check|editor|health|cli|page)(\\.[A-Za-z0-9_-]+)+$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text, with named placeholders: {from} requires {to}."
+          },
+          {
+            "type": "object",
+            "description": "Plural forms by CLDR category, chosen by the parameter count.",
+            "additionalProperties": false,
+            "required": ["other"],
+            "properties": {
+              "zero": { "type": "string", "minLength": 1 },
+              "one": { "type": "string", "minLength": 1 },
+              "two": { "type": "string", "minLength": 1 },
+              "few": { "type": "string", "minLength": 1 },
+              "many": { "type": "string", "minLength": 1 },
+              "other": { "type": "string", "minLength": 1 }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

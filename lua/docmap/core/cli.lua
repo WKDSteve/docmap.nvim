@@ -340,7 +340,7 @@ local function run_breaking(opts, root, ref)
 end
 
 ---Run the CLI over `opts` with `argv` (`_G.arg`-shaped: `--check`, `--lenient`,
----`--full`, `--breaking=<ref>`, `--exclude=<path>`, `--languages=<a,b>`). Writes to stdout/stderr
+---`--full`, `--breaking=<ref>`, `--exclude=<path>`, `--languages=<a,b>`, `--locale=<tag>`). Writes to stdout/stderr
 ---as a side effect; returns the process exit code rather than calling
 ---`os.exit`/`vim.cmd("cq ...")`, so the caller decides how to actually exit.
 ---
@@ -365,8 +365,12 @@ function M.run(opts, argv)
   local cli_exclude = {}
   ---@type string[]
   local cli_languages = {}
+  ---@type string?
+  local cli_locale = nil
   for _, a in ipairs(argv) do
-    if a == "--check" then
+    if a:match("^%-%-locale=") then
+      cli_locale = a:sub(#"--locale=" + 1)
+    elseif a == "--check" then
       check_only = true
     elseif a == "--lenient" then
       strict = false
@@ -394,6 +398,19 @@ function M.run(opts, argv)
       end
     end
   end
+
+  -- The language of the report: `--locale=`, then the environment (`docs/i18n.md`, "Which locale"). Only what
+  -- this run prints; the artifacts it writes are the same bytes in every locale.
+  local i18n = require("docmap.core.i18n")
+  i18n.configure({
+    locale = i18n.resolve(
+      cli_locale,
+      os.getenv("DOCMAP_LOCALE"),
+      os.getenv("LC_ALL"),
+      os.getenv("LC_MESSAGES"),
+      os.getenv("LANG")
+    ),
+  })
 
   -- **Replaced, not appended**, so parsing the same argv twice is the same
   -- as parsing it once. `standalone/docmap.lua` deliberately reads both

@@ -880,6 +880,11 @@ untranslatable. The templates use named placeholders for exactly that.
 its own `message` passes through untouched, because that prose belongs to
 another repository's code and this catalogue has never seen it.
 
+The sentences themselves live in the interface catalog
+(`core/i18n/en.json`, the `finding.*` keys) since the general catalog exists;
+`core/findings.lua` reads them from there. The format of that catalog, the
+fallback rule and which surfaces stay English are in [`i18n.md`](i18n.md).
+
 A key with no template renders as `<check-name>` plus its parameters rather
 than blank (`I18N.md` rule 2.3): a check added without a catalog entry has
 to look unfinished. `findings_spec.lua` fails on it as well, which is the

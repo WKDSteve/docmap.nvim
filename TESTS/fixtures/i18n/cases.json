@@ -1,0 +1,103 @@
+{
+  "about": "Golden cases of the interface catalog (docs/i18n.md). Both runtimes answer every case alike: lua/docmap/core/i18n/init.lua and lua/docmap/core/render/html/i18n_js.lua. TESTS/i18n_runtime_spec.lua runs them.",
+  "catalogs": {
+    "en": {
+      "plain": "Nothing to do.",
+      "named": "{from} requires {to}",
+      "twice": "{name} and {name}",
+      "count.files": { "one": "{count} file", "other": "{count} files" },
+      "count.other-only": { "other": "{count} entries" },
+      "count.broken": { "one": "exactly one" },
+      "only.en": "English only: {what}",
+      "percent": "100% of {what}",
+      "braces": "a {b} c {} d {not a name} e"
+    },
+    "de": {
+      "plain": "Nichts zu tun.",
+      "named": "{to} wird von {from} gebraucht",
+      "count.files": { "one": "{count} Datei", "other": "{count} Dateien" },
+      "count.other-only": { "other": "{count} Einträge" }
+    },
+    "pt-BR": {
+      "plain": "Nada a fazer."
+    }
+  },
+  "normalize": [
+    { "tag": "en", "want": "en" },
+    { "tag": "EN", "want": "en" },
+    { "tag": "de", "want": "de" },
+    { "tag": "de-AT", "want": "de" },
+    { "tag": "de_DE.UTF-8", "want": "de" },
+    { "tag": "de_DE@euro", "want": "de" },
+    { "tag": "de-Latn-DE", "want": "de" },
+    { "tag": "pt-BR", "want": "pt-BR" },
+    { "tag": "pt_br", "want": "pt-BR" },
+    { "tag": "pt-BR-x-private", "want": "pt-BR" },
+    { "tag": "pt", "want": null },
+    { "tag": "pt-PT", "want": null },
+    { "tag": "fr", "want": null },
+    { "tag": "C", "want": null },
+    { "tag": "POSIX", "want": null },
+    { "tag": "C.UTF-8", "want": null },
+    { "tag": "", "want": null },
+    { "tag": "deutsch", "want": null },
+    { "tag": "d", "want": null },
+    { "tag": "-de", "want": null },
+    { "tag": 7, "want": null },
+    { "tag": null, "want": null }
+  ],
+  "resolve": [
+    { "candidates": ["de"], "want": "de" },
+    { "candidates": [null, "fr", "de-AT", "en"], "want": "de" },
+    { "candidates": ["fr", "C"], "want": "en" },
+    { "candidates": [], "want": "en" },
+    { "candidates": [null, null, "pt_BR.UTF-8"], "want": "pt-BR" }
+  ],
+  "plural": [
+    { "locale": "en", "n": 1, "want": "one" },
+    { "locale": "en", "n": 0, "want": "other" },
+    { "locale": "en", "n": 2, "want": "other" },
+    { "locale": "en", "n": 1.5, "want": "other" },
+    { "locale": "en", "n": "1", "want": "other" },
+    { "locale": "en", "n": null, "want": "other" },
+    { "locale": "de", "n": 1, "want": "one" },
+    { "locale": "pt-BR", "n": 1, "want": "other" },
+    { "locale": "ja", "n": 1, "want": "other" }
+  ],
+  "t": [
+    { "locale": "en", "key": "plain", "want": "Nothing to do." },
+    { "locale": "de", "key": "plain", "want": "Nichts zu tun." },
+    { "locale": "pt-BR", "key": "plain", "want": "Nada a fazer." },
+    { "locale": "en", "key": "named", "params": { "from": "a.b", "to": "c.d" }, "want": "a.b requires c.d" },
+    { "locale": "de", "key": "named", "params": { "from": "a.b", "to": "c.d" }, "want": "c.d wird von a.b gebraucht" },
+    { "locale": "en", "key": "named", "params": { "from": "a.b" }, "want": "a.b requires {to}" },
+    { "locale": "en", "key": "named", "want": "{from} requires {to}" },
+    { "locale": "en", "key": "twice", "params": { "name": "x" }, "want": "x and x" },
+    { "locale": "en", "key": "named", "params": { "from": "%1 %s $&", "to": "$1 {from}" }, "want": "%1 %s $& requires $1 {from}" },
+    { "locale": "en", "key": "percent", "params": { "what": "it" }, "want": "100% of it" },
+    { "locale": "en", "key": "braces", "params": { "b": "B" }, "want": "a B c {} d {not a name} e" },
+    { "locale": "en", "key": "named", "params": { "from": 3, "to": true }, "want": "3 requires true" },
+    { "locale": "en", "key": "count.files", "params": { "count": 1 }, "want": "1 file" },
+    { "locale": "en", "key": "count.files", "params": { "count": 0 }, "want": "0 files" },
+    { "locale": "en", "key": "count.files", "params": { "count": 12 }, "want": "12 files" },
+    { "locale": "en", "key": "count.files", "want": "{count} files" },
+    { "locale": "de", "key": "count.files", "params": { "count": 1 }, "want": "1 Datei" },
+    { "locale": "de", "key": "count.files", "params": { "count": 5 }, "want": "5 Dateien" },
+    { "locale": "de", "key": "count.other-only", "params": { "count": 1 }, "want": "1 Einträge" },
+    { "locale": "en", "key": "count.broken", "params": { "count": 1 }, "want": "exactly one" },
+    { "locale": "en", "key": "count.broken", "params": { "count": 2 }, "want": "‹missing:count.broken›" },
+    { "locale": "de", "key": "only.en", "params": { "what": "x" }, "want": "English only: x" },
+    { "locale": "de", "debug": true, "key": "only.en", "params": { "what": "x" }, "want": "‹en› English only: x" },
+    { "locale": "de", "debug": true, "key": "plain", "want": "Nichts zu tun." },
+    { "locale": "en", "debug": true, "key": "plain", "want": "Nothing to do." },
+    { "locale": "pt-BR", "debug": true, "key": "count.files", "params": { "count": 1 }, "want": "‹en› 1 file" },
+    { "locale": "en", "key": "no.such.key", "want": "‹missing:no.such.key›" },
+    { "locale": "de", "key": "no.such.key", "want": "‹missing:no.such.key›" },
+    { "locale": "de", "debug": true, "key": "no.such.key", "params": { "a": 1 }, "want": "‹missing:no.such.key›" },
+    { "locale": "fr", "key": "plain", "want": "Nothing to do." },
+    { "locale": "de-AT", "key": "plain", "want": "Nichts zu tun." },
+    { "active": "de", "key": "plain", "want": "Nichts zu tun." },
+    { "active": "de", "locale": "en", "key": "plain", "want": "Nothing to do." },
+    { "active": "xx", "key": "plain", "want": "Nothing to do." }
+  ]
+}

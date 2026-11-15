@@ -99,7 +99,7 @@ function M.render(ir, findings, opts)
     local result = {
       ruleId = f.check,
       level = LEVEL[f.severity] or "note",
-      message = { text = require("docmap.core.findings").format(f) },
+      message = { text = require("docmap.core.findings").format(f, "en") },
     }
     local uri = uri_for(ir, f)
     if uri then

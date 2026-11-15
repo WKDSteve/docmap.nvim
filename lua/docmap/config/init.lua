@@ -93,6 +93,7 @@ M.KNOWN_OPTS_KEYS = {
   checklist_dir = true,
   install_dir = true,
   theme = true,
+  locale = true,
   serve_port = true,
   hover = true,
   startup_flamegraph = true,

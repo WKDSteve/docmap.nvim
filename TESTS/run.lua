@@ -14,6 +14,9 @@
 -- Make the repo importable whether invoked via -l (cwd) or luafile.
 vim.opt.rtp:append(vim.fn.getcwd())
 
+-- The suite speaks English, whatever the machine does (the same line as in TESTS/minimal_init.lua).
+vim.env.DOCMAP_LOCALE = "en"
+
 -- lib.nvim is a runtime dependency (notify, fs, usercmd, …), so the
 -- specs cannot run without it on the rtp. Three ways it can be found, in
 -- descending order of explicitness — CI uses the first, a local checkout the
@@ -241,6 +244,9 @@ local specs = {
   "check_orphaned_types_spec.lua",
   "check_tag_requires_spec.lua",
   "findings_spec.lua",
+  "i18n_runtime_spec.lua",
+  "i18n_catalog_spec.lua",
+  "i18n_locale_spec.lua",
   "quicks_artifact_spec.lua",
   "check_overload_credit_spec.lua",
   "check_applicability_spec.lua",
