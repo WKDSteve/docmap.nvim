@@ -9,14 +9,31 @@ M.COMPANIONS = {
   { module = "rules.settings", needs = "rules.env" },
 }
 
+-- The module a route probe exists to measure. A probe that ends before it (the route answers
+-- `available = false`, say because the probe asked for a map that is not committed) leaves the
+-- module out of the manifest without an error, and the binary then dies with "module not found"
+-- on the first real request. Found that way for `shape/<sha>` and `docmap.core.diff`.
+M.ROUTE_MODULES = {
+  { route = "commit/", needs = "docmap.core.history" },
+  { route = "shape/", needs = "docmap.core.diff" },
+}
+
 ---The modules a manifest lacks.
 ---@param names table<string, boolean> the module names of the manifest
----@return string[] missing one line per module, saying which module asks for it
-function M.missing(names)
+---@param routes? string[] the `--api=` routes the build probed (`shape/<sha>`, ...)
+---@return string[] missing one line per module, saying which module or route asks for it
+function M.missing(names, routes)
   local out = {}
   for _, rule in ipairs(M.COMPANIONS) do
     if names[rule.module] and not names[rule.needs] then
       out[#out + 1] = rule.needs .. " (needed by " .. rule.module .. ")"
+    end
+  end
+  for _, route in ipairs(routes or {}) do
+    for _, rule in ipairs(M.ROUTE_MODULES) do
+      if route:sub(1, #rule.route) == rule.route and not names[rule.needs] then
+        out[#out + 1] = rule.needs .. " (the probe of --api=" .. route .. " did not load it)"
+      end
     end
   end
   return out

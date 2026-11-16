@@ -12,7 +12,7 @@ local function read(rel)
 end
 
 return function(H)
-  local ok = H.ok
+  local ok, eq = H.ok, H.eq
   local rules = dofile(vim.fn.getcwd() .. "/scripts/manifest_rules.lua")
 
   ok(
@@ -32,7 +32,30 @@ return function(H)
     "a bundle without the rules engine needs neither"
   )
 
+  -- A route probe that ends before its module (shape/<sha> against a map that is not committed)
+  -- must stop the build instead of shipping a binary without docmap.core.diff.
+  local shape_missing = rules.missing({}, { "shape/abc1234" })
+  eq(#shape_missing, 1, "a shape probe without docmap.core.diff is reported")
+  ok(shape_missing[1]:find("docmap.core.diff", 1, true), "the report names docmap.core.diff")
+  ok(shape_missing[1]:find("shape/abc1234", 1, true), "and the route whose probe missed it")
+  eq(#rules.missing({ ["docmap.core.diff"] = true, ["docmap.core.history"] = true }, {
+    "commit/abc1234",
+    "shape/abc1234",
+  }), 0, "with both route modules nothing is missing")
+  ok(
+    rules.missing({}, { "commit/abc1234" })[1]:find("docmap.core.history", 1, true),
+    "commit needs history"
+  )
+
   local script = read("scripts/bundle_manifest.lua")
+  ok(
+    script:find("manifest_rules.missing(staged, probed_routes)", 1, true),
+    "the build asks for its route probes"
+  )
+  ok(
+    not script:find('"--api=shape/" .. head_sha, "--out-dir=', 1, true),
+    "the shape probe reads the committed map, not the throwaway out-dir"
+  )
   ok(script:find('\n%s+require%("rules%.env"%)'), "the build measures rules.env explicitly")
   ok(script:find("manifest_rules.missing", 1, true), "the build asks the rule")
   ok(

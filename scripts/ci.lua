@@ -435,6 +435,33 @@ function GATES.standalone()
   vim.fn.delete(links_dir, "rf")
 
   -- ------------------------------------------------------------------
+  -- The history routes, on the git runner this build ships.
+  --
+  -- `commits` asks git for a `%`-format, which cmd.exe used to refuse on Windows (`standalone/git_run.lua`);
+  -- `shape/<sha>` compares the committed map with the one on disk and is the one route that needs
+  -- `core/diff`, which the release once shipped without. Both must answer with data, not a reason.
+  local head = vim.trim(
+    vim.system({ "git", "-C", root, "rev-parse", "HEAD" }, { text = true }):wait().stdout or ""
+  )
+  for _, route in ipairs({ "commits", "shape/" .. head }) do
+    local proc = vim
+      .system({ lua, "standalone/docmap.lua", root, "--api=" .. route }, { cwd = root, text = true })
+      :wait()
+    local decoded_ok, answer = pcall(vim.json.decode, proc.stdout or "")
+    if proc.code ~= 0 or not decoded_ok or type(answer) ~= "table" or answer.available ~= true then
+      fail(
+        ("--api=%s did not answer with data (exit %d):\n    %s"):format(
+          route,
+          proc.code,
+          vim.trim((proc.stdout or "") .. (proc.stderr or ""))
+        )
+      )
+      return
+    end
+  end
+  say("  ok: --api=commits and --api=shape/<HEAD> answer with data")
+
+  -- ------------------------------------------------------------------
   -- The behavioural differential, replayed on the other interpreter.
   --
   -- `TESTS/shim_behavior_spec.lua` already compared most of this corpus

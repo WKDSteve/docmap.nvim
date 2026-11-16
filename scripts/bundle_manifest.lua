@@ -288,11 +288,20 @@ local head_sha = head_pipe and head_pipe:read("*l")
 if head_pipe then
   head_pipe:close()
 end
+-- The routes probed here, for `manifest_rules.missing` below: each must have loaded its module.
+local probed_routes = {}
 if head_sha and head_sha:match("^%x%x%x%x%x%x%x+$") then
   probe(root, { "--api=commit/" .. head_sha, "--out-dir=.deps/bundle-manifest-probe" })
+  probed_routes[#probed_routes + 1] = "commit/" .. head_sha
   -- `shape/<sha>` compares the map of that commit with the one on disk and reaches `core/diff`, which no other
   -- route does. Same reasoning as the commit probe: a route that ships has to be measured.
-  probe(root, { "--api=shape/" .. head_sha, "--out-dir=.deps/bundle-manifest-probe" })
+  --
+  -- **Without `--out-dir`.** The route reads the map at `<sha>:<out_dir>/module_map.json`, and only the
+  -- repository's own map directory is committed. With the throwaway out-dir of the other probes it found no map,
+  -- answered `available = false` before requiring `core/diff`, and the released binary died with "module
+  -- 'docmap.core.diff' not found" on every real comparison. `--api=` routes write nothing, so the default is safe.
+  probe(root, { "--api=shape/" .. head_sha })
+  probed_routes[#probed_routes + 1] = "shape/" .. head_sha
 else
   io.stderr:write(
     "bundle_manifest: could not resolve HEAD in "
@@ -458,7 +467,7 @@ for _, entries in pairs(groups) do
     staged[entry.name] = true
   end
 end
-local lacking = manifest_rules.missing(staged)
+local lacking = manifest_rules.missing(staged, probed_routes)
 if #lacking > 0 then
   io.stderr:write("bundle_manifest: the manifest lacks " .. table.concat(lacking, ", ") .. "\n")
   os.exit(1)
