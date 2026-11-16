@@ -907,6 +907,18 @@ M.WRITE_FLAGS = {
   reason = "rules_reason",
   expires = "rules_expires",
   paths = "rules_paths",
+  input = "rules_input_file",
+}
+
+---The keys of an input file (`--input=<file>`), by name, and the option each one fills: the texts of the two writing
+---routes as UTF-8 JSON, for a host whose command line cannot carry them (on Windows the arguments of the standalone
+---engine pass through the ANSI code page, which turns a letter outside it into `?` or a control character).
+M.INPUT_KEYS = {
+  by = "rules_by",
+  note = "rules_note",
+  reason = "rules_reason",
+  expires = "rules_expires",
+  paths = "rules_paths",
 }
 
 ---The option one argument fills, when it is a flag of `M.WRITE_FLAGS` (`--by=Stefan` -> `"rules_by", "Stefan"`).
@@ -1025,6 +1037,61 @@ local function given_text(value, what, required)
   return value, nil
 end
 
+---The options with the texts of an input file (`opts.rules_input_file`, `--input=<file>`) filled in: a JSON object
+---whose keys are those of `M.INPUT_KEYS`, each a text (`paths` a list of texts, or one comma-separated text). A key
+---the file and a flag both give is refused rather than one silently winning; so is a key it does not know.
+---@param opts table
+---@return table|nil opts A copy when there is a file, else `opts` itself.
+---@return string|nil reason
+local function with_input(opts)
+  local path = opts.rules_input_file
+  if path == nil or path == "" then
+    return opts, nil
+  end
+  local fh = io.open(tostring(path), "rb")
+  if not fh then
+    return nil, "the input file cannot be read: " .. tostring(path)
+  end
+  local text = fh:read(M.MAX_ANSWER_BYTES + 1) or ""
+  fh:close()
+  if #text > M.MAX_ANSWER_BYTES then
+    return nil, ("the input file is too large (more than %d bytes)"):format(M.MAX_ANSWER_BYTES)
+  end
+  -- a byte order mark is how some editors start a UTF-8 file; it is no part of the JSON
+  text = text:gsub("^\239\187\191", "")
+  local ok, decoded = pcall(vim.json.decode, text, { luanil = { object = true, array = true } })
+  if not ok or type(decoded) ~= "table" or (next(decoded) ~= nil and vim.islist(decoded)) then
+    return nil, "the input file is not a JSON object (by, note, reason, expires, paths)"
+  end
+  local out = vim.deepcopy(opts)
+  for key, value in pairs(decoded) do
+    local field = M.INPUT_KEYS[key]
+    if not field then
+      return nil,
+        ("unknown key %q in the input file (keys: by, expires, note, paths, reason)"):format(
+          tostring(key)
+        )
+    end
+    if opts[field] ~= nil and opts[field] ~= "" then
+      return nil, ("%s is given twice, by --%s= and by the input file"):format(key, key)
+    end
+    if key == "paths" and type(value) == "table" then
+      if not vim.islist(value) then
+        return nil, "paths in the input file must be a list of texts"
+      end
+      for _, item in ipairs(value) do
+        if type(item) ~= "string" then
+          return nil, "paths in the input file must be texts"
+        end
+      end
+    elseif type(value) ~= "string" then
+      return nil, ("%s in the input file must be a text"):format(key)
+    end
+    out[field] = value
+  end
+  return out, nil
+end
+
 ---`rules/accept`, `param` one rule id -- accept the agent's proposal about that rule as a verdict: written to the
 ---project's `.rules-verdicts.json` by `rules.engine.verdicts.accept`, the only function that writes that file.
 ---
@@ -1034,10 +1101,15 @@ end
 ---host must not decide: the files the request carried (`sent`) are planned again here and replace whatever the
 ---proposal says, the rule must be the one named and one an agent answers (no check), and the person (`by`) comes from
 ---the host, never from the proposal. The date is today's: a host does not date a verdict.
----@param opts table A resolved `Docmap.Opts`; `rules_proposal[_file]`, `rules_by`, `rules_note`.
+---@param opts table A resolved `Docmap.Opts`; `rules_proposal[_file]`, `rules_by`, `rules_note`, `rules_input_file`.
 ---@param param string|nil
 ---@return table
 local function accept(opts, param)
+  local given, bad_input = with_input(opts)
+  if not given then
+    return { available = false, reason = bad_input }
+  end
+  opts = given
   local engine = M.engine()
   if not engine then
     return { available = false, reason = M.NO_ENGINE }
@@ -1157,10 +1229,15 @@ end
 ---the reason one line that says something, the expiry a date, the paths relative globs; a waiver that is there
 ---already is refused (renew or remove it in the editor), the same one again is `unchanged`; the file is written under
 ---its lock, canonically, and never through a link. Nothing here re-decides any of that.
----@param opts table A resolved `Docmap.Opts`; `rules_reason`, `rules_expires`, `rules_paths`.
+---@param opts table A resolved `Docmap.Opts`; `rules_reason`, `rules_expires`, `rules_paths`, `rules_input_file`.
 ---@param param string|nil
 ---@return table
 local function waive(opts, param)
+  local given, bad_input = with_input(opts)
+  if not given then
+    return { available = false, reason = bad_input }
+  end
+  opts = given
   local engine = M.engine()
   if not engine then
     return { available = false, reason = M.NO_ENGINE }
@@ -1223,6 +1300,135 @@ local function waive(opts, param)
   return out
 end
 
+-- ── what a person decided ─────────────────────────────────────────────────────────
+
+---The day each file of the project last changed in a commit after `since` (`YYYY-MM-DD`), from one `git log` through
+---the host's `git` (`opts.git`), paths relative to the project (`--relative`). Nil when there is no git or it fails.
+---@param opts table
+---@param since string
+---@return table<string, string>|nil days
+local function changed_days(opts, since)
+  if type(opts.git) ~= "function" then
+    return nil
+  end
+  local out =
+    opts.git(opts, { "log", "--relative", "--since=" .. since, "--format=>%cs", "--name-only" })
+  if type(out) ~= "string" then
+    return nil
+  end
+  local days, day = {}, nil
+  for line in out:gmatch("[^\r\n]+") do
+    local d = line:match("^>(%d%d%d%d%-%d%d%-%d%d)$")
+    if d then
+      day = d
+    elseif day and days[line] == nil then
+      -- newest first: the first day a file is named on is the last day it changed
+      days[line] = day
+    end
+  end
+  return days
+end
+
+---`rules/judged` -- what a person decided about the rules of the project: the verdicts in `.rules-verdicts.json`
+---and the waivers in `.rules-waivers.json`, read by `rules.nvim`'s own readers (`rules.engine.verdicts.load`,
+---`rules.engine.waivers.load_entries`), so a host shows them without a second reader of either file.
+---
+---Lists sorted by id, never maps (an empty map would encode as `[]`). A waiver is `expired` after its last day,
+---counted in the engine's local day (`rules.engine.waivers.today`), the day `rules/run` waives by. A verdict is
+---`stale` when a file of its evidence changed in a commit after the day it was accepted (`rules.engine.verdicts.stale`
+---with the days of `git log`); without git, or with a `rules.nvim` that has no verdicts reader, `stale` is left out
+---(`stale_checked` false). A file that is there and cannot be used is in `unreadable` with the reason, never taken for
+---"no decisions".
+---@param opts table A resolved `Docmap.Opts`; `git` and `rules_today` (both optional).
+---@return table
+local function judged(opts)
+  local engine = M.engine()
+  if not engine then
+    return { available = false, reason = M.NO_ENGINE }
+  end
+  local root = slashed(vim.fn.fnamemodify(opts.root or ".", ":p"))
+  -- a folder that is not there has decided nothing; saying "no decisions" would hide a wrong path
+  if vim.fn.isdirectory(root) == 0 then
+    return { available = false, reason = "the project folder does not exist: " .. root }
+  end
+  -- `opts.rules_today` as for `rules/run` (a fixed date for tests), else the engine's clock
+  local today = opts.rules_today
+  if today == nil and type(engine.waivers.today) == "function" then
+    today = engine.waivers.today()
+  end
+  today = today or os.date("%Y-%m-%d")
+  local out = {
+    available = true,
+    today = today,
+    verdicts = {},
+    waivers = {},
+    unreadable = {},
+    stale_checked = false,
+  }
+
+  local wentries, werr = engine.waivers.load_entries(root)
+  if werr then
+    out.unreadable[#out.unreadable + 1] = { file = engine.waivers.FILE, reason = werr }
+  end
+  for id, e in pairs(wentries or {}) do
+    out.waivers[#out.waivers + 1] = {
+      id = id,
+      reason = e.reason,
+      expires = e.expires,
+      paths = e.paths,
+      expired = engine.waivers.is_expired(e, today),
+      partial = type(e.paths) == "table" and #e.paths > 0,
+    }
+  end
+
+  local verdicts = require("docmap.core.soft_require").probe("rules.engine.verdicts")
+  if verdicts and type(verdicts.load) == "function" then
+    local ventries, verr = verdicts.load(root)
+    if verr then
+      out.unreadable[#out.unreadable + 1] = { file = verdicts.FILE, reason = verr }
+    end
+    local stale_by
+    if next(ventries or {}) ~= nil and type(verdicts.stale) == "function" then
+      local since
+      for _, e in pairs(ventries) do
+        since = (since == nil or e.date < since) and e.date or since
+      end
+      local days = changed_days(opts, since)
+      if days then
+        stale_by = {}
+        for _, s in ipairs(verdicts.stale(ventries, { files = days })) do
+          stale_by[s.id] = s.reasons
+        end
+        out.stale_checked = true
+      end
+    end
+    for id, e in pairs(ventries or {}) do
+      local reasons, stale = nil, nil
+      if stale_by then
+        reasons = stale_by[id]
+        stale = reasons ~= nil
+      end
+      out.verdicts[#out.verdicts + 1] = {
+        id = id,
+        verdict = e.verdict,
+        date = e.date,
+        by = e.by,
+        note = e.note,
+        commit = e.commit,
+        evidence = #(e.evidence or {}),
+        stale = stale,
+        stale_reasons = reasons,
+      }
+    end
+  end
+  local function by_id(a, b)
+    return a.id < b.id
+  end
+  table.sort(out.verdicts, by_id)
+  table.sort(out.waivers, by_id)
+  return out
+end
+
 -- Exported guarded: whatever `rules.nvim` raises comes back as `{ available = false, reason }`.
 
 ---`/api/rules/catalog` (see `catalog` above).
@@ -1252,5 +1458,9 @@ M.accept = guarded(accept)
 ---`rules/waive` (see `waive` above).
 ---@type fun(opts: table, param: string|nil): table
 M.waive = guarded(waive)
+
+---`rules/judged` (see `judged` above).
+---@type fun(opts: table): table
+M.judged = guarded(judged)
 
 return M

@@ -5,7 +5,7 @@
 ---   lua standalone/rules_api.lua <project> <route> [--select=...] [--trust=<folder>]... [--answer=<file>]
 ---
 --- and, for `rules/accept` and `rules/waive`, their flags (`rules_api.WRITE_FLAGS`): `--proposal=<file>`, `--by=`,
---- `--note=`, `--reason=`, `--expires=`, `--paths=`.
+--- `--note=`, `--reason=`, `--expires=`, `--paths=`, `--input=<file>` (the texts as UTF-8 JSON).
 ---
 --- Under Neovim it uses the real `vim.*`; under plain Lua it installs `standalone.vim_shim` first. The JSON is
 --- encoded by `docmap.core.json` (sorted keys), so the same input prints the same bytes on both hosts: that is what

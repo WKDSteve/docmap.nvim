@@ -932,6 +932,15 @@ function GATES.standalone()
   for name, proposal in pairs(proposals) do
     vim.fn.writefile({ vim.json.encode(proposal) }, write_root .. "/" .. name .. ".json")
   end
+  -- texts outside any ANSI code page, as UTF-8 JSON in a file (`--input=`): what a command line on Windows cannot carry
+  vim.fn.writefile(
+    { vim.json.encode({ by = "J\195\188rgen \230\181\139" }) },
+    write_root .. "/input_accept.json"
+  )
+  vim.fn.writefile(
+    { vim.json.encode({ reason = "f\195\188r \230\181\139", paths = { "lua/a.lua" } }) },
+    write_root .. "/input_waive.json"
+  )
   local function bytes(file_path)
     local fh = io.open(file_path, "rb")
     if not fh then
@@ -1015,6 +1024,46 @@ function GATES.standalone()
         return r.available == false and tostring(r.reason):find("waived already", 1, true) ~= nil
       end,
     },
+    {
+      label = "accept with the person from an input file",
+      args = { "rules/accept", "--select=AGT-01", "--proposal=violation", "--input=input_accept" },
+      check = function(r)
+        return r.written == true and r.verdict.by == "J\195\188rgen \230\181\139"
+      end,
+    },
+    {
+      label = "waive with the reason from an input file",
+      args = { "rules/waive", "--select=AGT-03", "--input=input_waive" },
+      check = function(r)
+        return r.written == true
+          and r.waiver.reason == "f\195\188r \230\181\139"
+          and vim.deep_equal(r.waiver.paths, { "lua/a.lua" })
+      end,
+    },
+    {
+      label = "what was decided",
+      args = { "rules/judged" },
+      -- the day and the git history are the host's: the date the two count by differs, and only the binary has git
+      normalize = function(r)
+        r.today, r.stale_checked = nil, nil
+        for _, v in ipairs(r.verdicts or {}) do
+          v.stale, v.stale_reasons = nil, nil
+        end
+        return r
+      end,
+      check = function(r)
+        local w = r.waivers or {}
+        return r.available == true
+          and #r.verdicts == 1
+          and r.verdicts[1].id == "AGT-01"
+          and r.verdicts[1].by == "J\195\188rgen \230\181\139"
+          and #w == 2
+          and w[1].id == "AGT-02"
+          and w[1].partial == true
+          and w[2].reason == "f\195\188r \230\181\139"
+          and #r.unreadable == 0
+      end,
+    },
   }
   for _, case in ipairs(write_steps) do
     local route, extra = case.args[1], vim.list_slice(case.args, 2)
@@ -1022,8 +1071,12 @@ function GATES.standalone()
     local function host_args()
       local out = {}
       for _, a in ipairs(extra) do
-        local name = a:match("^%-%-proposal=(.+)$")
-        out[#out + 1] = name and ("--proposal=" .. write_root .. "/" .. name .. ".json") or a
+        local flag, name = a:match("^%-%-(%a+)=(.+)$")
+        if flag == "proposal" or flag == "input" then
+          out[#out + 1] = ("--%s=%s/%s.json"):format(flag, write_root, name)
+        else
+          out[#out + 1] = a
+        end
       end
       return out
     end
@@ -1046,6 +1099,9 @@ function GATES.standalone()
     )
     if not in_nvim or not in_binary then
       return
+    end
+    if case.normalize then
+      in_nvim, in_binary = case.normalize(in_nvim), case.normalize(in_binary)
     end
     if not vim.deep_equal(in_nvim, in_binary) then
       fail(

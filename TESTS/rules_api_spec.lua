@@ -613,6 +613,65 @@ return function(H)
       "accept: a later acceptance of the same rule replaces the verdict"
     )
 
+    -- the texts as UTF-8 JSON in a file (`--input=`): a name and a note outside any ANSI code page, a byte order mark
+    local input_file = scratch .. "/input.json"
+    local function input(doc)
+      local fh = assert(io.open(input_file, "wb"))
+      fh:write("\239\187\191" .. vim.json.encode(doc))
+      fh:close()
+    end
+    input({ by = "Jürgen 测试", note = "geprüft: a.lua" })
+    local from_file = api.answer(
+      "rules/accept",
+      { root = wproject, rules_proposal_file = proposal_file, rules_input_file = input_file },
+      "AGT-01"
+    )
+    eq(from_file.available, true, "accept --input: written")
+    eq(from_file.verdict.by, "Jürgen 测试", "accept --input: by, byte for byte")
+    eq(from_file.verdict.note, "geprüft: a.lua", "accept --input: the note, byte for byte")
+    eq(
+      vim.json.decode(bytes(verdicts_file))["AGT-01"].by,
+      "Jürgen 测试",
+      "accept --input: the file holds it unchanged"
+    )
+
+    -- what a person decided, read back by the route that only reads
+    local j = api.answer("rules/judged", { root = wproject })
+    eq(j.available, true, "judged: answers")
+    eq(#j.verdicts, 1, "judged: the one verdict")
+    eq(
+      { j.verdicts[1].id, j.verdicts[1].verdict, j.verdicts[1].by, j.verdicts[1].evidence },
+      { "AGT-01", "violation", "Jürgen 测试", 1 },
+      "judged: the verdict as the file holds it"
+    )
+    eq(j.stale_checked, false, "judged: without git nothing is said about staleness")
+    eq(j.verdicts[1].stale, nil, "judged: ...and stale is left out")
+    eq(j.waivers, {}, "judged: no waivers file is no waivers")
+    eq(j.unreadable, {}, "judged: nothing unreadable")
+    eq(j.today, os.date("%Y-%m-%d"), "judged: today is the engine's local day")
+    local function git_says(text)
+      return function(_, args)
+        eq(args[1], "log", "judged: asks git log")
+        return text
+      end
+    end
+    local later = api.answer("rules/judged", {
+      root = wproject,
+      git = git_says(">2999-01-02\nlua/a.lua\nlua/b.lua\n>2999-01-01\nlua/a.lua\n"),
+    })
+    eq(later.stale_checked, true, "judged: with git it is checked")
+    eq(later.verdicts[1].stale, true, "judged: evidence changed after the verdict")
+    eq(
+      later.verdicts[1].stale_reasons,
+      { "file lua/a.lua changed 2999-01-02" },
+      "judged: the last day the evidence changed, from the newest commit"
+    )
+    local earlier = api.answer("rules/judged", {
+      root = wproject,
+      git = git_says(">2000-01-01\nlua/a.lua\n"),
+    })
+    eq(earlier.verdicts[1].stale, false, "judged: a change before the verdict leaves it current")
+
     -- refusals: the file stays as it is
     local before = bytes(verdicts_file)
     local function refused(answer, pattern, msg)
@@ -767,7 +826,77 @@ return function(H)
       "",
       "waive: a path that leaves the project"
     )
+
+    -- the texts of a waiver as UTF-8 JSON in a file
+    input({ reason = "nur für 测试", paths = { "lua/a.lua" }, expires = "2099-02-01" })
+    local wfile = waive("AGT-03", { rules_input_file = input_file })
+    eq(wfile.available, true, "waive --input: written")
+    eq(wfile.waiver, {
+      reason = "nur für 测试",
+      expires = "2099-02-01",
+      paths = { "lua/a.lua" },
+    }, "waive --input: the waiver, byte for byte")
+    wbefore = bytes(waivers_file)
+    input({ reason = "again" })
+    wrefused(
+      waive("AGT-04", { rules_input_file = input_file, rules_reason = "flag" }),
+      "given twice",
+      "waive --input: a text from the file and a flag"
+    )
+    input({ reason = "x", who = "y" })
+    wrefused(
+      waive("AGT-04", { rules_input_file = input_file }),
+      'unknown key "who"',
+      "waive --input: a key it does not know"
+    )
+    input({ "a list" })
+    wrefused(
+      waive("AGT-04", { rules_input_file = input_file }),
+      "not a JSON object",
+      "waive --input: not an object"
+    )
+    input({ reason = 5 })
+    wrefused(
+      waive("AGT-04", { rules_input_file = input_file }),
+      "must be a text",
+      "waive --input: a number for a text"
+    )
+    wrefused(
+      waive("AGT-04", { rules_input_file = scratch .. "/missing.json" }),
+      "cannot be read",
+      "waive --input: a file that is not there"
+    )
+
+    -- judged: the waivers, one past its last day, and a file that cannot be used
+    local jw = api.answer("rules/judged", { root = wproject })
+    local ids = vim.tbl_map(function(x)
+      return x.id
+    end, jw.waivers)
+    eq(ids, { "AGT-02", "AGT-03" }, "judged: the waivers, sorted by id")
+    eq(
+      { jw.waivers[1].expired, jw.waivers[1].partial, jw.waivers[1].expires },
+      { false, true, "2099-01-31" },
+      "judged: a waiver for some paths, not expired"
+    )
+    local wdoc = vim.json.decode(bytes(waivers_file))
+    wdoc["OLD-01"] = { reason = "until then", expires = "2000-01-01" }
+    wdoc["ALL-01"] = "everywhere"
+    vim.fn.writefile({ vim.json.encode(wdoc) }, waivers_file)
+    jw = api.answer("rules/judged", { root = wproject })
+    local by = {}
+    for _, entry in ipairs(jw.waivers) do
+      by[entry.id] = entry
+    end
+    eq(by["OLD-01"].expired, true, "judged: past its last day")
+    eq(
+      { by["ALL-01"].reason, by["ALL-01"].partial },
+      { "everywhere", false },
+      "judged: the short form"
+    )
     vim.fn.writefile({ "[1" }, waivers_file)
+    jw = api.answer("rules/judged", { root = wproject })
+    eq(jw.waivers, {}, "judged: a broken waivers file has no waivers to list")
+    eq(jw.unreadable[1].file, ".rules-waivers.json", "judged: ...and says it cannot be used")
     wbefore = bytes(waivers_file)
     wrefused(
       waive("AGT-03", { rules_reason = "x" }),
@@ -779,6 +908,11 @@ return function(H)
     eq({ rules_api.write_flag("--by=Stefan") }, { "rules_by", "Stefan" }, "write_flag: --by")
     eq({ rules_api.write_flag("--note=") }, { "rules_note", "" }, "write_flag: an empty value")
     eq({ rules_api.write_flag("--paths=a,b") }, { "rules_paths", "a,b" }, "write_flag: --paths")
+    eq(
+      { rules_api.write_flag("--input=C:/t/in.json") },
+      { "rules_input_file", "C:/t/in.json" },
+      "write_flag: --input"
+    )
     eq({ rules_api.write_flag("--select=X") }, { nil, nil }, "write_flag: not one of its flags")
     eq(
       api.WRITES,

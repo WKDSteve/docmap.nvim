@@ -116,6 +116,7 @@ instead of generating anything. Today's routes:
 | `shape/<sha>`, `shape/<older>/<newer>` | The shape change between the map committed at a revision and the one on disk, or between two committed maps: nodes added and removed, requires gained and lost, and the same change as text. For the Hierarchy tab's comparison. Not in `routes`, for the same reason. |
 | `rules/catalog` | Every rule of the project's rulesets (`.rules.json`, else the vault): id, severity, family, title, section, text, source file and line, the check type if any, the agent hint. See below. |
 | `rules/run` | The mechanical run of a selection: one result per rule, `pass`, `fail`, `error`, `manual` or `waived`, with findings. See below. |
+| `rules/judged` | What a person decided: the verdicts of `.rules-verdicts.json` and the waivers of `.rules-waivers.json`, read by `rules.nvim`'s own readers, with expired waivers and stale verdicts marked. Reads only. See below. |
 | `rules/plan` | What an agent run over a selection would send: the requests (`system`, `prompt`, files, rules), what is not sent and why, sizes and a token estimate. Sends nothing. See below. |
 | `rules/validate` | One model answer about one rule, checked against the tree: a proposal with the findings whose quotes hold up. See below. |
 | `rules/attach` | One file of the project as a request would carry it, or why the deny list, the size limit or the tree keeps it out. For a host's conversation about a rule. Sends nothing; not offered by `:DocMap serve`. See below. |
@@ -220,11 +221,32 @@ the reading of the file (binary, too large, unreadable) are exactly those of `ru
   carry, not only the files a rule's scope names, and a page that can reach loopback must not be able to ask for
   that. `--capabilities` lists `rules-attach` when the agent functions are part of the build.
 
-### `rules/accept` and `rules/waive`
+### `rules/judged`
+
+```bash
+docmap /path/to/project --api=rules/judged
+```
+
+What a person decided about the rules of the project, so a host can show it next to `rules/run` without reading
+either file itself: `rules/run` reports a waived manual rule as `manual`, and the verdicts are no result of a run.
+
+- The answer is `{ "available": true, "today", "verdicts", "waivers", "unreadable", "stale_checked" }`, every list
+  sorted by `id`. A verdict is `{ "id", "verdict", "date", "by", "note"?, "commit"?, "evidence", "stale"?,
+  "stale_reasons"? }` (`evidence` the number of findings it holds); a waiver is `{ "id", "reason", "expires"?,
+  "paths"?, "expired", "partial" }` (`partial`: limited to some paths).
+- Both files are read by `rules.nvim` (`rules.engine.verdicts.load`, `rules.engine.waivers.load_entries`). A file that
+  is there and cannot be used is `{ "file", "reason" }` in `unreadable`, never an empty list.
+- `expired` counts by the engine's local day (`today`), the day `rules/run` waives by, not UTC.
+- `stale`: a file of the verdict's evidence changed in a commit after the day it was accepted
+  (`rules.engine.verdicts.stale` over one `git log` of the project). Without git `stale_checked` is false and `stale`
+  is left out. A change that is not committed yet is not seen.
+- `:DocMap serve` offers it; it writes nothing.
+
 
 ```bash
 docmap /path/to/project --api=rules/accept --select=DEP-07 --proposal=/tmp/proposal.json --by="A. Person" [--note=...]
 docmap /path/to/project --api=rules/waive --select=DEP-07 --reason="..." [--expires=2027-01-31] [--paths=lua/a.lua,lua/b/*]
+docmap /path/to/project --api=rules/waive --select=DEP-07 --input=/tmp/waive.json
 ```
 
 **Decided 2026-11-15: the engine writes these two files, and only through `rules.nvim`'s own writers.** Every other
@@ -247,6 +269,11 @@ rebuild what `rules.nvim` guarantees, and would drift from it. So:
 - `--proposal=<file>` is the `proposal` object of a `rules/validate` answer, as it came back (at most 1 MiB, a file
   and not stdin, as `--answer=`). `--by=` is required and is the person at the host, never anything from the
   proposal. `--paths=` is comma-separated.
+- `--input=<file>` gives the texts instead as a UTF-8 JSON object `{ "by", "note", "reason", "expires", "paths" }`
+  (each optional, `paths` a list or one comma-separated text, a byte order mark is allowed). On Windows the arguments
+  of the standalone engine pass through the ANSI code page: a letter outside it arrives as `?` or as a control
+  character, so a host passes any text a person typed this way (the file's own path should stay ASCII). A key given
+  both by the file and by its flag is refused, as is a key the file does not know.
 - The answer: `{ "available": true, "written": true, "file", "id", "verdict" }` (the entry as the file now holds it)
   for `rules/accept`; `{ "available": true, "written", "outcome", "file", "id", "waiver" }` for `rules/waive`
   (`outcome` is `waived` or `unchanged`). A refusal is `{ "available": false, "reason" }`, for `rules/waive` with the

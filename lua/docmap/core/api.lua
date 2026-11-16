@@ -530,6 +530,10 @@ M.routes = {
   ["rules/run"] = function(opts, param)
     return require("docmap.core.rules_api").run(opts, param)
   end,
+  -- what a person decided: the verdicts and waivers of the project, read by `rules.nvim`'s readers (no writing)
+  ["rules/judged"] = function(opts)
+    return require("docmap.core.rules_api").judged(opts)
+  end,
   -- the agent half (`rules.engine.agent.*`): what a run would send (`param` the selection), and the check of one
   -- model answer about one rule (`param` the rule id, the answer in `opts.rules_answer[_file]`). Neither sends.
   ["rules/plan"] = function(opts, param)
