@@ -42,7 +42,8 @@ return function(H)
       -- Real runtime-analysis.nvim on the rtp (RUNTIME_ANALYSIS_DIR).
       local telemetry = require("runtime-analysis.telemetry")
       local store = require("runtime-analysis.telemetry.store")
-      local cache_dir = vim.fn.stdpath("cache") .. "/runtime-analysis.nvim/cache"
+      -- The store's own default dir (stdpath("state")), the one `setup` flushes to.
+      local cache_dir = require("runtime-analysis.telemetry.paths").DIR
 
       -- The namespace is docmap's own, whatever tree is mapped: `title` is the
       -- mapped root's basename ("repos" for a setup rooted at E:/repos) and

@@ -230,15 +230,17 @@ return function(H)
       -- No `dir` override on the instances below: `telemetry_join.load` (like
       -- the real `:DocMap check`/`:DocBrowse telemetry` it backs) always reads
       -- `telemetry.load(namespace)` with no live instance and no dir override,
-      -- so this has to flush to the same real default cache dir to be found
+      -- so this has to flush to the same real default store dir to be found
       -- at all. `store.clear` itself does *not* default to that dir the way
       -- `telemetry.new`/`telemetry.load` do — it is a thin forward straight to
       -- `lib.nvim.cache.disk`, whose own default differs — so the dir has to
       -- be named explicitly here or `clear` silently touches a different file
       -- than `flush` just wrote, leaving stale counts to inflate every
-      -- subsequent run (merge-on-write). Cleared both before (self-healing
-      -- after an earlier failed run) and after this block.
-      local cache_dir = vim.fn.stdpath("cache") .. "/runtime-analysis.nvim/cache"
+      -- subsequent run (merge-on-write). Taken from `paths.DIR` (the store
+      -- moved from stdpath("cache") to stdpath("state")), never rebuilt here.
+      -- Cleared both before (self-healing after an earlier failed run) and
+      -- after this block.
+      local cache_dir = require("runtime-analysis.telemetry.paths").DIR
       store.clear(namespace, { dir = cache_dir })
       store.clear(namespace .. "-alive", { dir = cache_dir })
 
