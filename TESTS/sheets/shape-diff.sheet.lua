@@ -1,14 +1,15 @@
 -- TESTS/sheets/shape-diff.sheet.lua -- two maps compared on the Hierarchy tab, in a real window against a real
 -- host.
--- A browser sheet. TESTS/sheets_spec.lua starts `:DocMap serve` on port 38417 over the maps-page artifacts while
--- this sheet runs; only git is stood in for, with two commits:
+-- A browser sheet. Its app `shape-host` (.testing.lua, TESTS/shape_host.lua) runs `:DocMap serve` on a free port
+-- over the maps-page artifacts while this sheet runs; only git is stood in for, with two commits:
 --   aaaaaaa (older): no app.util.orphan yet; an app.core.cache that app.core.store required; app.util.text
 --                    required app.core.store; app.ui.window did not require app.core.store yet.
 --   bbbbbbb (newer): this map without app.util.orphan.
 -- So against the older commit this map has one node more and one less, one require gained and two lost.
 -- The first steps open the same page as a file, where there is no host to ask.
 -- Nodes on the Modules view, two commits and the way out are TESTS/sheets/shape-diff-nodes.sheet.lua.
-local HOST = "http://127.0.0.1:38417/"
+-- the URL of the host this sheet's app (`shape-host`, .testing.lua) started; it ends in "/"
+local HOST = "${host}"
 local BAR = "document.getElementById('hshape')"
 local OLDER = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 local STORE = "lua/app/core/store.lua"
@@ -43,6 +44,7 @@ return {
   title = "Shape diff: two maps compared on the Hierarchy tab",
   task = "docmap.nvim/page-compare-two-artifacts",
   engine = "browser",
+  app = "shape-host",
   steps = {
     -- A page that cannot fetch says so in place.
     { open = "TESTS/sheets/out/maps-page.html" },

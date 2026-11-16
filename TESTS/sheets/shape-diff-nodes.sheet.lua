@@ -1,9 +1,10 @@
 -- TESTS/sheets/shape-diff-nodes.sheet.lua -- the shape diff on the Modules view: nodes added and removed, two
 -- commits against each other, the way out and back, and a commit without a map.
--- The second half of TESTS/sheets/shape-diff.sheet.lua, against the same host (TESTS/shape_host.lua, started by
--- TESTS/sheets_spec.lua on port 38417; see that file for the two commits). It starts from a link that carries
+-- The second half of TESTS/sheets/shape-diff.sheet.lua, against the same host (TESTS/shape_host.lua, the app
+-- `shape-host` of .testing.lua on a free port; see that file for the two commits). It starts from a link that carries
 -- the comparison, the way a shared one arrives.
-local HOST = "http://127.0.0.1:38417/"
+-- the URL of the host this sheet's app (`shape-host`, .testing.lua) started; it ends in "/"
+local HOST = "${host}"
 local BAR = "document.getElementById('hshape')"
 local OLDER = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 local NEWER = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -24,6 +25,7 @@ return {
   title = "Shape diff: nodes on the Modules view, two commits, and the way out",
   task = "docmap.nvim/page-compare-two-artifacts",
   engine = "browser",
+  app = "shape-host",
   steps = {
     { open = HOST .. "#tab=hierarchy&view=modules&cmp=" .. OLDER },
     {

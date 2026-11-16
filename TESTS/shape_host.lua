@@ -1,6 +1,12 @@
 -- TESTS/shape_host.lua — the host behind TESTS/sheets/shape-diff*.sheet.lua, as a process of its own.
 --
---   nvim --headless -u NONE -l TESTS/shape_host.lua <repo root> <runtimepath> <port>
+--   nvim --headless -u NONE -l TESTS/shape_host.lua <host dir> <port>
+--
+-- Run from the repo root. Started as the app `shape-host` of `.testing.lua` (`sheets.apps`): each sheet that names
+-- it gets a host of its own on a free port (`0`), and its first stdout line, the URL, fills in `${host}` of the
+-- sheet. So two runs on one machine (two worktrees, a runner and a hand run) never share a port. The runtimepath of
+-- the editor that runs the sheets comes in through `$DOCMAP_SHAPE_HOST_RTP` (TESTS/sheets_spec.lua sets it); without
+-- it the dependencies are looked up like testing.nvim does: `$<NAME>_DIR`, then `../<name>`.
 --
 -- A file page cannot compare maps: it has nobody to ask for the commits or for the comparison. The sheets
 -- therefore need a host, and they get the real one: `:DocMap serve` (`editor/serve.lua`, `core/api.lua`,
@@ -13,12 +19,28 @@
 --   NEWER (bbbbbbb…): this map without `app.util.orphan`.
 --
 -- A process of its own, because a server in the editor that runs the sheet does not answer while that editor
--- waits for the browser. TESTS/sheets_spec.lua starts it, waits for the `ready` line and stops it again.
+-- waits for the browser. testing.sheet starts it, waits for the URL line and stops it after the sheet.
 
-local root, rtp, port = arg[1], arg[2], tonumber(arg[3])
-assert(root and rtp and port, "usage: shape_host.lua <repo root> <runtimepath> <port>")
+local host, port = arg[1], tonumber(arg[2])
+assert(host and port, "usage: shape_host.lua <host dir> <port>")
+local root = vim.fs.normalize(vim.fn.getcwd())
+
+---The runtimepath this host adds: the caller's, or the repo and its dependencies found the way testing.nvim does.
+---@return string
+local function added_rtp()
+  local given = vim.env.DOCMAP_SHAPE_HOST_RTP
+  if given and given ~= "" then
+    return given
+  end
+  local dirs = { root }
+  for _, dep in ipairs({ "lib.nvim", "runtime-analysis.nvim", "ui.nvim" }) do
+    local env = vim.env[dep:gsub("%.nvim$", ""):gsub("%-", "_"):upper() .. "_NVIM_DIR"]
+    dirs[#dirs + 1] = (env and env ~= "") and env or vim.fs.dirname(root) .. "/" .. dep
+  end
+  return table.concat(dirs, ",")
+end
 -- in front of this process's own runtime, so a caller may hand over only what it adds
-vim.o.runtimepath = rtp .. "," .. vim.o.runtimepath
+vim.o.runtimepath = added_rtp() .. "," .. vim.o.runtimepath
 
 local OLDER, NEWER = ("a"):rep(40), ("b"):rep(40)
 
@@ -74,7 +96,6 @@ local docmap = require("docmap")
 local opts =
   require("docmap.config").build(root .. "/TESTS/fixtures/maps_page", { source = "lua/app" })
 local ir, findings = docmap.scan_full(opts)
-local host = root .. "/TESTS/sheets/out/shape-host"
 vim.fn.mkdir(host .. "/docs/map", "p")
 local now = docmap.to_json(ir)
 for name, body in pairs({
@@ -110,7 +131,8 @@ if not url then
   io.stdout:flush()
   os.exit(1)
 end
-io.stdout:write("ready " .. url .. "\n")
+-- the line `ready` of the app waits for; it becomes `${host}` of the sheet
+io.stdout:write(url .. "\n")
 io.stdout:flush()
 -- Until the spec that started this stops it. Bounded, so a spec that died leaves no server behind for long.
 vim.wait(120000, function()

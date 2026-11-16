@@ -43,75 +43,21 @@ local function render_pages()
 end
 
 -- The shape-diff sheets need what a file page does not have: a host that answers `/api/commits` and
--- `/api/shape/...`. TESTS/shape_host.lua is that host (the real `:DocMap serve`, git stood in for), run as a
--- process of its own on a fixed port: a server inside this editor does not answer while the editor waits for
--- the browser.
-local SHAPE_PORT = 38417
-
----Start the host of the shape-diff sheets; returns what stops it.
----@return fun()
-local function start_shape_host()
-  local out = {}
-  local child = vim.system({
-    vim.v.progpath,
-    "--headless",
-    "-u",
-    "NONE",
-    "-l",
-    root .. "/TESTS/shape_host.lua",
-    root,
-    vim.o.runtimepath,
-    tostring(SHAPE_PORT),
-  }, {
-    text = true,
-    stdout = function(_, data)
-      out[#out + 1] = data or ""
-    end,
-  })
-  local function stop()
-    child:kill(9)
-    child:wait(5000)
-  end
-  local ready = vim.wait(20000, function()
-    return table.concat(out):find("\n", 1, true) ~= nil
-  end, 50)
-  local line = vim.trim(table.concat(out))
-  if not ready or not vim.startswith(line, "ready ") then
-    stop()
-    error("sheets: the shape host did not start on port " .. SHAPE_PORT .. ": " .. line, 0)
-  end
-  return stop
-end
-
----The sheets that need the shape host, by id. It is started for the first of them and stopped after the last:
----starting it is a scan and a render, and each sheet has ten seconds for everything.
-local HOSTED = { ["shape-diff"] = true, ["shape-diff-nodes"] = true }
-local hosted_left, stop_host = 0, nil
+-- `/api/shape/...`. Each of them names the app `shape-host` of .testing.lua (TESTS/shape_host.lua, the real
+-- `:DocMap serve` with git stood in for), which testing.sheet starts for that sheet on a free port and stops after
+-- it. The host is a process of its own: a server inside this editor does not answer while the editor waits for the
+-- browser. It gets this editor's runtimepath, so it finds docmap and its dependencies where this run found them.
+vim.env.DOCMAP_SHAPE_HOST_RTP = vim.o.runtimepath
 
 describe("test sheets", function()
   for _, path in ipairs(sheet.files(root .. "/TESTS/sheets")) do
     local s, err = sheet.load(path)
-    local hosted = s ~= nil and HOSTED[s.id] == true
-    if hosted then
-      hosted_left = hosted_left + 1
-    end
     it(s and sheet.spec_name(s) or path, function()
       assert(s, err)
       if s.engine == "browser" then
         render_pages()
       end
-      if hosted then
-        stop_host = stop_host or start_shape_host()
-      end
       local ran, why = pcall(sheet.check, s, { root = root })
-      if hosted then
-        hosted_left = hosted_left - 1
-        -- A run that selects only some of the hosted sheets never gets here; the host then ends on its own.
-        if hosted_left == 0 and stop_host then
-          stop_host()
-          stop_host = nil
-        end
-      end
       if not ran then
         error(why, 0)
       end

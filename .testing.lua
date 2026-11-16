@@ -78,6 +78,18 @@ return {
     "DOCMAP_RUBY_PARSER",
     "DOCMAP_RUST_PARSER",
   },
+  -- The programs the test sheets run against (testing.sheet.app). `shape-host` is the host of the shape-diff
+  -- sheets (TESTS/shape_host.lua: `:DocMap serve` over the maps-page fixture, git stood in for). Port 0, so two
+  -- runs on one machine never share one; its first stdout line, the URL, is `${host}` of the sheet. Its files go
+  -- to `${temp}`, a folder of the run.
+  sheets = {
+    apps = {
+      ["shape-host"] = {
+        run = { "nvim", "--headless", "-u", "NONE", "-l", "TESTS/shape_host.lua", "${temp}", "0" },
+        ready = { stdout = "^http://", as = "host", timeout_ms = 30000 },
+      },
+    },
+  },
   -- gated: a failed conformance check makes `scripts/test.sh conformance` exit 1 (docs/CONFORMANCE.md of testing.nvim)
   conformance = {
     gate = true,
