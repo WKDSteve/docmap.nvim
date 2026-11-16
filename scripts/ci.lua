@@ -443,7 +443,13 @@ function GATES.standalone()
   local head = vim.trim(
     vim.system({ "git", "-C", root, "rev-parse", "HEAD" }, { text = true }):wait().stdout or ""
   )
-  for _, route in ipairs({ "commits", "shape/" .. head }) do
+  -- A checkout git cannot read here (a worktree whose `.git` file names a Windows path, run from WSL) has
+  -- no history to ask about: counted as a skip with its reason rather than failed as a defect.
+  local routes = head:match("^%x+$") and { "commits", "shape/" .. head } or {}
+  if #routes == 0 then
+    skip("standalone history routes", "git cannot read HEAD of " .. root .. " from here")
+  end
+  for _, route in ipairs(routes) do
     local proc = vim
       .system({ lua, "standalone/docmap.lua", root, "--api=" .. route }, { cwd = root, text = true })
       :wait()
@@ -459,7 +465,9 @@ function GATES.standalone()
       return
     end
   end
-  say("  ok: --api=commits and --api=shape/<HEAD> answer with data")
+  if #routes > 0 then
+    say("  ok: --api=commits and --api=shape/<HEAD> answer with data")
+  end
 
   -- ------------------------------------------------------------------
   -- The behavioural differential, replayed on the other interpreter.
