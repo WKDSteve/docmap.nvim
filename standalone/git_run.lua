@@ -122,6 +122,76 @@ local function temp_path()
   return nil
 end
 
+---Whether `program` (the first element of an argument list) is git: `git`,
+---`git.exe` or a path ending in one of them, in any case.
+---@param program string?
+---@return boolean
+function M.is_git(program)
+  if type(program) ~= "string" then
+    return false
+  end
+  local name = (program:match("[^/\\]+$") or ""):lower()
+  return name == "git" or name == "git.exe"
+end
+
+---Quote an argument list `{ program, arg, ... }` into one shell command line.
+---
+---Every element goes through `shell_quote`, which refuses what it cannot
+---quote safely. When the program is git and `windows` is set, the format
+---values with a `%` are moved into a temporary git configuration first (see
+---the module comment), so git is the one program whose `%` arguments survive
+---cmd.exe; any other program's `%` is still refused.
+---
+---Shared by `M.run` and the vim shim's `vim.fn.system`
+---(`standalone/vim_shim.lua`), so the two cannot drift apart again.
+---@param cmd string[]
+---@param windows boolean
+---@return string? line Nil when an argument cannot be quoted or the configuration cannot be written.
+---@return fun()|string cleanup_or_err Removes the temporary configuration (call it after the command ran); the error when `line` is nil.
+function M.command_line(cmd, windows)
+  local args = cmd
+  local config_path
+  local function cleanup()
+    if config_path then
+      os.remove(config_path)
+      config_path = nil
+    end
+  end
+
+  if windows and M.is_git(cmd[1]) then
+    local rest = {}
+    for i = 2, #cmd do
+      rest[#rest + 1] = cmd[i]
+    end
+    local rewritten, config = M.pretty_aliases(rest)
+    if config then
+      config_path = temp_path()
+      local fd = config_path and io.open(config_path, "wb")
+      if not fd then
+        config_path = nil
+        return nil, "could not write a temporary git configuration for a format with a %"
+      end
+      fd:write(config)
+      fd:close()
+      args = { cmd[1], "-c", "include.path=" .. config_path }
+      for _, a in ipairs(rewritten) do
+        args[#args + 1] = a
+      end
+    end
+  end
+
+  local parts = {}
+  for i, a in ipairs(args) do
+    local quoted, err = shell_quote.quote(a, windows)
+    if not quoted then
+      cleanup()
+      return nil, err
+    end
+    parts[i] = quoted
+  end
+  return table.concat(parts, " "), cleanup
+end
+
 ---Run git in `o.root` via `io.popen`, the standalone build's only subprocess
 ---capability (`vim.system` does not exist outside Neovim).
 ---
@@ -142,50 +212,29 @@ function M.run(o, args, windows)
     return nil, root_err
   end
 
-  local config_path
-  if windows then
-    local rewritten, config = M.pretty_aliases(args)
-    if config then
-      config_path = temp_path()
-      local fd = config_path and io.open(config_path, "wb")
-      if not fd then
-        return nil, "could not write a temporary git configuration for a format with a %"
-      end
-      fd:write(config)
-      fd:close()
-      args = { "-c", "include.path=" .. config_path }
-      for _, a in ipairs(rewritten) do
-        args[#args + 1] = a
-      end
-    end
-  end
-
-  local function finish(...)
-    if config_path then
-      os.remove(config_path)
-    end
-    return ...
-  end
-
-  local parts = { "git" }
+  local cmd = { "git" }
   for _, a in ipairs(args) do
-    local quoted, err = shell_quote.quote(a, windows)
-    if not quoted then
-      return finish(nil, err)
-    end
-    parts[#parts + 1] = quoted
+    cmd[#cmd + 1] = a
   end
+  local line, cleanup = M.command_line(cmd, windows)
+  if not line then
+    return nil, cleanup --[[@as string]]
+  end
+  ---@cast cleanup fun()
+
   local cd = (windows and "cd /d " or "cd ") .. quoted_root .. " && "
-  local fh = io.popen(cd .. table.concat(parts, " ") .. " 2>&1", "r")
+  local fh = io.popen(cd .. line .. " 2>&1", "r")
   if not fh then
-    return finish(nil, "could not start git")
+    cleanup()
+    return nil, "could not start git"
   end
   local out = fh:read("*a") or ""
   fh:close()
+  cleanup()
   if out:match("^%s*fatal:") or out:match("^%s*error:") or out:match("^%s*usage:") then
-    return finish(nil, (out:gsub("%s+$", "")))
+    return nil, (out:gsub("%s+$", ""))
   end
-  return finish(out)
+  return out
 end
 
 return M

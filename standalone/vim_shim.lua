@@ -1612,18 +1612,18 @@ function vim.fn.system(cmd, input)
   if input ~= nil then
     error("standalone vim_shim: vim.fn.system does not implement the stdin argument", 0)
   end
-  local quote = require("standalone.shell_quote").quote
   local line
+  local cleanup = function() end
   if type(cmd) == "table" then
-    local parts = {}
-    for i, arg_ in ipairs(cmd) do
-      local quoted, err = quote(arg_, IS_WINDOWS)
-      if not quoted then
-        error("standalone vim_shim: vim.fn.system: " .. err, 0)
-      end
-      parts[i] = quoted
+    -- The same quoting as the `--api=` routes' git runner: on Windows a git
+    -- format with a `%` travels in a temporary git configuration instead of
+    -- on the cmd.exe line (`standalone/git_run.lua`); any other `%` is refused.
+    local built, done = require("standalone.git_run").command_line(cmd, IS_WINDOWS)
+    if not built then
+      error("standalone vim_shim: vim.fn.system: " .. tostring(done), 0)
     end
-    line = table.concat(parts, " ")
+    ---@cast done fun()
+    line, cleanup = built, done
   else
     line = tostring(cmd)
   end
@@ -1638,10 +1638,12 @@ function vim.fn.system(cmd, input)
   end
   local fh = io.popen(full, "r")
   if not fh then
+    cleanup()
     error("standalone vim_shim: vim.fn.system could not start: " .. line, 0)
   end
   local out = fh:read("*a") or ""
   local ok, how, code = fh:close()
+  cleanup()
   if how == nil then
     error(
       "standalone vim_shim: vim.fn.system cannot see the exit status on this Lua ("

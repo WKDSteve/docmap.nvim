@@ -1494,6 +1494,15 @@ M.cases = {
     needs = "puc",
     why = "stderr is merged into the output and the status is non-zero",
   },
+  {
+    id = "fn.system/git-format-percent",
+    path = "fn.system",
+    kind = "system",
+    args = { { "git", "log", "-1", "--format=%H %cs" } },
+    needs = "puc",
+    why = "a git format with a % used to be refused on Windows (cmd.exe expands %NAME%); "
+      .. "it now travels in a temporary git configuration (standalone/git_run.lua)",
+  },
 
   -- -------------------------------------------------------- json, encode
   -- Compared everywhere, because the shim writes scalars itself rather than
