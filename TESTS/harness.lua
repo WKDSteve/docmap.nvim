@@ -172,6 +172,21 @@ local function set_of(list)
   return s
 end
 
+local MAP_MODES = { "n", "x", "s", "o", "i", "c", "t" }
+
+---The buffer-local mappings of `buf`, as a set of `mode .. " " .. lhs`.
+---@param buf integer
+---@return table<string, true>
+local function buf_keymaps(buf)
+  local maps = {}
+  for _, mode in ipairs(MAP_MODES) do
+    for _, m in ipairs(vim.api.nvim_buf_get_keymap(buf, mode)) do
+      maps[mode .. " " .. m.lhs] = true
+    end
+  end
+  return maps
+end
+
 --- What a spec may leave behind, taken at its start; hand it to `H.restore`
 --- at its end. The specs share one editor (`isolated = "none"`), and the
 --- state guard of testing.nvim (`.testing.lua`, `guards.state = "error"`)
@@ -194,12 +209,14 @@ function H.snapshot(opts)
       autocmds[a.id] = true
     end
   end
-  local bufs = {}
+  local bufs, bufmaps = {}, {}
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     bufs[buf] = vim.api.nvim_buf_get_name(buf)
+    bufmaps[buf] = buf_keymaps(buf)
   end
   return {
     bufs = bufs,
+    bufmaps = bufmaps,
     wins = set_of(vim.api.nvim_list_wins()),
     tabs = set_of(vim.api.nvim_list_tabpages()),
     cmds = vim.api.nvim_get_commands({ builtin = false }),
@@ -217,6 +234,23 @@ end
 function H.wipe_new(snap)
   for buf, name in pairs(snap.bufs) do
     if vim.api.nvim_buf_is_valid(buf) and name == "" and vim.api.nvim_buf_get_name(buf) ~= "" then
+      -- An LSP client attached to the reused buffer (a spec that `:edit`s a file
+      -- while the first, empty buffer is current) stays attached and leaves the
+      -- buffer-local `K` (hover) mapping Neovim sets on attach. Detaching does
+      -- not take `K` back (Neovim 0.12 compares the mapping's callback with
+      -- `vim.lsp.buf.hover` itself, but sets a wrapper), so every buffer-local
+      -- mapping the buffer did not have at the snapshot is deleted as well.
+      for _, client in ipairs(vim.lsp.get_clients({ bufnr = buf })) do
+        pcall(vim.lsp.buf_detach_client, buf, client.id)
+      end
+      local before = snap.bufmaps and snap.bufmaps[buf] or {}
+      for _, mode in ipairs(MAP_MODES) do
+        for _, m in ipairs(vim.api.nvim_buf_get_keymap(buf, mode)) do
+          if not before[mode .. " " .. m.lhs] then
+            pcall(vim.api.nvim_buf_del_keymap, buf, mode, m.lhs)
+          end
+        end
+      end
       vim.api.nvim_buf_call(buf, function()
         -- `:0file` keeps the old name as a new (alternate) buffer: wiped below.
         vim.cmd("silent! 0file")

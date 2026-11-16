@@ -45,4 +45,28 @@ return function(H)
     ran = type(s) == "table" and s.bufs ~= nil
   end)
   ok(ran, "with_restore: the body runs and gets the snapshot")
+
+  -- `wipe_new` on a reused `[No Name]` buffer: `:edit` names the empty buffer
+  -- the spec found, and whatever attached to the file (Neovim's LSP sets a
+  -- buffer-local `K`) leaves its buffer-local mappings there. They go; the
+  -- ones the buffer had at the snapshot stay.
+  local outer = H.snapshot()
+  vim.cmd("new")
+  local reused = vim.api.nvim_get_current_buf()
+  vim.keymap.set("n", "<Plug>(docmap-harness-kept)", "<Nop>", { buffer = reused })
+  local snap_reused = H.snapshot()
+  vim.api.nvim_buf_set_name(reused, H.tmpfile("_harness_reused") .. "/reused.lua")
+  vim.keymap.set("n", "K", "<Nop>", { buffer = reused })
+  H.wipe_new(snap_reused)
+  eq(vim.api.nvim_buf_get_name(reused), "", "wipe_new: the reused buffer loses its name")
+  eq(
+    vim.fn.maparg("K", "n", false, true).buffer,
+    nil,
+    "wipe_new: a buffer-local mapping added on the reused buffer goes"
+  )
+  local kept = vim.api.nvim_buf_call(reused, function()
+    return vim.fn.maparg("<Plug>(docmap-harness-kept)", "n", false, true).buffer
+  end)
+  eq(kept, 1, "wipe_new: a buffer-local mapping from before the snapshot stays")
+  H.restore(outer)
 end
