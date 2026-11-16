@@ -217,17 +217,22 @@ return [[
   // hide/dim above, kept on its own class so the two never fight over one:
   // a box the reader dimmed by hand must stay dimmed when the language
   // filter clears, and vice versa.
+  function langOff(key){
+    if(!activeLangs) return false;
+    var langs = languagesOfBoxKey(key);
+    if(!langs) return false;
+    for(var k in langs){ if(activeLangs[k]) return false; }
+    return true;
+  }
   function syncLangFilter(){
     Object.keys(hboxes).forEach(function(key){
-      var off = false;
-      if(activeLangs){
-        var langs = languagesOfBoxKey(key);
-        if(langs){
-          off = true;
-          for(var k in langs){ if(activeLangs[k]){ off = false; break; } }
-        }
-      }
-      hboxes[key].classList.toggle("langoff", off);
+      hboxes[key].classList.toggle("langoff", langOff(key));
+    });
+    // The alt views (Tree rows, Treemap areas, the dots of the Coupling
+    // plot) carry the node id: they dim the same way, on the same class.
+    var alt = document.getElementById("halt-body");
+    if(alt) alt.querySelectorAll(".ht-row[data-id], .tm-group[data-id], .tm-tile[data-id], .cq-dot[data-id]").forEach(function(el){
+      el.classList.toggle("langoff", langOff(el.dataset.id));
     });
   }
 

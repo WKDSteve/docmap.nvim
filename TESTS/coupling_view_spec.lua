@@ -92,6 +92,16 @@ return function(H)
     "out.inside = L.dots.every(function(d){ return d.x >= L.left - 6 && d.x <= L.right + 6 && d.y >= L.top - 6 && d.y <= L.bottom + 6; });",
     "var small = couplingLayout([rows[4]], 600, 400);",
     "out.smallMax = small.maxIn + '/' + small.maxOut;",
+    "function sz(v, pw, vh, top){ var r = altViewSize(v, pw, vh, top); return r.w + 'x' + r.h; }",
+    "out.sizes = [sz('coupling', 1000, 900, 100), sz('coupling', 1000, 400, 100), sz('coupling', 200, 300, 100),",
+    "  sz('treemap', 1000, 900, 100), sz('treemap', 200, 300, 100)].join(' ');",
+    "out.staleNone = altViewStale(1000, 900, 100);",
+    "altDrawn = { view: 'coupling', w: 972, h: 700 };",
+    "out.staleSame = altViewStale(1000, 900, 100);",
+    "out.staleTaller = altViewStale(1000, 1400, 100);",
+    "out.staleWider = altViewStale(1200, 900, 100);",
+    "altDrawn = { view: 'treemap', w: 990, h: 760 };",
+    "out.staleTm = altViewStale(1000, 900, 100) + ',' + altViewStale(1000, 901, 100);",
     "console.log(JSON.stringify(out));",
   }, "\n")
   local tmp = vim.fn.tempname() .. ".js"
@@ -132,6 +142,16 @@ return function(H)
     "coupling: a second module with the same numbers gets a dot of its own beside it"
   )
   ok(got.inside, "coupling: every dot is inside the frame")
+  eq(
+    got.sizes,
+    "972x700 972x320 320x320 990x760 320x360",
+    "coupling: the plot is the pane less a scroll bar, no taller than the window or 0.72 of its width; the treemap fills the rest of the window; both have a floor"
+  )
+  eq(got.staleNone, false, "coupling: nothing drawn, nothing to redraw on resize")
+  eq(got.staleSame, false, "coupling: a resize that keeps the size keeps the plot")
+  eq(got.staleTaller, false, "coupling: a taller window does not grow a plot held by its width")
+  eq(got.staleWider, true, "coupling: a wider pane redraws the plot")
+  eq(got.staleTm, "false,true", "coupling: the treemap redraws when the window height changes")
   eq(
     got.smallMax,
     "5/5",

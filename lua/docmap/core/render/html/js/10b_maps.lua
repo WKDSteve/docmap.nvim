@@ -296,6 +296,30 @@ return [[
     el.textContent = r ? couplingText(r) : t("page.coupling.readout");
   }
 
+  // The size of the drawing of an alt view that has one (Coupling, Treemap),
+  // from the width of the pane, the height of the window and where the pane
+  // starts in it. Both are sized when drawn; a resize redraws them when this
+  // changes (`altDrawn`, the resize handler beside `drawAltView`).
+  //   * Coupling: narrower than the pane by a scroll bar's width (the pane
+  //     grows one when the plot is taller than the window, and must not grow
+  //     a second), no taller than the window and never taller than wide.
+  //   * Treemap: the pane's width and the rest of the window's height.
+  function altViewSize(view, paneWidth, viewHeight, paneTop){
+    if(view === "coupling"){
+      var cw = Math.max(paneWidth - 28, 320);
+      return { w: cw, h: Math.max(Math.min(Math.round(viewHeight - paneTop - 56), Math.round(cw * 0.72)), 320) };
+    }
+    return { w: Math.max(paneWidth - 10, 320), h: Math.max(Math.round(viewHeight - paneTop - 40), 360) };
+  }
+  // What the shown alt view was drawn at: { view, w, h }, or null.
+  var altDrawn = null;
+  // Whether a window of this size needs the shown alt view drawn again.
+  function altViewStale(paneWidth, viewHeight, paneTop){
+    if(!altDrawn) return false;
+    var s = altViewSize(altDrawn.view, paneWidth, viewHeight, paneTop);
+    return s.w !== altDrawn.w || s.h !== altDrawn.h;
+  }
+
   var couplingShown = [];
   function drawCoupling(centerId){
     var rows = couplingRows(centerId);
@@ -310,11 +334,10 @@ return [[
       couplingReadout(null);
       return;
     }
-    // Narrower than the pane by a scroll bar's width: the pane grows one
-    // when the plot is taller than the window, and must not grow a second.
-    var W = Math.max(haltBody.clientWidth - 28, 320);
-    var H = Math.max(Math.min(Math.round(window.innerHeight - haltBody.getBoundingClientRect().top - 56),
-      Math.round(W * 0.72)), 320);
+    var size = altViewSize("coupling", haltBody.clientWidth, window.innerHeight,
+      haltBody.getBoundingClientRect().top);
+    var W = size.w, H = size.h;
+    altDrawn = { view: "coupling", w: W, h: H };
     var L = couplingLayout(rows, W, H);
     var s = ['<svg class="cq" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H +
       '" role="group" aria-label="' + esc(t("page.coupling.aria", { count: rows.length })) + '">'];

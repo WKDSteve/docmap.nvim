@@ -297,6 +297,7 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
    `#hgraph.focusing` overrides repeat for the same reason they do there:
    equal specificity, decided by source order. */
 .hnode.langoff{opacity:.08;pointer-events:none}
+.ht-row.langoff,.tm-group.langoff,.tm-tile.langoff,.cq-dot.langoff{opacity:.08;pointer-events:none}
 #hgraph.focusing .hnode.langoff{opacity:.08}
 #hgraph.focusing .hnode.langoff.near{opacity:.08}
 /* The keyword card: the same component as .sigpop, one layer above it,

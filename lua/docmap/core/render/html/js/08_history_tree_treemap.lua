@@ -514,8 +514,10 @@ return [[
         { name: byId[centerId].name || centerId })) + "</p>";
       return;
     }
-    var W = Math.max(haltBody.clientWidth - 10, 320);
-    var H = Math.max(Math.round(window.innerHeight - haltBody.getBoundingClientRect().top - 40), 360);
+    var size = altViewSize("treemap", haltBody.clientWidth, window.innerHeight,
+      haltBody.getBoundingClientRect().top);
+    var W = size.w, H = size.h;
+    altDrawn = { view: "treemap", w: W, h: H };
     var HEAD = 18, html = [];
     squarify(kids, 0, 0, W, H).forEach(function(r){
       var n = byId[r.it.id];
@@ -562,10 +564,34 @@ return [[
     hpathEl.textContent = (center.module || center.path) + " · " + viewName(view);
     if(haltBar.dataset.view !== view) haltBar.innerHTML = "";
     haltBar.dataset.view = view;
+    altDrawn = null;
     if(view === "tree") drawTree(hcenter);
     else if(view === "coupling") drawCoupling(hcenter);
     else drawTreemap(hcenter);
+    // the legend's language filter reaches the new rows, tiles and dots
+    syncLangFilter();
   }
+
+  // Coupling and Treemap are sized when drawn (`altViewSize`); a window that
+  // changes size draws them again, once it has settled. The module that had
+  // the focus in the drawing keeps it.
+  var altResizeTimer = 0;
+  window.addEventListener("resize", function(){
+    clearTimeout(altResizeTimer);
+    altResizeTimer = setTimeout(function(){
+      if(halt.hidden || !altDrawn || altDrawn.view !== state.view) return;
+      if(!altViewStale(haltBody.clientWidth, window.innerHeight, haltBody.getBoundingClientRect().top)) return;
+      var had = haltBody.contains(document.activeElement) && document.activeElement.dataset
+        ? document.activeElement.dataset.id : null;
+      drawAltView(state.view);
+      if(had){
+        var back = Array.prototype.filter.call(haltBody.querySelectorAll("[data-id]"), function(el){
+          return el.dataset.id === had;
+        })[0];
+        if(back) back.focus();
+      }
+    }, 150);
+  });
 
   // How many edges of a graph view touch one node: requires for Deps, call
   // sites for Calls, calling module pairs for Module Calls.

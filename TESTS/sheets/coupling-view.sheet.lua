@@ -38,6 +38,26 @@ return {
       expect = DOTS .. ".filter(d => d.getAttribute('tabindex') === '0').length === 1",
       note = "the plot is one tab stop",
     },
+    -- The language filter of the legend. The fixture is Lua only, so the legend stays hidden; a chip for a language
+    -- the map does not hold goes through the legend's own click handler and leaves no Lua module selected.
+    {
+      expect = '(b => (b.innerHTML = \'<button type="button" data-lang="python">python</button>\','
+        .. " b.querySelector('[data-lang]').click(), true))(document.getElementById('langbar-h'))",
+      note = "a language chip is chosen in the legend",
+    },
+    {
+      wait = DOTS .. ".every(d => d.classList.contains('langoff'))",
+      note = "the dots of the other language dim, as boxes, rows and tiles do",
+    },
+    {
+      expect = '(b => (b.innerHTML = \'<button type="button" data-lang-clear="1">all</button>\','
+        .. " b.querySelector('[data-lang-clear]').click(), true))(document.getElementById('langbar-h'))",
+      note = "the filter is cleared",
+    },
+    {
+      wait = DOTS .. ".every(d => !d.classList.contains('langoff'))",
+      note = "and the dots are back",
+    },
     { focus = "#halt-body .cq-dot[tabindex='0']" },
     {
       wait = "/required by \\d+ · requires \\d+ · leaf$/.test(" .. READ .. ")",
