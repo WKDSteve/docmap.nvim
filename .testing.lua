@@ -47,7 +47,8 @@ return {
     -- The shim (standalone/vim_shim.lua), which shim_behavior_spec runs, shells out twice: `uname
     -- -s` on Unix to tell macOS from Linux, and on Windows the cmd line `set "DIRCMD=" & dir
     -- /a:l ...` to list links. The guard judges a shell string by its first word, hence `set`.
-    spawn = { "git", "nvim", "node", "rm", "cmd", "uname", "set" },
+    -- git_run_spec runs the standalone git runner, whose shell line starts `cd <root> && git ...`.
+    spawn = { "git", "nvim", "node", "rm", "cmd", "uname", "set", "cd" },
     -- Fixtures of the generate-all spec live below .deps/generate-all-*; the callhierarchy spec
     -- makes the runtime append to the Neovim LSP log in the state directory.
     -- The telemetry specs make runtime-analysis.nvim write its telemetry snapshots below

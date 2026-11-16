@@ -399,84 +399,14 @@ local opts = require("docmap.config").build(root, {
 if api_route then
   local windows = (package.config:sub(1, 1) == "\\")
 
-  -- Quoting itself lives in `standalone/shell_quote.lua` — the only piece
-  -- of this block with no dependency on the vim shim, `lfs`, or a git
-  -- checkout, and unit-tested there directly (`TESTS/shell_quote_spec.lua`)
-  -- instead of only through this file's own `lfs`-gated CI gate.
-  local shell_quote_mod = require("standalone.shell_quote")
-  ---One shell-quoted argument, or a refusal. See `standalone/shell_quote.
-  ---lua` for what is and is not trusted here and why.
-  ---@param s string
-  ---@return string? quoted
-  ---@return string? err
-  local function shell_quote(s)
-    return shell_quote_mod.quote(s, windows)
+  -- The runner and its quoting live in `standalone/git_run.lua` and
+  -- `standalone/shell_quote.lua`, unit-tested there directly
+  -- (`TESTS/git_run_spec.lua`, `TESTS/shell_quote_spec.lua`) instead of only
+  -- through this file's own `lfs`-gated CI gate.
+  local git_run = require("standalone.git_run")
+  opts.git = function(o, args)
+    return git_run.run(o, args, windows)
   end
-
-  ---Run git in `opts.root` via `io.popen` — the standalone build's only
-  ---subprocess capability; `vim.system` does not exist outside Neovim.
-  ---
-  ---**Does not use the exit code, and the original reason was half right.**
-  ---Probed on Windows via Neovim's own embedded LuaJIT as a stand-in:
-  ---`file:close()` returned `true, nil, nil` for both a genuinely
-  ---succeeding *and* a genuinely failing git invocation. The conclusion that
-  ---this "transfers to PUC Lua 5.4" was an assumption, and it is wrong: re-
-  ---measured on PUC 5.4 (the interpreter this binary is built with),
-  ---`close()` returns `true|nil, "exit", code` — 128 for a failed
-  ---`git rev-parse`. `standalone/vim_shim.lua`'s `vim.fn.system` uses exactly
-  ---that, and raises under an interpreter that cannot report it. This
-  ---function keeps the output heuristic below because changing what
-  ---`--api=` routes treat as a failure is a behaviour change of its own, not
-  ---part of the change that found this.
-  ---
-  ---So: stderr is merged into the captured stream (`2>&1`), and output
-  ---starting with `fatal:`/`error:`/`usage:` is treated as a failure.
-  ---Heuristic, not a guarantee, and named as one rather than pretended to
-  ---be exact — but every format string these routes actually request
-  ---starts with a sha, a `\31`/`\30` control byte, or `diff --git`, never
-  ---with one of those three words, so a real false positive would need a
-  ---commit whose *first output byte* happens to look like a git error,
-  ---which the formats used here cannot produce.
-  ---
-  ---**Decision: the heuristic stays.** Reading the exit status instead would
-  ---be a behaviour change of its own, because it would change what the
-  ---`--api=` routes call an error; and no known defect depends on the
-  ---heuristic, since none of the requested formats can start with one of the
-  ---three words. The cost is accepted: a second, weaker definition of
-  ---failure next to the exact one in the shim (`vim.fn.system` reads the
-  ---real exit status, which PUC Lua 5.4 provides).
-  ---@param o table
-  ---@param args string[]
-  ---@return string|nil stdout
-  ---@return string|nil err
-  local function popen_git(o, args)
-    local quoted_root, root_err = shell_quote(o.root)
-    if not quoted_root then
-      return nil, root_err
-    end
-
-    local parts = { "git" }
-    for _, a in ipairs(args) do
-      local quoted, err = shell_quote(a)
-      if not quoted then
-        return nil, err
-      end
-      parts[#parts + 1] = quoted
-    end
-    local cd = (windows and "cd /d " or "cd ") .. quoted_root .. " && "
-    local fh = io.popen(cd .. table.concat(parts, " ") .. " 2>&1", "r")
-    if not fh then
-      return nil, "could not start git"
-    end
-    local out = fh:read("*a") or ""
-    fh:close()
-    if out:match("^%s*fatal:") or out:match("^%s*error:") or out:match("^%s*usage:") then
-      return nil, (out:gsub("%s+$", ""))
-    end
-    return out
-  end
-
-  opts.git = popen_git
   opts.rules_trust = trust
   opts.rules_answer_file = answer_file
   for key, value in pairs(write_opts) do

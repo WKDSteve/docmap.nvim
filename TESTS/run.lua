@@ -264,6 +264,7 @@ local specs = {
   "shim_behavior_spec.lua",
   "shim_links_spec.lua",
   "shell_quote_spec.lua",
+  "git_run_spec.lua",
   "tools_spec.lua",
   "features_spec.lua",
   "features_index_spec.lua",
