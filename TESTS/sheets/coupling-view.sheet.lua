@@ -58,6 +58,28 @@ return {
       wait = DOTS .. ".every(d => !d.classList.contains('langoff'))",
       note = "and the dots are back",
     },
+    -- A narrower pane redraws the plot. A sheet cannot resize the window, so the pane is made narrower and the
+    -- window's own resize event is sent; the handler measures the pane, as it does after a real resize.
+    {
+      expect = "(window.__cqw = +document.querySelector('#halt-body svg.cq').getAttribute('width'),"
+        .. " document.getElementById('halt-body').style.width = '520px',"
+        .. " window.dispatchEvent(new Event('resize')), window.__cqw > 600)",
+      note = "the plot is wide; the pane becomes narrow",
+    },
+    {
+      wait = "+document.querySelector('#halt-body svg.cq').getAttribute('width') < window.__cqw"
+        .. " && document.querySelectorAll('#halt-body .cq-dot').length > 0",
+      note = "the plot is drawn again at the new width",
+    },
+    {
+      expect = "(document.getElementById('halt-body').style.width = '',"
+        .. " window.dispatchEvent(new Event('resize')), true)",
+      note = "the pane gets its width back",
+    },
+    {
+      wait = "+document.querySelector('#halt-body svg.cq').getAttribute('width') === window.__cqw",
+      note = "and the plot its size",
+    },
     { focus = "#halt-body .cq-dot[tabindex='0']" },
     {
       wait = "/required by \\d+ · requires \\d+ · leaf$/.test(" .. READ .. ")",
