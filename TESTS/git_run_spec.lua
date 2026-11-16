@@ -50,6 +50,14 @@ return function(H)
   end
 
   do
+    local args, config = git_run.pretty_aliases({ "--pretty=%h" })
+    eq(args[1], "--pretty=docmap1", "git_run: --pretty= with a placeholder is moved")
+    ok(config and config:find('docmap1 = "tformat:%h"', 1, true), "git_run: as tformat:, like git")
+    local named = git_run.pretty_aliases({ "--pretty=oneline" })
+    eq(named[1], "--pretty=oneline", "git_run: a built-in format name stays")
+  end
+
+  do
     local args, config = git_run.pretty_aliases({ "diff", "--format=", "HEAD" })
     eq(config, nil, "git_run: nothing to move without a %")
     eq(args[2], "--format=", "git_run: an empty --format= stays")
@@ -72,20 +80,17 @@ return function(H)
   local function git(...)
     local out = vim
       .system(
-        vim.list_extend(
-          {
-            "git",
-            "-C",
-            repo,
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "-c",
-            "commit.gpgsign=false",
-          },
-          { ... }
-        ),
+        vim.list_extend({
+          "git",
+          "-C",
+          repo,
+          "-c",
+          "user.name=t",
+          "-c",
+          "user.email=t@t",
+          "-c",
+          "commit.gpgsign=false",
+        }, { ... }),
         { text = true }
       )
       :wait()

@@ -57,6 +57,11 @@ local function format_value(arg_)
     if kind then
       return kind, rest
     end
+    -- `--pretty=X` with a placeholder in it is `--pretty=tformat:X` as well (git-log(1)); a
+    -- built-in name (`oneline`, ...) has no `%` and is left alone by the caller.
+    if pretty:find("%", 1, true) then
+      return "tformat:", pretty
+    end
   end
   return nil
 end
@@ -87,6 +92,10 @@ function M.pretty_aliases(args)
 end
 
 local written = 0
+-- Differs between processes: the address of a fresh table. `math.random` alone does not, under
+-- an interpreter that does not seed it (LuaJIT), and two engines started in the same second
+-- would then write one file and read each other's formats.
+local process_tag = (tostring({}):match("(%x+)$") or "0")
 
 ---A path for the temporary configuration file, in the user's temp directory.
 ---@return string? path
@@ -97,8 +106,9 @@ local function temp_path()
   end
   for _ = 1, 20 do
     written = written + 1
-    local path = ("%s/docmap-git-%d-%d-%d.gitconfig"):format(
+    local path = ("%s/docmap-git-%s-%d-%d-%d.gitconfig"):format(
       (dir:gsub("\\", "/"):gsub("/+$", "")),
+      process_tag,
       os.time(),
       math.random(0, 0x7fffffff),
       written
