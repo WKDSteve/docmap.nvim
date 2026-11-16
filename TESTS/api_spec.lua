@@ -37,6 +37,10 @@ return function(H)
   end
 
   -- ------------------------------------------------- every route answers
+  -- Without the machine's rules vault: with `$RULES_VAULT` set (and rules.nvim on the path) `rules/catalog`
+  -- answers the vault's rules for any folder, which is right there and no answer for "no map".
+  local vault = vim.env.RULES_VAULT
+  vim.env.RULES_VAULT = nil
   for name in pairs(api.routes) do
     local res, err = api.answer(name, nowhere, nil)
     eq(err, nil, "api: " .. name .. " does not error on a root with no map")
@@ -44,6 +48,7 @@ return function(H)
     eq(res.available, false, "api: " .. name .. " reports available=false with no map")
     ok(type(res.reason) == "string" and res.reason ~= "", "api: " .. name .. " states a reason")
   end
+  vim.env.RULES_VAULT = vault
 
   -- An unknown route is an error, not an empty answer: a host that asked
   -- for a route this build does not have must find out, rather than render
