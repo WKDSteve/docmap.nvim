@@ -140,6 +140,7 @@ return function(H)
     "  '  -- a method of the same name on a line no edge names',",
     "  '  local w = other:help(x) + old.legacy(x)',",
     '  \'  log("dkjson", "b")\',',
+    "  '  local soft = pcall(require, \"plenary.path\")',",
     "  'end'].join('\\n');",
     "var IR = { tags: [ { name: 'deprecated', summary: 'Marks it old.', origin: 'luals', url: 'https://x/#d' },",
     "                   { name: 'internal', summary: 'Not API.', origin: 'project' } ],",
@@ -359,6 +360,11 @@ return function(H)
     count(got.snip, 'data-kw="b" data-kwkind="req"'),
     1,
     "snippet: nor is the name of a module required elsewhere in the file"
+  )
+  eq(
+    count(got.snip, 'data-kw="plenary.path" data-kwkind="req"'),
+    1,
+    'snippet: the soft require `pcall(require, "x")` is a require'
   )
   local registry = require("docmap.core.lang_registry")
   local cs = registry.comment_syntax()

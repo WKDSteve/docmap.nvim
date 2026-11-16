@@ -548,7 +548,7 @@ return [[
            src.substr(j - str[1].length, str[1].length) === str[1] &&
            /^[A-Za-z0-9_@.\/:-]+$/.test(body) &&
            (own(reqLines, body + "@" + (self.fn.line + lineAt(i))) ||
-            /(?:^|[^A-Za-z0-9_])(?:require|import|from)\s*\(?\s*$/.test(src.slice(Math.max(0, i - 24), i)))){
+            /(?:^|[^A-Za-z0-9_])(?:require|import|from)\s*[(,]?\s*$/.test(src.slice(Math.max(0, i - 24), i)))){
           plain += str[0];
           flush();
           out += span(body, "req", body);
