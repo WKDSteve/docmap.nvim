@@ -318,6 +318,37 @@ function M.glossaries()
   return out
 end
 
+---What a snippet of a language without a glossary syntax may skip, keyed by file extension: the comment tokens its
+---backend declares (`line_comments`, `block_comments`, the ones `core/markers.lua` reads) and the double-quoted
+---string with a backslash escape, which every registered language spells that way. The page's tokenizer uses it
+---where `glossary.syntax` is missing, so a module name in a comment or a log text is not marked.
+---
+---Single quotes are left out on purpose: a lifetime (`'a`) in Rust, a prime (`x'`) in Haskell or OCaml would open a
+---"string" that swallows code, and a single-quoted string that is not skipped costs at most a mark on text the IR
+---already names. A backend that declares no comment syntax contributes nothing.
+---@return table<string, { line_comments: string[], block_comment?: string[], strings: string[][], escape: string }>
+function M.comment_syntax()
+  local out = {}
+  for _, entry in ipairs(store:entries()) do
+    local name, backend = entry[1], entry[2]
+    local has_syntax = backend.glossary and backend.glossary.syntax
+    local lines = backend.line_comments or {}
+    local block = (backend.block_comments or {})[1]
+    if enabled(name) and backend.extensions and not has_syntax and (#lines > 0 or block) then
+      local syntax = {
+        line_comments = vim.list_extend({}, lines),
+        block_comment = block and { block[1], block[2] } or nil,
+        strings = { { '"', '"' } },
+        escape = "\\",
+      }
+      for _, ext in ipairs(backend.extensions) do
+        out[ext] = syntax
+      end
+    end
+  end
+  return out
+end
+
 ---Every registered backend, in registration order. What the walk uses to
 ---answer "does any backend's `module_file` exist in this directory" without
 ---hardcoding which backends exist.

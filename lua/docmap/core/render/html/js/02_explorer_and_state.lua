@@ -432,18 +432,28 @@ return [[
   // need no glossary, so a language without one gets them too; what it loses
   // is the skipping of strings and comments, and the call match is by line
   // and name, which a comment rarely satisfies by accident.
+  // A language whose glossary has no `syntax` (or that has no glossary)
+  // still skips its comments and double-quoted strings: the tokens its
+  // backend declares (`IR.comment_syntax`, `lang_registry.comment_syntax()`).
+  function commentSyntaxForPath(path){
+    if(!path || !IR.comment_syntax) return null;
+    var m = /\.([A-Za-z0-9]+)$/.exec(path);
+    return m && own(IR.comment_syntax, m[1].toLowerCase()) ? IR.comment_syntax[m[1].toLowerCase()] : null;
+  }
+
   function snipBodyHTML(src, path, ctx){
     var gl = glossaryForPath(path);
     var self = (ctx && ctx.fnKey && own(fnByKey, ctx.fnKey)) ? fnByKey[ctx.fnKey] : null;
     if((!gl || !gl.keywords) && !self) return esc(src);
     if(!gl) gl = {};
-    var sx = gl.syntax || {};
+    var sx = gl.syntax || commentSyntaxForPath(path) || {};
     var strs = sx.strings || [];
+    var lineComments = sx.line_comments || (sx.line_comment ? [sx.line_comment] : []);
     var out = "", plain = "", i = 0, n = src.length;
 
     // ---- what the IR knows about this function ----
     function bare(name){ return String(name).replace(/^.*[.:]/, ""); }
-    var callees = {}, externals = {}, modules = {}, ownBare = null, ownDone = false;
+    var callees = {}, externals = {}, modules = {}, reqLines = {}, ownBare = null, ownDone = false;
     if(self){
       ownBare = bare(self.fn.name);
       (callOut[ctx.fnKey] || []).forEach(function(e){
@@ -458,7 +468,11 @@ return [[
       (self.node.calls_external || []).forEach(function(c){
         if(!underOwnPrefix(c.module)) externals[c.module] = true;
       });
-      (depOut[self.node.id] || []).forEach(function(d){ if(d.to_module) modules[d.to_module] = true; });
+      (depOut[self.node.id] || []).forEach(function(d){
+        if(!d.to_module) return;
+        modules[d.to_module] = true;
+        if(typeof d.line === "number") reqLines[d.to_module + "@" + d.line] = true;
+      });
     }
     // The source line a position of the snippet is on (the snippet starts at
     // the function's own first line). Positions only ever grow.
@@ -495,8 +509,13 @@ return [[
     function flush(){ if(plain){ out += esc(plain); plain = ""; } }
     function at(tok){ return tok && src.substr(i, tok.length) === tok; }
 
+    function atLineComment(){
+      for(var c = 0; c < lineComments.length; c++){ if(at(lineComments[c])) return true; }
+      return false;
+    }
+
     while(i < n){
-      if(at(sx.line_comment)){
+      if(atLineComment()){
         var eol = src.indexOf("\n", i);
         if(eol < 0) eol = n;
         plain += src.slice(i, eol); i = eol; continue;
@@ -521,12 +540,14 @@ return [[
         if(j > n) j = n;
         // A string that is a `require`/`import` path: the fifth thing a
         // snippet can be asked about. Either the word before it says so, or
-        // the map knows the name as a module this file requires.
+        // a require edge of this file to that module names this very line.
+        // A name the file requires is not enough on its own: the same text
+        // in a log line or a table key is no require.
         var body = src.slice(i + str[0].length, j - str[1].length);
         if(self && j - str[1].length >= i + str[0].length &&
            src.substr(j - str[1].length, str[1].length) === str[1] &&
            /^[A-Za-z0-9_@.\/:-]+$/.test(body) &&
-           (own(modules, body) ||
+           (own(reqLines, body + "@" + (self.fn.line + lineAt(i))) ||
             /(?:^|[^A-Za-z0-9_])(?:require|import|from)\s*\(?\s*$/.test(src.slice(Math.max(0, i - 24), i)))){
           plain += str[0];
           flush();

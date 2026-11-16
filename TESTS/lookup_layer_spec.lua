@@ -139,6 +139,7 @@ return function(H)
     "  '  return dkjson.encode(v), table.concat(g)',",
     "  '  -- a method of the same name on a line no edge names',",
     "  '  local w = other:help(x) + old.legacy(x)',",
+    '  \'  log("dkjson", "b")\',',
     "  'end'].join('\\n');",
     "var IR = { tags: [ { name: 'deprecated', summary: 'Marks it old.', origin: 'luals', url: 'https://x/#d' },",
     "                   { name: 'internal', summary: 'Not API.', origin: 'project' } ],",
@@ -201,7 +202,9 @@ return function(H)
     cut(s01, "  function esc(s){", "  // Markdown info strings that are not"),
     cut(s02, "  function typeHTML(text, lang){", "  // `key` (the function's `fnKey`) is optional"),
     cut(s02, "  function glossaryForPath(path){", "  // Artifact lives in out_dir"),
+    "IR.comment_syntax = { sx: { line_comments: ['--'], strings: [['\"', '\"']], escape: '\\\\' } };",
     "var A = 'lua/a.lua#M.run', out = {};",
+    "out.syntaxOnly = snipBodyHTML(SNIP, 'lua/a.sx', { fnKey: A });",
     "out.snip = snipBodyHTML(SNIP, 'lua/a.lua', { fnKey: A });",
     "out.plain = snipBodyHTML(SNIP, 'lua/a.lua');",
     "out.noGlossary = snipBodyHTML(SNIP, 'lua/a.zz', { fnKey: A });",
@@ -334,6 +337,43 @@ return function(H)
   ok(
     not got.noGlossaryPlain:find("<span", 1, true),
     "snippet: no glossary and no function is plain text"
+  )
+  -- the backend's comment tokens stand in for a glossary's syntax
+  ok(
+    count(got.noGlossary, 'data-kwkind="call"') > 3,
+    "snippet: without any syntax a call named in a comment is marked (the case below fixes)"
+  )
+  eq(
+    count(got.syntaxOnly, 'data-kwkind="call"'),
+    3,
+    "snippet: with the backend's comment tokens the comment is skipped, as with a glossary"
+  )
+  eq(count(got.syntaxOnly, 'data-kwkind="kw"'), 0, "snippet: comment tokens are no keywords")
+  -- a string that equals a required module is a require only where it is one
+  eq(
+    count(got.snip, 'data-kw="dkjson" data-kwkind="req"'),
+    1,
+    "snippet: a log text that names a required module is no require trigger"
+  )
+  eq(
+    count(got.snip, 'data-kw="b" data-kwkind="req"'),
+    1,
+    "snippet: nor is the name of a module required elsewhere in the file"
+  )
+  local registry = require("docmap.core.lang_registry")
+  local cs = registry.comment_syntax()
+  ok(
+    cs.java and vim.deep_equal(cs.java.line_comments, { "//" }),
+    "comment_syntax: java from its backend"
+  )
+  ok(
+    cs.java and vim.deep_equal(cs.java.strings, { { '"', '"' } }),
+    "comment_syntax: the double-quoted string"
+  )
+  eq(cs.lua, nil, "comment_syntax: a language whose glossary has a syntax needs none")
+  ok(
+    cs.ml and #cs.ml.line_comments == 0 and vim.deep_equal(cs.ml.block_comment, { "(*", "*)" }),
+    "comment_syntax: a block comment alone is enough (OCaml)"
   )
   ok(
     got.python:find('data-fnkey="py/c.py#go"', 1, true)

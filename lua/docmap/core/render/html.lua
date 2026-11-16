@@ -164,6 +164,9 @@ function M.render(ir, findings, opts)
     -- `docmap.core` must not name `docmap.core.lang.*`, and
     -- this module is under that prefix.
     glossaries = require("docmap.core.lang_registry").glossaries(),
+    -- The comment tokens and strings of the languages whose glossary has no `syntax` (or that have no glossary),
+    -- by extension: what the snippet tokenizer skips there. Tool data on the same terms as `glossaries`.
+    comment_syntax = require("docmap.core.lang_registry").comment_syntax(),
     -- The annotation catalogue, for the same reason and on the same terms as
     -- `glossaries` above: tool data, identical in every checkout, so it rides
     -- on the page rather than inflating a byte-deterministic artifact that is
