@@ -75,17 +75,11 @@ local function assert_opts(opts, where)
   )
 end
 
----`scan()` + optional LuaLS merge (`opts.luals`) + `check()`, in one call.
----The shared step `generate()` and `install()`'s rescan both build on, so the
----enrichment wiring exists in exactly one place rather than being repeated at
----every entry point that needs a fully-formed IR.
+---The body of `scan_full`, run inside its parse-cache scope.
 ---@param opts Docmap.Opts
 ---@return Docmap.IR
 ---@return Docmap.Finding[]
----@raises string When `opts.root` is missing, or `opts.source` names a directory that does not exist (from `scan`).
-function M.scan_full(opts)
-  assert_opts(opts, "docmap.scan_full")
-
+local function scan_full_body(opts)
   -- Instrumentation, off unless `opts.debug`. Attached to the IR rather than
   -- returned as a third value: every caller of `scan_full` would otherwise
   -- have to thread a value it mostly ignores, and `install()`'s rescan would
@@ -249,6 +243,27 @@ function M.scan_full(opts)
     return require("docmap.core.quicks").compute(ir, findings, opts)
   end)
 
+  return ir, findings
+end
+
+---`scan()` + optional LuaLS merge (`opts.luals`) + `check()`, in one call.
+---The shared step `generate()` and `install()`'s rescan both build on, so the
+---enrichment wiring exists in exactly one place rather than being repeated at
+---every entry point that needs a fully-formed IR.
+---
+---Runs inside a `core/ts_parse` scope: the stages that parse the same file
+---(functions and markers each module, coverage and check each spec file)
+---share one tree per source, and every tree is dropped when the scan ends.
+---@param opts Docmap.Opts
+---@return Docmap.IR
+---@return Docmap.Finding[]
+---@raises string When `opts.root` is missing, or `opts.source` names a directory that does not exist (from `scan`).
+function M.scan_full(opts)
+  assert_opts(opts, "docmap.scan_full")
+  local ir, findings
+  require("docmap.core.ts_parse").scoped(function()
+    ir, findings = scan_full_body(opts)
+  end)
   return ir, findings
 end
 

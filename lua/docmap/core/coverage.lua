@@ -32,19 +32,12 @@ local IDENT_QUERY = vim.treesitter.query.parse("lua", "(identifier) @id")
 ---@param src string
 ---@return table<string, boolean>
 local function mentioned_names(src)
-  local ok, parser = pcall(vim.treesitter.get_string_parser, src, "lua")
-  -- `not parser` is for the type rather than the runtime: `pcall` hands back
-  -- the error message as its second value.
-  if not ok or not parser then
+  -- Shared with `check`'s test-reference pass, which parses every spec file
+  -- again later in the same scan (see `core/ts_parse.lua`).
+  local root = require("docmap.core.ts_parse").root(src, "lua")
+  if not root then
     return {}
   end
-  local ok_parse, trees = pcall(function()
-    return parser:parse()
-  end)
-  if not ok_parse or not trees or not trees[1] then
-    return {}
-  end
-  local root = trees[1]:root()
 
   local names = {}
   for id, node in IDENT_QUERY:iter_captures(root, src) do

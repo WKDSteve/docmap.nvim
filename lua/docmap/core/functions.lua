@@ -497,19 +497,12 @@ function M.scan_file(path)
   local _, newlines = src:gsub("\n", "")
   local lines = #src == 0 and 0 or (newlines + (src:sub(-1) == "\n" and 0 or 1))
 
-  local ok, parser = pcall(vim.treesitter.get_string_parser, src, "lua")
-  -- `not parser` is for the type rather than the runtime: `pcall` hands back
-  -- the error message as its second value.
-  if not ok or not parser then
+  -- Shared with `markers.scan_source`, which parses the same source right
+  -- after this inside a scan (see `core/ts_parse.lua`).
+  local root = require("docmap.core.ts_parse").root(src, "lua")
+  if not root then
     return {}, {}, requires, {}, {}, {}, lines, {}
   end
-  local ok_parse, trees = pcall(function()
-    return parser:parse()
-  end)
-  if not ok_parse or not trees or not trees[1] then
-    return {}, {}, requires, {}, {}, {}, lines, {}
-  end
-  local root = trees[1]:root()
 
   ---@type { row: integer, erow: integer, text: string }[]
   local comments = {}

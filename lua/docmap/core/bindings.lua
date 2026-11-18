@@ -302,18 +302,16 @@ local function table_truthy_field(node, key, src)
   return false
 end
 
----Depth-first over every node, since a binding call can sit anywhere — a
+---Every `function_call` in the tree, since a binding call can sit anywhere — a
 ---module's top level, inside a `setup()`, inside an autocmd callback.
 ---`plugins.lua` walks only the top-level `return`, which is right for a
 ---spec file and wrong here.
----@param node TSNode
----@param visit fun(n: TSNode)
-local function walk(node, visit)
-  visit(node)
-  for child in node:iter_children() do
-    walk(child, visit)
-  end
-end
+---
+---A query rather than the depth-first Lua walk this used to be: the walk
+---called `node:type()` and `iter_children()` on every node of every module
+---to find the few calls, and was 6% of a `generate` over lib.nvim. The query
+---visits the tree in C and hands back only the calls, in document order.
+local CALL_QUERY = vim.treesitter.query.parse("lua", "(function_call) @call")
 
 ---Extract every recognized binding call in this file.
 ---@param root TSNode Root of the parsed Lua tree for this source.
@@ -323,10 +321,8 @@ function M.extract(root, src)
   local recognized = M.recognized()
   local out = {}
 
-  walk(root, function(node)
-    if node:type() ~= "function_call" then
-      return
-    end
+  ---@param node TSNode
+  local function visit(node)
     local callee = callee_text(node, src)
     if not callee then
       return
@@ -374,8 +370,11 @@ function M.extract(root, src)
     if spec.lhs or spec.name or #spec.events > 0 then
       out[#out + 1] = spec
     end
-  end)
+  end
 
+  for _, node in CALL_QUERY:iter_captures(root, src) do
+    visit(node)
+  end
   return out
 end
 

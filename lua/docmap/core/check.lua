@@ -1005,20 +1005,12 @@ local function check_one_test_file(findings, root, path, idx, surface_of)
   local src = fd:read("*a")
   fd:close()
 
-  local ok_parser, parser = pcall(vim.treesitter.get_string_parser, src, "lua")
-  -- `not parser` is for the type rather than the runtime: `pcall` hands back
-  -- the error message as its second value, so the parser stays nil-able until
-  -- both halves are checked.
-  if not ok_parser or not parser then
+  -- The tree `coverage.resolve` already parsed for this spec file, when both
+  -- run inside one scan (see `core/ts_parse.lua`).
+  local tree_root = require("docmap.core.ts_parse").root(src, "lua")
+  if not tree_root then
     return
   end
-  local ok_parse, trees = pcall(function()
-    return parser:parse()
-  end)
-  if not ok_parse or not trees or not trees[1] then
-    return
-  end
-  local tree_root = trees[1]:root()
 
   local cap = {}
   for id, name in ipairs(TEST_QUERY.captures) do

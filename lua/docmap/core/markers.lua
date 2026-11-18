@@ -79,13 +79,23 @@ M.KEYWORDS = {
 ---
 ---Built once at load rather than per file: this is a fixed table, and the
 ---alternative is rebuilding it ~150 times in a walk of this repository.
----@type { word: string, name: string }[]
+---The two search patterns per spelling are built here too, not per comment
+---line: `match_marker` runs for every comment line of every file.
+---@type { word: string, name: string, plain_pat: string, author_pat: string }[]
 local SPELLINGS = (function()
   local out = {}
+  local function add(word, name)
+    out[#out + 1] = {
+      word = word,
+      name = name,
+      plain_pat = "%f[%w]" .. word .. "%s*:",
+      author_pat = "%f[%w]" .. word .. "%s*%([^)]*%)%s*:",
+    }
+  end
   for _, kw in ipairs(M.KEYWORDS) do
-    out[#out + 1] = { word = kw.name, name = kw.name }
+    add(kw.name, kw.name)
     for _, alias in ipairs(kw.aliases) do
-      out[#out + 1] = { word = alias, name = kw.name }
+      add(alias, kw.name)
     end
   end
   -- Longest first so `FIXME:` is not reported as `FIX` with a stray `ME:`
@@ -170,23 +180,38 @@ end
 ---@return string? author
 ---@return string? text
 local function match_marker(comment)
+  -- Every accepted form ends its keyword with a `:`. A line without one --
+  -- most of a doc comment -- cannot hold a marker, and this runs once per
+  -- comment line of every file: on lib.nvim it was 9% of a `generate`
+  -- before this early out.
+  if not comment:find(":", 1, true) then
+    return nil
+  end
+
   -- Inline code inside a comment is a *mention* of a marker, not a marker:
   -- this module's own header contains the line "`-- TODO:`, `// FIXME:`,
   -- `-- PERF:`", and the first version of it reported three open items in
   -- prose describing the feature. Blanked to spaces rather than deleted so
   -- every byte offset below still refers to the real line.
-  local masked = comment:gsub("`[^`]*`", function(m)
-    return string.rep(" ", #m)
-  end)
+  local masked = comment
+  if comment:find("`", 1, true) then
+    masked = comment:gsub("`[^`]*`", function(m)
+      return string.rep(" ", #m)
+    end)
+  end
 
   local best
   for _, sp in ipairs(SPELLINGS) do
     -- `%f[%w]` is a frontier pattern: it forbids a preceding word character
     -- so `AUTOTODO:` is not a todo, while still allowing the keyword to
-    -- follow a space, a dash, or the comment opener itself.
-    local at = masked:find("%f[%w]" .. sp.word .. "%s*:")
-    if not at then
-      at = masked:find("%f[%w]" .. sp.word .. "%s*%([^)]*%)%s*:")
+    -- follow a space, a dash, or the comment opener itself. The plain find
+    -- first: a keyword that is not on the line at all needs no pattern.
+    local at
+    if masked:find(sp.word, 1, true) then
+      at = masked:find(sp.plain_pat)
+      if not at then
+        at = masked:find(sp.author_pat)
+      end
     end
     -- **Leftmost wins**, and only then longest. Iterating longest-first and
     -- returning the first hit made the reported keyword depend on how many
@@ -213,6 +238,45 @@ local function match_marker(comment)
   return nil
 end
 
+---@type table<string, vim.treesitter.Query|false>
+local comment_queries = {}
+
+---One query per grammar that captures every comment node it has.
+---
+---**Why a query and not a walk.** The first version visited every node of
+---every file from Lua (`node:type()` and `iter_children()` per node) and was
+---7% of a `generate` over lib.nvim on its own; a query walks the tree in C
+---and hands back only the comments. Built from the names in `nodes` that
+---this grammar actually defines -- a query naming a node type the grammar
+---lacks does not parse at all, so each name is probed on its own. Cached per
+---grammar, including the answer "none of them" (`false`).
+---@param grammar string
+---@param nodes table<string, boolean>
+---@return vim.treesitter.Query?
+local function comment_query(grammar, nodes)
+  local cached = comment_queries[grammar]
+  if cached ~= nil then
+    return cached or nil
+  end
+  local names = vim.tbl_keys(nodes)
+  table.sort(names)
+  local known = {}
+  for _, name in ipairs(names) do
+    if pcall(vim.treesitter.query.parse, grammar, "(" .. name .. ") @c") then
+      known[#known + 1] = "(" .. name .. ")"
+    end
+  end
+  ---@type vim.treesitter.Query|false
+  local query = false
+  if #known > 0 then
+    local ok, q =
+      pcall(vim.treesitter.query.parse, grammar, "[" .. table.concat(known, " ") .. "] @c")
+    query = ok and q or false
+  end
+  comment_queries[grammar] = query
+  return query or nil
+end
+
 ---Ask the parser which parts of the file are comments.
 ---
 ---**The accurate path, and the reason the text scanner below is a fallback
@@ -235,14 +299,10 @@ local function parsed_comments(src, backend)
   if not backend or not backend.grammar then
     return nil
   end
-  local ok, parser = pcall(vim.treesitter.get_string_parser, src, backend.grammar)
-  if not ok or not parser then
-    return nil
-  end
-  local ok_parse, trees = pcall(function()
-    return parser:parse()
-  end)
-  if not ok_parse or not trees or not trees[1] then
+  -- Inside a scan this is the tree the backend's own `scan_file` just parsed
+  -- for the same source (see `core/ts_parse.lua`).
+  local tree_root = require("docmap.core.ts_parse").root(src, backend.grammar)
+  if not tree_root then
     return nil
   end
 
@@ -284,22 +344,40 @@ local function parsed_comments(src, backend)
     documentation_comment = true,
   }
 
-  ---@param node TSNode
-  local function walk(node)
-    if COMMENT_NODES[node:type()] then
+  local query = comment_query(backend.grammar, COMMENT_NODES)
+  if not query then
+    return out
+  end
+
+  -- Collected first, then reduced to the outermost nodes: a grammar may nest
+  -- one comment node in another (a `haddock` block around plain comments),
+  -- and the outer one carries the whole text. The Lua tree walk this
+  -- replaced stopped descending at the first comment node; a query reports
+  -- both, in an order that is not specified for two nodes starting at the
+  -- same byte, so the reduction sorts instead of trusting the order.
+  ---@type { s: integer, e: integer, row: integer }[]
+  local spans = {}
+  for _, node in query:iter_captures(tree_root, src) do
+    local srow, _, sbyte = node:start()
+    local _, _, ebyte = node:end_()
+    spans[#spans + 1] = { s = sbyte, e = ebyte, row = srow }
+  end
+  table.sort(spans, function(a, b)
+    if a.s ~= b.s then
+      return a.s < b.s
+    end
+    return a.e > b.e
+  end)
+  local covered = -1
+  for _, sp in ipairs(spans) do
+    if sp.s >= covered then
       -- The node's own bytes, not the lines it sits on. Taking whole lines
       -- would put the code back in — and `local s = "TODO: x" -- TODO: real`
       -- would report the string literal, since the leftmost keyword wins.
-      local srow, _, sbyte = node:start()
-      local _, _, ebyte = node:end_()
-      out[#out + 1] = { text = src:sub(sbyte + 1, ebyte), row = srow }
-      return
-    end
-    for child in node:iter_children() do
-      walk(child)
+      out[#out + 1] = { text = src:sub(sp.s + 1, sp.e), row = sp.row }
+      covered = sp.e
     end
   end
-  walk(trees[1]:root())
   return out
 end
 
