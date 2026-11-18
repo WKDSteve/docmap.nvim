@@ -3,9 +3,11 @@
 -- The parse cache `scan_full` opens around itself. Profiling `generate` over
 -- lib.nvim found every source parsed twice (functions + markers for each
 -- module, coverage + check for each spec file); this module makes the second
--- ask a lookup. What could go wrong is all about scope: a tree kept after the
+-- ask of a back-to-back pair a lookup, and keeps no more than one tree per
+-- grammar. What could go wrong is all about scope: a tree kept after the
 -- scan, a tree handed out for a different source, a cache left open by a
--- stage that threw. Those are what these cases pin.
+-- stage that threw, a cache that grows with the tree. Those are what these
+-- cases pin.
 
 return function(H)
   local eq, ok = H.eq, H.ok
@@ -71,6 +73,20 @@ return function(H)
       end)
     end)
     eq(n, 2, "two sources, two parses")
+  end
+
+  -- Only the last source is remembered: keeping every tree until the scan
+  -- ended cost 100 MB on lib.nvim. A, B, A parses A twice.
+  do
+    local other = "return 1\n"
+    local n = parses_during(function()
+      ts_parse.scoped(function()
+        ts_parse.root(SRC, "lua")
+        ts_parse.root(other, "lua")
+        ts_parse.root(SRC, "lua")
+      end)
+    end)
+    eq(n, 3, "one remembered tree per grammar, not one per source")
   end
 
   -- A failure is remembered as a failure, not retried and not turned into a

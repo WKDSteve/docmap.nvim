@@ -497,8 +497,8 @@ function M.scan_file(path)
   local _, newlines = src:gsub("\n", "")
   local lines = #src == 0 and 0 or (newlines + (src:sub(-1) == "\n" and 0 or 1))
 
-  -- Shared with `markers.scan_source`, which parses the same source right
-  -- after this inside a scan (see `core/ts_parse.lua`).
+  -- Remembered for `markers.scan_source`, which asks for the same source
+  -- right after this inside a scan (see `core/ts_parse.lua`).
   local root = require("docmap.core.ts_parse").root(src, "lua")
   if not root then
     return {}, {}, requires, {}, {}, {}, lines, {}

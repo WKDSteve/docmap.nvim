@@ -1,28 +1,35 @@
 ---@module 'docmap.core.ts_parse'
---- Parse a source string once per scan, however many stages ask for its tree.
+--- Hand the second stage that asks for the same source's tree the one the
+--- first stage just parsed.
 ---
 --- **Measured, not guessed.** Profiling `generate` over lib.nvim (497
 --- modules, 276 spec files) counted 1484 `parser:parse()` calls for 742
 --- distinct sources: every module was parsed by `functions.scan_file` and
---- again by `markers.scan_source`, every spec file by `coverage.resolve`
---- and again by `check`'s test-reference pass. About 1.6 s of a 10 s run,
---- half of it repeated work.
+--- again, right after, by `markers.scan_source`; every spec file by
+--- `coverage.resolve` and again, a stage later, by `check`'s test-reference
+--- pass. About 1.6 s of a 10 s run, half of it repeated work.
 ---
---- The cache only lives inside `scoped()`, which `scan_full` wraps around
---- itself. Outside a scope every call parses afresh and keeps nothing, so a
---- caller that scans one file (a spec, `install()`'s single-file path, the
---- LSP-free hover) holds no trees it will never ask for again, and nothing
---- outlives the scan that filled it: the trees are dropped when the scope
---- ends, also when a stage throws.
+--- **One tree per grammar, not all of them.** Keeping every tree until the
+--- scan ends removed both repeats (-30% on lib.nvim) and raised the peak
+--- working set from 137 MB to 237 MB. The functions/markers pair asks back
+--- to back, so remembering the last source alone catches it at no memory
+--- cost (129 MB, -20%). The coverage/check pair is a stage apart and is not
+--- caught; sharing that one needs the two passes over the spec files fused,
+--- not a bigger cache.
 ---
---- Keyed by the source *string*, not by path: two reads of one file give two
---- equal strings, and a stage that rewrote the source before parsing must not
---- be handed the tree of the original. LuaJIT interns strings, so the lookup
---- costs a hash probe, not a byte compare.
+--- The memory only exists inside `scoped()`, which `scan_full` wraps around
+--- itself. Outside a scope every call parses afresh and keeps nothing, and
+--- the last tree is dropped when the scope ends, also when a stage throws.
+---
+--- Compared by the source *string*, not by path: two reads of one file give
+--- two equal strings, and a stage that rewrote the source before parsing
+--- must not be handed the tree of the original. LuaJIT interns strings, so
+--- the comparison is a pointer compare.
 
 local M = {}
 
----@type table<string, table<string, TSTree|false>>?
+---Per grammar, the last source parsed and its tree (`false`: the parse failed).
+---@type table<string, { src: string, tree: TSTree|false }>?
 local cache = nil
 local depth = 0
 
@@ -34,12 +41,9 @@ local depth = 0
 ---@param grammar string
 ---@return TSNode?
 function M.root(src, grammar)
-  local by_src = cache and cache[grammar]
-  if by_src then
-    local hit = by_src[src]
-    if hit ~= nil then
-      return hit and hit:root() or nil
-    end
+  local last = cache and cache[grammar]
+  if last and last.src == src then
+    return last.tree and last.tree:root() or nil
   end
 
   local tree = false
@@ -56,13 +60,12 @@ function M.root(src, grammar)
   end
 
   if cache then
-    cache[grammar] = cache[grammar] or {}
-    cache[grammar][src] = tree
+    cache[grammar] = { src = src, tree = tree }
   end
   return tree and tree:root() or nil
 end
 
----Run `fn` with the cache on; drop every cached tree when the outermost
+---Run `fn` with the memory on; drop the remembered trees when the outermost
 ---scope ends. Nested scopes share the outer cache. Errors pass through
 ---unchanged (level 0), after the cache is released. `fn` hands its results
 ---out through upvalues, which keeps a multi-value caller like `scan_full`

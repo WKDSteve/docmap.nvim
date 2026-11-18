@@ -32,8 +32,9 @@ local IDENT_QUERY = vim.treesitter.query.parse("lua", "(identifier) @id")
 ---@param src string
 ---@return table<string, boolean>
 local function mentioned_names(src)
-  -- Shared with `check`'s test-reference pass, which parses every spec file
-  -- again later in the same scan (see `core/ts_parse.lua`).
+  -- Through `core/ts_parse` like every scan-time parse; `check` parses the
+  -- same spec files a stage later, which that module's header explains is
+  -- deliberately not cached.
   local root = require("docmap.core.ts_parse").root(src, "lua")
   if not root then
     return {}

@@ -1005,8 +1005,9 @@ local function check_one_test_file(findings, root, path, idx, surface_of)
   local src = fd:read("*a")
   fd:close()
 
-  -- The tree `coverage.resolve` already parsed for this spec file, when both
-  -- run inside one scan (see `core/ts_parse.lua`).
+  -- Through `core/ts_parse` like every scan-time parse. `coverage.resolve`
+  -- parsed this file a stage earlier; that tree is not kept (memory), see
+  -- that module's header.
   local tree_root = require("docmap.core.ts_parse").root(src, "lua")
   if not tree_root then
     return

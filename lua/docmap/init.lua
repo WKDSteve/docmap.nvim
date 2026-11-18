@@ -251,9 +251,8 @@ end
 ---enrichment wiring exists in exactly one place rather than being repeated at
 ---every entry point that needs a fully-formed IR.
 ---
----Runs inside a `core/ts_parse` scope: the stages that parse the same file
----(functions and markers each module, coverage and check each spec file)
----share one tree per source, and every tree is dropped when the scan ends.
+---Runs inside a `core/ts_parse` scope: `markers` reuses the tree `functions`
+---just parsed for the same module instead of parsing it a second time.
 ---@param opts Docmap.Opts
 ---@return Docmap.IR
 ---@return Docmap.Finding[]
