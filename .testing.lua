@@ -51,12 +51,12 @@ return {
     spawn = { "git", "nvim", "node", "rm", "cmd", "uname", "set", "cd" },
     -- Fixtures of the generate-all spec live below .deps/generate-all-*; the callhierarchy spec
     -- makes the runtime append to the Neovim LSP log in the state directory.
-    -- The telemetry specs make runtime-analysis.nvim write its telemetry snapshots below
-    -- stdpath('cache')/runtime-analysis.nvim (the plugin's own cache directory).
+    -- Not listed: the telemetry store runtime-analysis.nvim writes below stdpath('state') (since
+    -- runtime-analysis f15930a). scripts/test.sh points XDG_STATE_HOME at its mktemp scratch
+    -- directory, which the fs guard allows as temp; measured with --guard fs=error, no finding.
     fs = {
       ".deps",
       vim.fn.stdpath("state") .. "/lsp.log",
-      vim.fn.stdpath("cache") .. "/runtime-analysis.nvim",
     },
   },
   -- Environment variables the specs read; a child editor inherits an allowlist only (never secrets).
