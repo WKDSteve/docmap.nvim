@@ -29,8 +29,8 @@
 ---    Doing it up front costs the same time but spends it before the client
 ---    is listening.
 ---
---- The protocol itself lives in `protocol.lua` and the tool catalogue in
---- `tools.lua`; this module is the transport and nothing else.
+--- The protocol and the read loop are `lib.nvim.mcp.server`; `protocol.lua`
+--- binds a lib server to a handle and `tools.lua` is the tool catalogue.
 
 local protocol = require("docmap.mcp.protocol")
 
@@ -62,27 +62,15 @@ function M.serve(opts)
   local server =
     protocol.new(handle, { name = opts.title or "docmap.nvim", out_dir = opts.out_dir })
 
-  -- Line-buffered: the client is blocked reading our next line, so a full
-  -- buffer would deadlock the session rather than merely delay it. The
-  -- Windows C runtime treats "line" as full buffering, so every response is
-  -- also flushed explicitly below.
-  io.stdout:setvbuf("line")
-  io.stderr:write(("docmap.nvim MCP server ready (%s)\n"):format(opts.root))
-
-  while true do
-    local line = io.read("l")
-    if line == nil then
-      break -- stdin closed: the client went away, which is the normal exit.
-    end
-    local response = protocol.dispatch(server, line)
-    if response then
-      io.stdout:write(response, "\n")
-      io.stdout:flush()
-    end
-  end
+  -- The read loop is lib.nvim.mcp.server's: stdout carries the protocol and
+  -- nothing else (print and vim.notify go to stderr while it runs), and each
+  -- answer is flushed, since the Windows C runtime treats a line-buffered
+  -- stdout as fully buffered and the client would wait for an answer that
+  -- sits in the buffer. The "ready" line on stderr is lib's too.
+  local code = server:serve()
 
   docmap.uninstall(handle)
-  return 0
+  return code
 end
 
 return M

@@ -5,7 +5,10 @@ exposes this repository's module map to a coding agent — the module tree, the
 require graph, the call graph, and the documentation-drift findings, as tools
 the agent can call instead of grepping.
 
-Shipped 2026-08-11 as Phase 1 of the V1 extension plan.
+Shipped 2026-08-11 as Phase 1 of the V1 extension plan. Since 2026-11-18 the
+protocol and the read loop are lib.nvim's (`lib.nvim.mcp.server`, which started
+here); docmap registers its tools on it. tasks.nvim, rules.nvim and testing.nvim
+serve their read tools the same way.
 
 ## Running it
 
@@ -31,6 +34,17 @@ shape below is what most clients use; the field names vary:
   }
 }
 ```
+
+In Claude Code, inside the checkout (Claude Code starts a project's server with
+the project as its working directory, and the script maps the repository it is
+started in):
+
+```sh
+claude mcp add docmap -- nvim --headless -u NONE -l scripts/mcp_server.lua
+```
+
+(lib.nvim is found through `$LIB_NVIM_DIR`, `.deps/lib.nvim`, or beside this
+repository.)
 
 `scripts/mcp_server.lua` is thin on purpose and hardcodes only *this*
 repository's layout (`source = "lua/docmap"`). Another plugin copies
@@ -95,8 +109,8 @@ every diagnostic — including `vim.notify` — is pinned to stderr.
 | File | Role |
 |---|---|
 | `lua/docmap/mcp/tools.lua` | The tool catalogue. The only place that knows what a `Docmap.Handle` can answer. |
-| `lua/docmap/mcp/protocol.lua` | JSON-RPC 2.0 dispatch. No stdio, so tests drive the whole protocol in-process. |
-| `lua/docmap/mcp/init.lua` | The transport: install the handle, read lines, write lines. |
+| `lua/docmap/mcp/protocol.lua` | One `lib.nvim.mcp.server` per handle, with the catalogue registered on it. No stdio, so tests drive the whole protocol in-process. |
+| `lua/docmap/mcp/init.lua` | Install the handle (no watching), then lib's read loop (`server:serve()`). |
 | `scripts/mcp_server.lua` | This repository's entry point. |
 | `TESTS/mcp_spec.lua` | Handshake, every tool, every error path — driven through `protocol.dispatch` with real JSON on both sides. |
 
