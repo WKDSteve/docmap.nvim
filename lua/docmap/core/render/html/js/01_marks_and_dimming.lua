@@ -129,7 +129,7 @@ return [[
     if(!wrap || !sel) return;
     var listed = I18N.locales.filter(function(l){ return l.offered || l.code === I18N.locale(); });
     wrap.hidden = listed.length < 2;
-    sel.innerHTML = "";
+    sel.replaceChildren();
     var auto = document.createElement("option");
     auto.value = "";
     auto.textContent = t("page.lang.auto");
@@ -548,7 +548,7 @@ return [[
   // its own sibling output.
   //
   // **Escaping first is not a detail, it is the whole safety argument.** A
-  // summary is author-controlled text that ends up as innerHTML. `esc` runs
+  // summary is author-controlled text that ends up as a markup string. `esc` runs
   // over the entire string before a single tag is introduced, and the only
   // tags this can then produce are the `<code>` pair it writes itself —
   // there is no path from source text to markup, because by the time the
