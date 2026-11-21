@@ -14,8 +14,9 @@
 --- working set from 137 MB to 237 MB. The functions/markers pair asks back
 --- to back, so remembering the last source alone catches it at no memory
 --- cost (129 MB, -20%). The coverage/check pair is a stage apart and is not
---- caught; sharing that one needs the two passes over the spec files fused,
---- not a bigger cache.
+--- caught by the tree memory; `core/spec_scan` shares that one by keeping
+--- what both stages read from a spec file (a few name sets, no tree) in
+--- `M.memo`.
 ---
 --- The memory only exists inside `scoped()`, which `scan_full` wraps around
 --- itself. Outside a scope every call parses afresh and keeps nothing, and
@@ -65,6 +66,24 @@ function M.root(src, grammar)
   return tree and tree:root() or nil
 end
 
+---Per scan, a bag for results derived from sources (not trees): what
+---`core/spec_scan` keeps per spec file. `nil` outside a scope, so a caller
+---outside one recomputes and keeps nothing, like `M.root`.
+---@type table<string, table>?
+local memos = nil
+
+---The memo table named `name` of the open scope, created on first use; `nil`
+---outside a scope. Released with the scope, errors included.
+---@param name string
+---@return table?
+function M.memo(name)
+  if not memos then
+    return nil
+  end
+  memos[name] = memos[name] or {}
+  return memos[name]
+end
+
 ---Run `fn` with the memory on; drop the remembered trees when the outermost
 ---scope ends. Nested scopes share the outer cache. Errors pass through
 ---unchanged (level 0), after the cache is released. `fn` hands its results
@@ -75,11 +94,13 @@ function M.scoped(fn)
   depth = depth + 1
   if depth == 1 then
     cache = {}
+    memos = {}
   end
   local ok, err = pcall(fn)
   depth = depth - 1
   if depth == 0 then
     cache = nil
+    memos = nil
   end
   if not ok then
     error(err, 0)

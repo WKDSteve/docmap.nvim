@@ -256,6 +256,7 @@ local specs = {
   "annotate_spec.lua",
   "markers_spec.lua",
   "ts_parse_spec.lua",
+  "spec_scan_spec.lua",
   "scopes_spec.lua",
   "scan_scope_spec.lua",
   "scan_repo_url_derive_spec.lua",

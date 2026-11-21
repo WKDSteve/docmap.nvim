@@ -23,32 +23,6 @@
 
 local M = {}
 
-local IDENT_QUERY = vim.treesitter.query.parse("lua", "(identifier) @id")
-
----Every identifier mentioned in `src`, by name — `calls.identifier_counts`
----duplicated rather than reused across a require, since `calls.lua` frames
----it as "used as a value" over the *source* tree and this reads over the
----*test* tree; two different questions sharing one small query.
----@param src string
----@return table<string, boolean>
-local function mentioned_names(src)
-  -- Through `core/ts_parse` like every scan-time parse; `check` parses the
-  -- same spec files a stage later, which that module's header explains is
-  -- deliberately not cached.
-  local root = require("docmap.core.ts_parse").root(src, "lua")
-  if not root then
-    return {}
-  end
-
-  local names = {}
-  for id, node in IDENT_QUERY:iter_captures(root, src) do
-    if IDENT_QUERY.captures[id] == "id" then
-      names[vim.treesitter.get_node_text(node, src)] = true
-    end
-  end
-  return names
-end
-
 ---Last dot/colon-separated segment: `M.scan_full` / `M:put` -> `scan_full`
 ---/ `put`. What a spec file actually writes when it calls a function whose
 ---owning table is a local import, not the file's own `M`.
@@ -92,11 +66,9 @@ function M.resolve(ir, opts)
 
   local mentioned = {}
   for _, path in ipairs(lua_files(root, tests_dir)) do
-    local fd = io.open(path, "rb")
-    if fd then
-      local src = fd:read("*a")
-      fd:close()
-      for name in pairs(mentioned_names(src)) do
+    local facts = require("docmap.core.spec_scan").facts(path)
+    if facts then
+      for name in pairs(facts.names) do
         mentioned[name] = true
       end
     end

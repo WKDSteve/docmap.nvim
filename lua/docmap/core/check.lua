@@ -943,54 +943,6 @@ local function check_orphaned_types(ir, findings, opts)
   end
 end
 
---- Everything one spec file has to say, in a single pattern set so the tree
---- is walked once instead of three times. Measured over this repo's 75 spec
---- files: one walk is ~45ms where three were ~126ms, against ~80ms of
---- parsing that has to happen either way.
----
---- `@bind` is used only to *count*: a name bound twice in one file is one
---- this check refuses to reason about. That is cheaper and more honest than
---- a scope model, and it is what answers the shadowing local measured in
---- runtime-analysis.nvim — a `local config = { host = … }` inside a test
---- body, in a file that also binds `local config = require(…)`.
----
---- **The require pattern is deliberately not anchored on `(chunk …)`.** It
---- was, and profiling caught what reading could not: the anchored version
---- matched *once* across all 75 spec files, because a spec in this ecosystem
---- is `return function(H) … end` and every require sits inside that
---- function. The check was therefore looking at almost nothing while
---- appearing to work. Following a binding across scopes is safe here only
---- because `@bind` counts it first.
-local TEST_QUERY = vim.treesitter.query.parse(
-  "lua",
-  [[
-  (variable_declaration (assignment_statement (variable_list (identifier) @bind)))
-  (parameters (identifier) @bind)
-
-  (variable_declaration
-    (assignment_statement
-      (variable_list (identifier) @alias)
-      (expression_list
-        (function_call
-          name: (identifier) @req (#eq? @req "require")
-          arguments: (arguments (string) @module)))))
-
-  (dot_index_expression table: (identifier) @tbl field: (identifier) @field)
-]]
-)
-
----First node of a capture, across both `iter_matches` shapes.
----@param match table
----@param id integer?
----@return TSNode?
-local function first(match, id)
-  local v = id and match[id]
-  if not v then
-    return nil
-  end
-  return type(v) == "table" and v[1] or v
-end
-
 ---One spec file: resolve its require-bound members against the tree.
 ---@param findings Docmap.Finding[]
 ---@param root string
@@ -998,55 +950,13 @@ end
 ---@param idx Docmap.Docs.Index
 ---@param surface_of fun(module: string): { enumerable: boolean, members: table<string, boolean> }
 local function check_one_test_file(findings, root, path, idx, surface_of)
-  local fd = io.open(path, "rb")
-  if not fd then
+  -- One read and one parse per spec per scan, shared with `coverage.resolve`
+  -- (`core/spec_scan`).
+  local facts = require("docmap.core.spec_scan").facts(path)
+  if not facts then
     return
   end
-  local src = fd:read("*a")
-  fd:close()
-
-  -- Through `core/ts_parse` like every scan-time parse. `coverage.resolve`
-  -- parsed this file a stage earlier; that tree is not kept (memory), see
-  -- that module's header.
-  local tree_root = require("docmap.core.ts_parse").root(src, "lua")
-  if not tree_root then
-    return
-  end
-
-  local cap = {}
-  for id, name in ipairs(TEST_QUERY.captures) do
-    cap[name] = id
-  end
-
-  local bound = {}
-  local module_of = {}
-  local members = {}
-
-  for _, match in TEST_QUERY:iter_matches(tree_root, src) do
-    local bind_node = first(match, cap.bind)
-    if bind_node then
-      local name = vim.treesitter.get_node_text(bind_node, src)
-      bound[name] = (bound[name] or 0) + 1
-    end
-
-    local alias_node = first(match, cap.alias)
-    local module_node = first(match, cap.module)
-    if alias_node and module_node then
-      local alias = vim.treesitter.get_node_text(alias_node, src)
-      local module = vim.treesitter.get_node_text(module_node, src)
-      module_of[alias] = (module:gsub("^['\"]", ""):gsub("['\"]$", ""))
-    end
-
-    local tbl_node = first(match, cap.tbl)
-    local field_node = first(match, cap.field)
-    if tbl_node and field_node then
-      members[#members + 1] = {
-        alias = vim.treesitter.get_node_text(tbl_node, src),
-        field = vim.treesitter.get_node_text(field_node, src),
-        row = select(1, tbl_node:range()),
-      }
-    end
-  end
+  local bound, module_of, members = facts.bound, facts.module_of, facts.members
 
   if not next(module_of) then
     return
