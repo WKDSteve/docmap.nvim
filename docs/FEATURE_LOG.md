@@ -3802,3 +3802,24 @@ English and German; a finding is rendered in the reader's language on an interac
 wherever a committed file is written, so `--check` never depends on the machine's `LANG`. The page embeds
 every catalog and switches without a reload, but offers a language only once the whole page speaks it. See
 [`i18n.md`](i18n.md).
+
+## The page runs under Trusted Types (2026-11-21)
+
+The generated page assigned strings of its own markup to `innerHTML` in about 80 places, which a page served with
+`Content-Security-Policy: require-trusted-types-for 'script'` refuses ("This document requires 'TrustedHTML'
+assignment"). docmap-desktop shows the map in a blob frame that inherits the CSP of its page, so that was the reason
+its web page could not ask for Trusted Types.
+
+- **No string reaches a parser of the browser.** `DOMParser`, `createContextualFragment` and `template.innerHTML` are
+  sinks as well, and a policy with `createHTML: (s) => s` would only move the sink. The slice `01b_markup` reads the
+  page's own fragments (`markupNodes`, `setMarkup`, `appendMarkup`) and builds the nodes with `createElement`,
+  `setAttribute` and `createTextNode`. A text from a project file reaches the markup only through `esc`; the reader
+  turns `&lt;` into a character of a text node, never into a tag. It builds no `script`, `style`, `iframe`, `object`,
+  `embed`, `link`, `meta` or `base`, no `on…` attribute, no `srcdoc`, no `javascript:` link.
+- **Same DOM as before.** The reader was compared with the browser's own parser on every string the page assigned
+  while a sweep opened all tabs of the four fixture pages (253 distinct strings, no difference), which is why the
+  visible behaviour did not change. It implies the end tags the HTML parser implies (`p`, `li`, `td`, `tr`, table
+  sections, `option`, and the `tbody` of a bare `<table><tr>`).
+- **Check:** `TESTS/trusted_types_spec.lua` (no sink in the script source) and `TESTS/browser/trusted_types_check.js`
+  (Chromium under the header, every tab, view, menu and popup; a violation, console error or page error fails; skips
+  without node, playwright or chromium). The page before this change fails it with the `innerHTML` violation.
