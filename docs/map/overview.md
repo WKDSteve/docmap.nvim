@@ -3,7 +3,7 @@
 > **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**8 modules** · 8 namespaces · 158 helper files
+**8 modules** · 8 namespaces · 159 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
@@ -98,6 +98,7 @@ flowchart LR
   nlua_docmap_core_scopes_lua["docmap.core.scopes"]
   nlua_docmap_core_snippet_lua["docmap.core.snippet"]
   nlua_docmap_core_soft_require_lua["docmap.core.soft_require"]
+  nlua_docmap_core_spec_scan_lua["docmap.core.spec_scan"]
   nlua_docmap_core_startup_graph_lua["docmap.core.startup_graph"]
   nlua_docmap_core_symbols_lua["docmap.core.symbols"]
   nlua_docmap_core_tagfiles_lua["docmap.core.tagfiles"]
@@ -173,8 +174,8 @@ flowchart LR
   nlua_docmap_core_check_lua --> nlua_docmap_core_loaded_diff_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_scopes_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_spec_scan_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_telemetry_join_lua
-  nlua_docmap_core_check_lua --> nlua_docmap_core_ts_parse_lua
   nlua_docmap_core_check_policy_lua --> nlua_docmap_core_i18n
   nlua_docmap_core_checklist_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_churn_lua --> nlua_docmap_core_telemetry_join_lua
@@ -194,7 +195,7 @@ flowchart LR
   nlua_docmap_core_cli_lua --> nlua_docmap_core_telemetry_join_lua
   nlua_docmap_core_consumers_lua --> nlua_docmap_core_artifact_lua
   nlua_docmap_core_coverage_lua --> nlua_docmap_core_safe_fs_lua
-  nlua_docmap_core_coverage_lua --> nlua_docmap_core_ts_parse_lua
+  nlua_docmap_core_coverage_lua --> nlua_docmap_core_spec_scan_lua
   nlua_docmap_core_deps_lua --> nlua_docmap_core_lang_registry_lua
   nlua_docmap_core_diff_lua --> nlua_docmap_core_check_lua
   nlua_docmap_core_diff_lua --> nlua_docmap_core_deps_lua
@@ -248,6 +249,7 @@ flowchart LR
   nlua_docmap_core_scan_lua --> nlua_docmap_core_plugins_lua
   nlua_docmap_core_scan_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_scan_lua --> nlua_docmap_core_snippet_lua
+  nlua_docmap_core_spec_scan_lua --> nlua_docmap_core_ts_parse_lua
   nlua_docmap_core_startup_graph_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_core_symbols_lua --> nlua_docmap_core_scan_lua
   nlua_docmap_core_tagfiles_lua --> nlua_docmap_core_find_lua
