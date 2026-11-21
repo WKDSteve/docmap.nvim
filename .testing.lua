@@ -125,6 +125,14 @@ return {
       min_nvim = { version = "0.11.4", why = "the version floor docs/ promises" },
       -- the browser sheets (TESTS/sheets/*.sheet.lua with a page): the version mdview.nvim pins
       playwright = { version = "1.64.1", used_by = "the browser sheets" },
+      -- the screenshots of the browser sheets, red or green, from the full ubuntu leg (sheet-shots-ubuntu, 14 days)
+      artifacts = {
+        {
+          name = "sheet-shots",
+          path = "TESTS/sheets/out/**/*.png",
+          why = "what the page looked like is the evidence a sheet leaves behind",
+        },
+      },
       checkouts = {
         {
           repo = "WKDSteve/rules.nvim",

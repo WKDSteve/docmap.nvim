@@ -211,6 +211,14 @@ jobs:
             ${{ runner.temp }}/suite-ir.json
           if-no-files-found: ignore
           retention-days: 14
+      # sheet-shots: what the page looked like is the evidence a sheet leaves behind
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always() && matrix.hosted && matrix.steps == ''
+        with:
+          name: sheet-shots-${{ matrix.name }}
+          path: "TESTS/sheets/out/**/*.png"
+          if-no-files-found: ignore
+          retention-days: 14
 
   # Moves the branch `ci-verified` to a commit whose pipeline is green on all three systems, never backwards along main
   # (two pushes can finish out of order), and retries a lost lease. A consumer that checks this repository out with
