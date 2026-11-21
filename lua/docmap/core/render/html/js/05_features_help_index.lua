@@ -127,7 +127,7 @@ return [[
       b.setAttribute("aria-selected", on ? "true" : "false");
     });
     var line = host.querySelector(".feat-count");
-    if(line) line.innerHTML = featureCountLine(feats, theme);
+    if(line) setMarkup(line, featureCountLine(feats, theme));
 
     if(pendingFeatureCard){
       var card = host.querySelector('.feat-card[data-feat-card="' +
@@ -154,7 +154,7 @@ return [[
     if(!feats){
       parts.push('<p class="ntext none">' + rich(t("page.features.none")) + '</p>');
       parts.push("</div>");
-      host.innerHTML = parts.join("");
+      setMarkup(host, parts.join(""));
       return;
     }
 
@@ -234,7 +234,7 @@ return [[
     });
 
     parts.push("</div>");
-    host.innerHTML = parts.join("");
+    setMarkup(host, parts.join(""));
 
     host.querySelectorAll("#feattoggle .anview-btn").forEach(function(b){
       b.addEventListener("click", function(){
@@ -534,8 +534,8 @@ return [[
     // the nine tabs an association they never had.
     explainpop.id = explainpop.id || "explainpop";
     el.setAttribute("aria-describedby", explainpop.id);
-    explainpop.innerHTML = '<div class="fn-desc"></div>';
-    // `textContent`, not `innerHTML`: these strings carry backticks as
+    setMarkup(explainpop, '<div class="fn-desc"></div>');
+    // `textContent`, not markup: these strings carry backticks as
     // literal characters and nothing else, and a card that renders markup
     // is a card somebody eventually puts a link in.
     explainpop.querySelector(".fn-desc").textContent = text;
@@ -643,11 +643,11 @@ return [[
     var entries = subTabs(s.tab);
     if(!entries.length){
       host.hidden = true;
-      host.innerHTML = "";
+      host.replaceChildren();
       return;
     }
     host.hidden = false;
-    host.innerHTML = "";
+    host.replaceChildren();
     entries.forEach(function(e){
       var b = document.createElement("button");
       b.className = "subtab-btn";
@@ -842,7 +842,7 @@ return [[
     parts.push('<div class="feat-src"><a href="#" data-src="' + esc(f.path) + '">' +
       esc(f.path) + ':' + e.line + '</a></div>');
     parts.push("</div>");
-    host.innerHTML = parts.join("");
+    setMarkup(host, parts.join(""));
 
     var nameEl = host.querySelector(".feat-tab-name[data-node]");
     if(nameEl){
@@ -1019,7 +1019,7 @@ return [[
   function drawIndex(){
     var host = document.getElementById("ixbody");
     var iview = state.iview === "modules" ? "modules" : "functions";
-    host.innerHTML = iview === "modules" ? renderIndexModules() : renderIndexFunctions();
+    setMarkup(host, iview === "modules" ? renderIndexModules() : renderIndexFunctions());
     wireIndexBody(host);
   }
 
