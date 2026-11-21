@@ -3,7 +3,7 @@
 > **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**8 modules** · 8 namespaces · 160 helper files
+**8 modules** · 8 namespaces · 161 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
@@ -335,13 +335,13 @@ flowchart LR
 
 ## Drift
 
-0 errors · 0 warnings · 45 info
+0 errors · 0 warnings · 46 info
 
 No errors or warnings.
 
 
 <details>
-<summary>45 informational findings</summary>
+<summary>46 informational findings</summary>
 
 
 | Check | Message |
@@ -378,6 +378,7 @@ No errors or warnings.
 | `unreferenced-module` | docmap.core.lang.tsx is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.zig is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.render.html.js.01_marks_and_dimming is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.render.html.js.01b_markup is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.render.html.js.02_explorer_and_state is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.render.html.js.03_tree_findings_tabs_hierarchy is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.render.html.js.04_directed_views_and_notes is required by no other file in the tree |
