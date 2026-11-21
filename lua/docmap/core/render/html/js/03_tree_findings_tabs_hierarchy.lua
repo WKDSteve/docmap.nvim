@@ -32,8 +32,8 @@ return [[
 
     var head = document.createElement("div");
     head.className = "row fnhead";
-    head.innerHTML = '<span class="tw">▸</span>' +
-      i18nSpan("nm", "page.tree.functions", { count: n.functions.length });
+    setMarkup(head, '<span class="tw">▸</span>' +
+      i18nSpan("nm", "page.tree.functions", { count: n.functions.length }));
 
     var list = document.createElement("div");
     list.className = "kids fnkids hide";
@@ -44,9 +44,9 @@ return [[
       r.className = "row k-fn";
       r.dataset.fn = key;
       r.dataset.id = n.id;
-      r.innerHTML = '<span class="tw"></span>' +
+      setMarkup(r, '<span class="tw"></span>' +
         '<span class="nm">' + esc(fn.signature) + '</span>' +
-        '<span class="sm">' + prose(fn.summary || "") + '</span>';
+        '<span class="sm">' + prose(fn.summary || "") + '</span>');
       r.addEventListener("click", function(){
         navigate({ tab: "tree", id: n.id });
       });
@@ -71,11 +71,10 @@ return [[
     var row = document.createElement("div");
     row.className = "row k-" + n.kind;
     row.dataset.id = n.id;
-    row.innerHTML =
-      '<span class="tw">' + (hasKids ? "▾" : "") + '</span>' +
+    setMarkup(row, '<span class="tw">' + (hasKids ? "▾" : "") + '</span>' +
       '<span class="nm">' + esc(n.name) + '</span>' +
       badges(n) +
-      '<span class="sm">' + prose(n.summary || "") + '</span>';
+      '<span class="sm">' + prose(n.summary || "") + '</span>');
 
     var box = document.createElement("div");
     box.appendChild(row);
@@ -340,7 +339,7 @@ return [[
     meta.push(t("page.detail.meta.kind", { kind: n.kind }));
     h.push('<div class="sec">'+esc(t("page.detail.meta"))+'</div><ul class="lst"><li>'+esc(meta.join("  ·  "))+'</li></ul>');
 
-    detailEl.innerHTML = h.join("");
+    setMarkup(detailEl, h.join(""));
 
     // One handler per link family. `fn: null` on the Deps/Hierarchy hops is
     // not redundant: leaving a stale function centered would make a later
@@ -453,7 +452,7 @@ return [[
       // that hangs the page if it is ever wrong.
       if(chain.length > 64) break;
     }
-    host.innerHTML = "";
+    host.replaceChildren();
     // One level deep is the root itself, which `⌂ Root` already says. A
     // breadcrumb of one entry is a label pretending to be navigation.
     if(chain.length < 2){ host.hidden = true; return; }
@@ -692,7 +691,7 @@ return [[
         h += '<div class="et-row et-back"><span class="et-n">' + back + '</span> ' +
           (back === 1 ? "call" : "calls") + " back</div>";
       }
-      edgeTip.innerHTML = h;
+      setMarkup(edgeTip, h);
       edgeTip.classList.add("on");
       // Widen the real edge while it is described, so it is unambiguous which
       // of several overlapping lines the readout belongs to. Set inline and

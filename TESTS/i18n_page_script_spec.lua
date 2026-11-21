@@ -58,7 +58,7 @@ return function(H)
     {
       slice = "03_tree_findings_tabs_hierarchy",
       from = "  function renderDetail(n){",
-      to = '    detailEl.innerHTML = h.join("");',
+      to = '    setMarkup(detailEl, h.join(""));',
       task = "i18n-page-tree-index-notes-quicks (the Tree detail pane)",
     },
     {
