@@ -7,6 +7,7 @@
 
 local SLICES = {
   "docmap.core.render.html.js.01_marks_and_dimming",
+  "docmap.core.render.html.js.01b_markup",
   "docmap.core.render.html.js.02_explorer_and_state",
   "docmap.core.render.html.js.03_tree_findings_tabs_hierarchy",
   "docmap.core.render.html.js.04_directed_views_and_notes",
