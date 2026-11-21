@@ -324,13 +324,12 @@ return [[
   function drawCoupling(centerId){
     var rows = couplingRows(centerId);
     couplingShown = rows;
-    haltBar.innerHTML =
-      '<span class="hmuted">' + esc(t("page.coupling.bar", { high: COUPLING_HIGH })) + '</span>' +
-      '<span class="cq-read" id="cq-read" aria-live="polite"></span>';
+    setMarkup(haltBar, '<span class="hmuted">' + esc(t("page.coupling.bar", { high: COUPLING_HIGH })) + '</span>' +
+      '<span class="cq-read" id="cq-read" aria-live="polite"></span>');
     haltBody.removeAttribute("role");
     if(!rows.length){
-      haltBody.innerHTML = '<p class="hmsg">' +
-        esc(t("page.coupling.empty", { name: byId[centerId].name || centerId })) + '</p>';
+      setMarkup(haltBody, '<p class="hmsg">' +
+        esc(t("page.coupling.empty", { name: byId[centerId].name || centerId })) + '</p>');
       couplingReadout(null);
       return;
     }
@@ -383,7 +382,7 @@ return [[
         esc(couplingText(r)) + '</title></circle>');
     });
     s.push('</svg>');
-    haltBody.innerHTML = s.join("");
+    setMarkup(haltBody, s.join(""));
     couplingReadout(null);
   }
 
@@ -779,11 +778,11 @@ return [[
     [first, ringShown.entry].forEach(function(id){ if(id && ids.indexOf(id) === -1) ids.unshift(id); });
     var all = 0;
     IR.nodes.forEach(function(n){ if(ringModule(n.id)) all++; });
-    sel.innerHTML = ids.map(function(id){
+    setMarkup(sel, ids.map(function(id){
       return '<option value="' + esc(id) + '"' + (id === ringShown.entry ? " selected" : "") + ">" +
         esc(t("page.rings.entry.option", { name: ringName(id), reached: ringDistances(id).order.length, total: all })) +
         "</option>";
-    }).join("");
+    }).join(""));
   }
 
   // What stands under the diagram: the two numbers the view is for, and the
