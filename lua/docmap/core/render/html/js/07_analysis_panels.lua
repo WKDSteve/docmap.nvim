@@ -48,12 +48,12 @@ return [[
   function drawAnalysisTelemetry(){
     var host = document.getElementById("anbody");
     if(!historyAvailable()){
-      host.innerHTML = '<p class="hmsg">' + paragraphs(t("page.telemetry.file")) + '</p>';
+      setMarkup(host, '<p class="hmsg">' + paragraphs(t("page.telemetry.file")) + '</p>');
       return;
     }
 
     var token = ++telReqToken;
-    host.innerHTML = '<p class="hmsg">' + esc(t("page.telemetry.loading")) + '</p>';
+    setMarkup(host, '<p class="hmsg">' + esc(t("page.telemetry.loading")) + '</p>');
 
     var snapListPromise = telSnapLoaded
       ? Promise.resolve(telSnapList)
@@ -76,7 +76,7 @@ return [[
         explainFetchFailure(e, "telemetry").then(function(msg){
           // The token is re-checked after the probe: a newer selection may
           // have superseded this one while it was in flight.
-          if(token === telReqToken) host.innerHTML = msg;
+          if(token === telReqToken) setMarkup(host, msg);
         });
       });
   }
@@ -148,12 +148,12 @@ return [[
     var host = document.getElementById("anbody");
 
     if(!dA || !dA.available){
-      host.innerHTML = telPickerHTML() + '<p class="ntext none">' + telUnavailableMessage(dA) + '</p>';
+      setMarkup(host, telPickerHTML() + '<p class="ntext none">' + telUnavailableMessage(dA) + '</p>');
       telWirePicker();
       return;
     }
     if(dB !== null && (!dB || !dB.available)){
-      host.innerHTML = telPickerHTML() + '<p class="ntext none">' + telUnavailableMessage(dB) + '</p>';
+      setMarkup(host, telPickerHTML() + '<p class="ntext none">' + telUnavailableMessage(dB) + '</p>');
       telWirePicker();
       return;
     }
@@ -175,7 +175,7 @@ return [[
 
       if(totalRows === 0){
         parts.push('<p class="ntext none">' + rich(t("page.telemetry.unresolved", { namespace: dA.namespace })) + '</p>');
-        host.innerHTML = parts.join("");
+        setMarkup(host, parts.join(""));
         telWirePicker();
         return;
       }
@@ -193,7 +193,7 @@ return [[
         anFilterNote(rows.length, totalRows) + '</p>');
       if(rows.length === 0){
         parts.push('<p class="ntext none">' + esc(t("page.an.nomatch.function")) + '</p>');
-        host.innerHTML = parts.join("");
+        setMarkup(host, parts.join(""));
         telWirePicker();
         return;
       }
@@ -206,7 +206,7 @@ return [[
           '</tr>');
       });
       parts.push("</tbody></table>");
-      host.innerHTML = parts.join("");
+      setMarkup(host, parts.join(""));
       host.querySelectorAll(".anrow").forEach(function(tr){
         tr.addEventListener("click", function(){
           navigate({ tab: "tree", id: tr.dataset.node });
@@ -252,7 +252,7 @@ return [[
       anFilterNote(diffRows.length, allKeys.length) + '</p>');
     if(diffRows.length === 0){
       parts.push('<p class="ntext none">' + esc(t("page.an.nomatch.function")) + '</p>');
-      host.innerHTML = parts.join("");
+      setMarkup(host, parts.join(""));
       telWirePicker();
       return;
     }
@@ -268,7 +268,7 @@ return [[
         '</tr>');
     });
     parts.push("</tbody></table>");
-    host.innerHTML = parts.join("");
+    setMarkup(host, parts.join(""));
     host.querySelectorAll(".anrow").forEach(function(tr){
       tr.addEventListener("click", function(){
         navigate({ tab: "tree", id: tr.dataset.node });
@@ -402,7 +402,7 @@ return [[
   //
   // **A node, not a string, and that is the reason this is not a case in
   // `renderAnalysis`.** Everything there returns HTML that reaches `#anbody`
-  // through `innerHTML`, which would parse this content a second time —
+  // through `setMarkup`, which would parse this content a second time —
   // once by the HTML parser at load, once by the assignment. Cloning a
   // `<template>`'s content parses it exactly once, at load, from bytes Lua
   // wrote after checking them. It also means a `<script>` could not run even
@@ -414,12 +414,12 @@ return [[
     var tpl = document.getElementById("startup-graph");
 
     if(!tpl){
-      host.innerHTML = '<p class="ntext none">' + rich(t("page.startup.none")) + '</p>';
+      setMarkup(host, '<p class="ntext none">' + rich(t("page.startup.none")) + '</p>');
       return;
     }
 
-    host.innerHTML = '<p class="nsub">' + rich(t(tpl.dataset.measured ? "page.startup.sub.measured" : "page.startup.sub",
-      { measured: tpl.dataset.measured })) + '</p>';
+    setMarkup(host, '<p class="nsub">' + rich(t(tpl.dataset.measured ? "page.startup.sub.measured" : "page.startup.sub",
+      { measured: tpl.dataset.measured })) + '</p>');
 
     var frame = document.createElement("div");
     frame.className = "startup-graph";
@@ -429,7 +429,7 @@ return [[
 
   function drawAnalysisChecklist(){
     var host = document.getElementById("anbody");
-    host.innerHTML = renderChecklistBody();
+    setMarkup(host, renderChecklistBody());
 
     // One fetch per page load, not per panel open: the answer only changes
     // when someone commits, and re-asking on every tab switch would spawn a
@@ -440,7 +440,7 @@ return [[
     fetch("/api/checklist").then(function(r){ return r.json(); }).then(function(d){
       if(d && d.available) checklistStatus = d;
       if(state.tab === "analysis" && state.atool === "checklist"){
-        document.getElementById("anbody").innerHTML = renderChecklistBody();
+        setMarkup(document.getElementById("anbody"), renderChecklistBody());
       }
     }).catch(function(){
       // Still silent — the panel above is already complete and correct
@@ -449,7 +449,7 @@ return [[
       // still reading, which is what this flag is for.
       checklistFailed = true;
       if(state.tab === "analysis" && state.atool === "checklist"){
-        document.getElementById("anbody").innerHTML = renderChecklistBody();
+        setMarkup(document.getElementById("anbody"), renderChecklistBody());
       }
     });
   }
@@ -457,7 +457,7 @@ return [[
   function drawAnalysisLoaded(){
     var host = document.getElementById("anbody");
     if(!historyAvailable()){
-      host.innerHTML = '<p class="hmsg">' + paragraphs(t("page.loaded.file")) + '</p>';
+      setMarkup(host, '<p class="hmsg">' + paragraphs(t("page.loaded.file")) + '</p>');
       return;
     }
 
@@ -477,7 +477,7 @@ return [[
     // fetched" because a *second*, later fetch is just as real as the first.
     // Left un-gated only for the true no-op case: an already-loaded list
     // with no snapshot picked resolves with nothing to wait for.
-    if(!loadedSnapLoaded || state.lsnap) host.innerHTML = '<p class="hmsg">' + esc(t("page.loaded.loading")) + '</p>';
+    if(!loadedSnapLoaded || state.lsnap) setMarkup(host, '<p class="hmsg">' + esc(t("page.loaded.loading")) + '</p>');
 
     var snapListPromise = loadedSnapLoaded
       ? Promise.resolve(loadedSnapList)
@@ -505,7 +505,7 @@ return [[
         renderAnalysisLoadedBody(d, list);
       });
     }).catch(function(e){
-      explainFetchFailure(e, "loaded").then(function(msg){ host.innerHTML = msg; });
+      explainFetchFailure(e, "loaded").then(function(msg){ setMarkup(host, msg); });
     });
   }
 
@@ -542,13 +542,13 @@ return [[
 
     if(!state.lsnap){
       parts.push('<p class="ntext none">' + esc(t("page.loaded.choose-above")) + '</p>');
-      host.innerHTML = parts.join("");
+      setMarkup(host, parts.join(""));
       loadedWirePicker();
       return;
     }
     if(!d || !d.available){
       parts.push('<p class="ntext none">' + loadedUnavailableMessage(d) + '</p>');
-      host.innerHTML = parts.join("");
+      setMarkup(host, parts.join(""));
       loadedWirePicker();
       return;
     }
@@ -566,7 +566,7 @@ return [[
     if(totalRows === 0){
       parts.push('<p class="ntext none">' + rich(t("page.loaded.agrees", { snapshot: d.snapshot, captured: capturedAt,
         prefix: d.prefix })) + '</p>');
-      host.innerHTML = parts.join("");
+      setMarkup(host, parts.join(""));
       loadedWirePicker();
       return;
     }
@@ -585,7 +585,7 @@ return [[
       captured: capturedAt, prefix: d.prefix })) + anFilterNote(rows.length, totalRows) + '</p>');
     if(rows.length === 0){
       parts.push('<p class="ntext none">' + esc(t("page.an.nomatch.function")) + '</p>');
-      host.innerHTML = parts.join("");
+      setMarkup(host, parts.join(""));
       loadedWirePicker();
       return;
     }
@@ -599,7 +599,7 @@ return [[
         '</tr>');
     });
     parts.push("</tbody></table>");
-    host.innerHTML = parts.join("");
+    setMarkup(host, parts.join(""));
     host.querySelectorAll(".anrow").forEach(function(tr){
       tr.addEventListener("click", function(){
         navigate({ tab: "tree", id: tr.dataset.node });
