@@ -23,22 +23,109 @@ function M.run(root, args)
   return vim.trim(out)
 end
 
----Whether `root` is inside a git work tree.
+---@class Docmap.Testing.GitStatus
+---@field head string|nil Full sha of HEAD; nil before the first commit.
+---@field paths string[] Root-relative paths with uncommitted changes, untracked files included.
+---@field untracked string[] Root-relative untracked files (gitignore respected).
+
+---The prefix of `root` below the top of its work tree ("" at the top): git
+---status names paths from the top, the pathspecs here are relative to `root`.
 ---@param root string
----@return boolean
-function M.in_repo(root)
-  return M.run(root, { "rev-parse", "--is-inside-work-tree" }) == "true"
+---@return string
+local function root_prefix(root)
+  local abs = vim.fn.fnamemodify(root, ":p"):gsub("\\", "/"):gsub("/+$", "")
+  local info = require("docmap.core.git_files").find(abs)
+  if not info then
+    return ""
+  end
+  local top = info.top
+  local fold = vim.fn.has("win32") == 1 and string.lower or function(s)
+    return s
+  end
+  if #abs > #top and fold(abs:sub(1, #top + 1)) == fold(top .. "/") then
+    return abs:sub(#top + 2)
+  end
+  return ""
 end
 
----Full sha of HEAD, or nil (no repository, no commit yet).
+---Everything the freshness check and the untracked half of `changed_since`
+---need, in one process: whether `root` is a work tree at all (nil when not),
+---HEAD, and every changed or untracked path. Asked once per request instead
+---of `rev-parse` twice, `status` twice and `ls-files --others`.
 ---@param root string
----@return string|nil
-function M.head(root)
-  local out = M.run(root, { "rev-parse", "--verify", "-q", "HEAD" })
-  if out and out:match("^%x+$") then
-    return out
+---@return Docmap.Testing.GitStatus|nil
+function M.status(root)
+  local out = M.run(root, {
+    "status",
+    "--porcelain=v2",
+    "--branch",
+    "-z",
+    "--untracked-files=all",
+  })
+  if out == nil then
+    return nil
   end
-  return nil
+  local prefix = root_prefix(root)
+  local st = { head = nil, paths = {}, untracked = {} }
+  ---@param p string|nil Top-relative path.
+  ---@param untracked boolean|nil
+  local function add(p, untracked)
+    if not p or p == "" then
+      return
+    end
+    if prefix ~= "" then
+      if p:sub(1, #prefix + 1) ~= prefix .. "/" then
+        return
+      end
+      p = p:sub(#prefix + 2)
+    end
+    st.paths[#st.paths + 1] = p
+    if untracked then
+      st.untracked[#st.untracked + 1] = p
+    end
+  end
+  local recs = vim.split(out, "\0", { plain = true })
+  local i = 1
+  while i <= #recs do
+    local r = recs[i]
+    local kind = r:sub(1, 2)
+    if kind == "# " then
+      local oid = r:match("^# branch%.oid (%x+)$")
+      if oid then
+        st.head = oid
+      end
+    elseif kind == "1 " then
+      add(r:match("^1 %S+ %S+ %S+ %S+ %S+ %S+ %S+ (.+)$"))
+    elseif kind == "2 " then
+      -- A rename or copy: the next record is the original path, changed too.
+      add(r:match("^2 %S+ %S+ %S+ %S+ %S+ %S+ %S+ %S+ (.+)$"))
+      i = i + 1
+      add(recs[i])
+    elseif kind == "u " then
+      add(r:match("^u %S+ %S+ %S+ %S+ %S+ %S+ %S+ %S+ %S+ (.+)$"))
+    elseif kind == "? " then
+      add(r:sub(3), true)
+    end
+    i = i + 1
+  end
+  return st
+end
+
+---Whether any of `pathspecs` (plain root-relative files or directories) has
+---a change in `st`.
+---@param st Docmap.Testing.GitStatus
+---@param pathspecs string[]
+---@return boolean
+function M.dirty_in(st, pathspecs)
+  for _, spec in ipairs(pathspecs) do
+    local s = spec:gsub("^%./", ""):gsub("/+$", "")
+    for _, p in ipairs(st.paths) do
+      if s == "" or s == "." or p == s or p:sub(1, #s + 1) == s .. "/" then
+        return true
+      end
+    end
+  end
+  return false
 end
 
 ---The newest commit touching `pathspecs`: sha and committer time.
@@ -72,17 +159,6 @@ function M.is_ancestor(root, ancestor, descendant)
   return M.run(root, { "merge-base", "--is-ancestor", ancestor, descendant }) ~= nil
 end
 
----Whether any of `pathspecs` has uncommitted changes (modified or untracked).
----@param root string
----@param pathspecs string[]
----@return boolean
-function M.dirty(root, pathspecs)
-  local args = { "status", "--porcelain", "--" }
-  vim.list_extend(args, pathspecs)
-  local out = M.run(root, args)
-  return out ~= nil and out ~= ""
-end
-
 ---A revision as the caller may spell it: refs, shas, `HEAD~3`, `main@{1}`.
 ---Anything that could be read as an option, contains whitespace or a control
 ---character, or is absurdly long is refused outright.
@@ -101,8 +177,9 @@ end
 ---the untracked ones, deletions excluded (a deleted file has nothing to map).
 ---@param root string
 ---@param rev string A revision accepted by `valid_rev`.
+---@param st? Docmap.Testing.GitStatus|false The request's `status` snapshot, if it has one already.
 ---@return string[]|nil files `nil` when git could not answer.
-function M.changed_since(root, rev)
+function M.changed_since(root, rev, st)
   local out = M.run(root, { "diff", "--name-only", "--diff-filter=d", "-z", rev, "--" })
   if out == nil then
     return nil
@@ -118,9 +195,13 @@ function M.changed_since(root, rev)
     end
   end
   take(out)
-  local untracked = M.run(root, { "ls-files", "--others", "--exclude-standard", "-z" })
-  if untracked then
-    take(untracked)
+  if st == nil then
+    st = M.status(root)
+  end
+  if st then
+    for _, name in ipairs(st.untracked) do
+      take(name)
+    end
   end
   table.sort(files)
   return files

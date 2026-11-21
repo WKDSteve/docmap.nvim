@@ -1,6 +1,6 @@
 -- TESTS/sheets/testing-provider.sheet.lua -- the affected-spec provider a test runner asks (testing.nvim's
 -- affected selection): which specs does a change since a revision touch? The changed files come from git
--- (`docmap.testing.git`: `git diff --name-only <rev>` and `git ls-files --others`).
+-- (`docmap.testing.git`: `git diff --name-only <rev>` and one `git status --porcelain=v2`).
 return {
   id = "docmap.testing-provider",
   title = "The affected-spec provider names the specs a change since a revision touches",

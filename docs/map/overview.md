@@ -307,6 +307,7 @@ flowchart LR
   nlua_docmap_mcp_tools_lua --> nlua_docmap_core_findings_lua
   nlua_docmap_mcp_tools_lua --> nlua_docmap_core_json_lua
   nlua_docmap_testing_freshness_lua --> nlua_docmap_testing_git_lua
+  nlua_docmap_testing_git_lua --> nlua_docmap_core_git_files_lua
   nlua_docmap_testing_specs_lua --> nlua_docmap_core_deps_lua
   nlua_docmap_testing_specs_lua --> nlua_docmap_core_safe_fs_lua
 ```

@@ -633,11 +633,15 @@ function M.affected_specs(opts)
   for _, p in ipairs(opts.changed or {}) do
     raw[#raw + 1] = p
   end
+  -- One `git status` per request, shared by the untracked files of `since`
+  -- and the freshness check (`false`: not a repository).
+  local st
   if opts.since ~= nil then
     if not gitq.valid_rev(opts.since) then
       return nil, "affected_specs: opts.since is not a valid revision"
     end
-    local files = gitq.changed_since(root, opts.since)
+    st = gitq.status(root) or false
+    local files = gitq.changed_since(root, opts.since, st)
     if not files then
       return nil, ("affected_specs: git could not list the changes since %s"):format(opts.since)
     end
@@ -656,7 +660,7 @@ function M.affected_specs(opts)
   local ok, result = pcall(function()
     local deps = require("docmap.core.deps")
     local freshness = require("docmap.testing.freshness")
-    local graph = freshness.assess(root, map_rel, map_abs, ir.meta, pick(opts, cfg, "lua_root"))
+    local graph = freshness.assess(root, map_rel, map_abs, ir.meta, pick(opts, cfg, "lua_root"), st)
     local gaps = graph.gaps
 
     if graph.stale and opts.verify == true and matches_fresh_scan(root, ir) then

@@ -74,8 +74,9 @@ end
 ---@param map_abs string Absolute path of the map file.
 ---@param meta table|nil The map's `meta` (source directories).
 ---@param lua_root string|nil
+---@param st? Docmap.Testing.GitStatus|false The request's `status` snapshot (`false`: not a repository); asked here when nil.
 ---@return Docmap.Testing.Graph graph Without `gaps` (the caller owns those).
-function M.assess(root, map_rel, map_abs, meta, lua_root)
+function M.assess(root, map_rel, map_abs, meta, lua_root, st)
   local stat = (vim.uv or vim.loop).fs_stat(map_abs)
   local mtime = stat and stat.mtime and stat.mtime.sec or nil
 
@@ -91,16 +92,21 @@ function M.assess(root, map_rel, map_abs, meta, lua_root)
     gaps = {},
   }
 
-  if not gitq.in_repo(root) then
+  -- One `git status` answers "is this a repository", HEAD and both dirty
+  -- questions (`docmap.testing.git.status`).
+  if st == nil then
+    st = gitq.status(root)
+  end
+  if not st then
     graph.stale_reason = "no git history: the age of the map cannot be judged"
     return graph
   end
 
-  graph.head = gitq.head(root)
+  graph.head = st.head
   local specs = M.source_pathspecs(meta, lua_root)
-  graph.dirty = gitq.dirty(root, specs)
+  graph.dirty = gitq.dirty_in(st, specs)
 
-  local map_modified = gitq.dirty(root, { map_rel })
+  local map_modified = gitq.dirty_in(st, { map_rel })
   local map_sha, map_time = gitq.last_commit(root, { map_rel })
   if not map_sha or map_modified then
     -- Not in history yet, or rewritten since: the file on disk is what counts.

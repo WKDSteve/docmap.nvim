@@ -287,6 +287,57 @@ return function(H)
   ok(sres, "since=HEAD answers")
   eq(list(sres.specs), "TESTS/c_spec.lua", "since lists the modified file")
   eq(gap_kinds(sres).changed_not_in_graph, 1, "...and the untracked file, which is not in the map")
+
+  -- A request asks git few questions: one `status` serves the untracked files
+  -- of `since` and the freshness check (it used to be nine processes). Counted
+  -- through a `vim.system` stand-in that passes everything through.
+  local real_system = vim.system
+  local git_argv = {}
+  vim.system = function(cmd, o, cb) ---@diagnostic disable-line: duplicate-set-field
+    if type(cmd) == "table" and cmd[1] == "git" then
+      git_argv[#git_argv + 1] = table.concat(cmd, " ")
+    end
+    return real_system(cmd, o, cb)
+  end
+  local counted_ok, counted = pcall(testing.affected_specs, { root = since_root, since = "HEAD" })
+  vim.system = real_system
+  assert(counted_ok, counted)
+  ok(
+    #git_argv <= 5,
+    "since: at most five git processes per request, got:\n" .. table.concat(git_argv, "\n")
+  )
+  eq(list(counted.specs), list(sres.specs), "...with the same answer")
+  eq(counted.graph.dirty, true, "...the uncommitted edit still reported")
+  eq(counted.graph.head, git(since_root, "rev-parse", "HEAD"), "...and HEAD read from the status")
+
+  -- The status snapshot: paths relative to the root even below the top of
+  -- the work tree, a rename names both sides, gitignore is respected.
+  local gitq = require("docmap.testing.git")
+  local top = tmpdir() .. "/top"
+  write(top .. "/sub/lua/x.lua", "return 1\n")
+  write(top .. "/sub/old.lua", "return 2\n")
+  write(top .. "/other.lua", "return 3\n")
+  write(top .. "/.gitignore", "*.log\n")
+  git(top, "init", "-q")
+  commit_all(top, "init")
+  write(top .. "/sub/lua/x.lua", "return 10\n")
+  write(top .. "/sub/new dir/n.lua", "return 4\n")
+  write(top .. "/sub/skip.log", "x\n")
+  write(top .. "/other.lua", "return 30\n")
+  git(top, "mv", "sub/old.lua", "sub/renamed.lua")
+  local sub_st = assert(gitq.status(top .. "/sub"))
+  table.sort(sub_st.paths)
+  eq(
+    table.concat(sub_st.paths, ","),
+    "lua/x.lua,new dir/n.lua,old.lua,renamed.lua",
+    "status: root-relative paths below the top, both sides of a rename, nothing ignored or outside"
+  )
+  eq(table.concat(sub_st.untracked, ","), "new dir/n.lua", "status: the untracked file")
+  eq(gitq.dirty_in(sub_st, { "lua" }), true, "dirty_in: a changed file under a directory")
+  eq(gitq.dirty_in(sub_st, { "docs" }), false, "dirty_in: nothing under another one")
+  eq(gitq.dirty_in(sub_st, { "renamed.lua" }), true, "dirty_in: a single file")
+  eq(gitq.status(tmpdir()), nil, "status: nil outside a repository")
+
   local bad, bad_err = testing.affected_specs({ root = since_root, since = "--output=/tmp/x" })
   eq(bad, nil, "an option-shaped revision is refused")
   ok(bad_err:find("valid revision", 1, true), "...with a reason")
@@ -673,7 +724,7 @@ local e = require("x.dialect." .. name)
   eq(specs.clean_rel("/a"), nil, "clean_rel refuses an absolute path")
   eq(specs.clean_rel("a\0b"), nil, "clean_rel refuses a NUL byte")
 
-  local gitq = require("docmap.testing.git")
+  -- `gitq` from the status block above
   eq(gitq.valid_rev("HEAD~3"), true, "a plain revision is accepted")
   eq(gitq.valid_rev("origin/main@{1}"), true, "a reflog revision is accepted")
   eq(gitq.valid_rev("--upload-pack=x"), false, "an option-shaped revision is refused")
