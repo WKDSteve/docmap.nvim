@@ -622,7 +622,7 @@ function M.render(ir, findings, opts)
 
     -- The startup flamegraph, in a `<template>` so the browser parses it
     -- once at load and the Startup panel can clone it without a second
-    -- pass through `innerHTML`. Emitted only when there is one; the panel
+    -- pass through `setMarkup`. Emitted only when there is one; the panel
     -- says what to run when there is not, and the button is hidden
     -- entirely so nobody clicks into an empty tool.
     startup_graph_html,
