@@ -377,7 +377,7 @@ return [[
   // Boxes are held in `hboxes` by key and reused across redraws, so a box
   // present before and after a re-center is the *same element* at a new
   // left/top, and the CSS transition on .hnode animates it there. Rebuilding
-  // the subtree with innerHTML = "" (what this used to do) threw that
+  // the subtree with a markup assignment (what this used to do) threw that
   // identity away every time, which is why every navigation was a hard cut
   // even though the two layouts often shared most of their boxes.
   //
@@ -419,7 +419,7 @@ return [[
       el.style.top = pos.y + "px";
       el.style.width = BOX_W + "px";
       el.title = spec.title;
-      el.innerHTML = spec.html;
+      setMarkup(el, spec.html);
       el._spec = spec;
     });
 
@@ -487,7 +487,7 @@ return [[
   };
 
   function drawLegend(view){
-    if(isMapView(view)){ hlegendEl.innerHTML = mapLegend(view); return; }
+    if(isMapView(view)){ setMarkup(hlegendEl, mapLegend(view)); return; }
     var entries = (LEGEND[view] || []).slice();
     if(view === "deps" && state.ext) entries = entries.concat(LEGEND.depsExt);
     var items = entries.map(function(it){
@@ -497,7 +497,7 @@ return [[
     if(view === "routes") items = items.concat(routeLegend());
     items.push('<span class="lg">' + esc(t(isGraphView(view) ? "page.legend.gestures.graph" : "page.legend.gestures.map")) +
       '</span>');
-    hlegendEl.innerHTML = items.join("");
+    setMarkup(hlegendEl, items.join(""));
   }
 
   function emptyMessage(view, center){
@@ -525,7 +525,7 @@ return [[
     Object.keys(hpending).forEach(function(k){ clearTimeout(hpending[k]); });
     hpending = {};
     hboxes = {};
-    hstage.innerHTML = "";
+    hstage.replaceChildren();
     // The empty-state message hangs off #hgraph, outside the stage, so
     // clearing the stage alone would stack a second copy on the next empty
     // draw instead of replacing the first.
@@ -723,7 +723,7 @@ return [[
     });
     drawMarkers(parts);
 
-    host.innerHTML = parts.join("");
+    setMarkup(host, parts.join(""));
 
     host.querySelectorAll(".nfn").forEach(function(a){
       a.addEventListener("click", function(){
