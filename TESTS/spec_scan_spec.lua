@@ -37,18 +37,26 @@ return function(H)
 
   eq(spec_scan.facts(path .. ".missing"), nil, "an unreadable file has no facts")
 
-  eq(parses_during(function()
-    spec_scan.facts(path)
-    spec_scan.facts(path)
-  end), 2, "outside a scope every call parses")
+  eq(
+    parses_during(function()
+      spec_scan.facts(path)
+      spec_scan.facts(path)
+    end),
+    2,
+    "outside a scope every call parses"
+  )
 
   local a, b
-  eq(parses_during(function()
-    ts_parse.scoped(function()
-      a = spec_scan.facts(path)
-      b = spec_scan.facts(path)
-    end)
-  end), 1, "inside a scope the file is parsed once")
+  eq(
+    parses_during(function()
+      ts_parse.scoped(function()
+        a = spec_scan.facts(path)
+        b = spec_scan.facts(path)
+      end)
+    end),
+    1,
+    "inside a scope the file is parsed once"
+  )
   ok(a == b, "the second ask gets the same facts")
   eq(ts_parse.memo("spec_scan"), nil, "the memo is gone with the scope")
 end

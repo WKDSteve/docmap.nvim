@@ -150,8 +150,14 @@ return function(H)
       list = function(o)
         root_seen = o.root
         return {
-          { method = "GET", url = "https://api.example.com/users?x=1", status = 200, duration_ms = 30, bytes = 120,
-            shape = { type = "object", keys = { id = "number" } } },
+          {
+            method = "GET",
+            url = "https://api.example.com/users?x=1",
+            status = 200,
+            duration_ms = 30,
+            bytes = 120,
+            shape = { type = "object", keys = { id = "number" } },
+          },
           { method = "GET", url = "https://api.example.com/users", status = 500, duration_ms = 10 },
           { method = "POST", url = "https://api.example.com/users" },
         }
@@ -173,7 +179,11 @@ return function(H)
       ok(r.body == nil and r.url == nil, "traffic: metadata only, no url/body fields")
     end
 
-    package.loaded["runtime-analysis.history"] = { list = function() return {} end }
+    package.loaded["runtime-analysis.history"] = {
+      list = function()
+        return {}
+      end,
+    }
     local none = api.answer("traffic", { root = "/some/root" }, nil)
     package.loaded["runtime-analysis.history"] = saved
     eq(none.available, false, "traffic: nothing recorded is available=false")

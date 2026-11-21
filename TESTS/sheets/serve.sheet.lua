@@ -22,7 +22,10 @@ return {
       expect = "(_G.answer:match('^HTTP/1%.%d 200') ~= nil and _G.answer:find('second', 1, true) ~= nil) or error(_G.answer:sub(1, 600))",
       note = "with the commits of the repository",
     },
-    { lua = "P.get('/api/traffic')", note = "the Endpoints panel asks for the recorded request traffic" },
+    {
+      lua = "P.get('/api/traffic')",
+      note = "the Endpoints panel asks for the recorded request traffic",
+    },
     { wait = "_G.answer ~= nil", timeout = 15000, note = "the server answers" },
     {
       expect = "(_G.answer:match('^HTTP/1%.%d 200') ~= nil and _G.answer:find('\"available\"', 1, true) ~= nil) or error(_G.answer:sub(1, 600))",
