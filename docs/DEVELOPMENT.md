@@ -34,12 +34,14 @@ nvim -n -i NONE --headless -u NONE -l /path/to/testing.nvim/scripts/testing.lua 
 ```
 
 That is all of them, in order, stopping at the first failure. One gate at a
-time by naming it — `scripts/ci.sh luacheck` (`tests` is the step `suite`) —
-which is also how `.github/workflows/ci.yml` calls it, one stage per job, so
-five of them keep their independent red/green marks and their parallelism (the
-conformance gate runs inside the `tests` job, after the specs). A single gate
-is a partial run: green for that gate only. `scripts/ci.sh --fast` runs
-stylua and luacheck.
+time by naming it — `scripts/ci.sh luacheck` (`tests` is the step `suite`).
+A single gate is a partial run: green for that gate only. `scripts/ci.sh --fast`
+runs stylua and luacheck. `.github/workflows/ci.yml` is generated from the
+`ci.workflow` section of `.testing.lua` (`testing init --workflow=public
+--force`; the step `workflow-in-sync` keeps the two together): the ubuntu leg
+runs the whole profile, windows and macOS the suite and the conformance gate,
+`ubuntu-min` the suite on Neovim 0.11.4. `scripts/ci-setup.sh` prepares the
+hosted legs first (the grammars, PUC Lua 5.4 with its rocks, `../lib.nvim`).
 
 **What each gate *is* lives in the `ci` section of
 [`.testing.lua`](../.testing.lua) and nowhere else** (`testing ci`, see
@@ -293,8 +295,8 @@ commit. The pre-commit hook enforces exactly that:
 git config core.hooksPath scripts/hooks   # once per clone
 ```
 
-So do the `map` step of `scripts/test.sh ci` and the `map` job of the CI: both
-only check, on a pull request and on `main` alike. Nothing regenerates the map
+So does the `map` step of `scripts/test.sh ci`, on every CI leg that runs it: it
+only checks, on a pull request and on `main` alike. Nothing regenerates the map
 for you (until 2026-11-15 a push to `main` did, with a bot commit).
 
 **Committing the map does not publish it.** The page on GitHub Pages is
@@ -323,7 +325,8 @@ silently falls back to the unverified flat shape: about 20 external links
 degrade from `…/autocmd/init.lua` to `…/autocmd.lua`, the artifact differs by
 roughly a hundred bytes, and `--check` calls the tree stale for something the
 tree never said. Same failure the `map` job hit in CI, which is why the
-workflow symlinks the dependency into place before generating.
+CI symlinks the dependency into place before generating (`scripts/ci-setup.sh
+linux`).
 
 So make `../lib.nvim` resolve from wherever you generate, rather than skipping
 the regeneration. One directory symlink in the folder your worktrees live in

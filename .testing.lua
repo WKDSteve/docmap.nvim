@@ -110,9 +110,52 @@ return {
     default = "full",
     profiles = {
       fast = { "stylua", "luacheck" },
-      full = { "fast", "suite", "conformance", "map", "standalone" },
+      full = { "fast", "suite", "conformance", "map", "standalone", "workflow-in-sync" },
+    },
+    -- The GitHub workflow, generated: `testing init --workflow=public --force` writes .github/workflows/ci.yml from
+    -- this (testing.nvim docs/WORKFLOW-CI.md); the step workflow-in-sync keeps the two together.
+    workflow = {
+      name = "docmap.nvim",
+      layout = "hosted",
+      -- the steps that depend on the platform: the windows and macOS legs run only these
+      platform = { "suite", "conformance" },
+      -- `testing ci land`: a check branch ci/** runs the hosted legs, main moves to a commit only once it is green there
+      land = true,
+      -- TESTS/min_version_spec.lua keeps this version, the docs and the comment above the matrix together
+      min_nvim = { version = "0.11.4", why = "the version floor docs/ promises" },
+      -- the browser sheets (TESTS/sheets/*.sheet.lua with a page): the version mdview.nvim pins
+      playwright = { version = "1.64.1", used_by = "the browser sheets" },
+      checkouts = {
+        {
+          repo = "WKDSteve/rules.nvim",
+          ref = "ci-verified",
+          why = "the real-engine half of TESTS/rules_api_spec.lua and the rules.nvim engine of the step standalone",
+        },
+      },
+      packages = {
+        {
+          name = "tree-sitter-cli",
+          npm = { "tree-sitter-cli@0.27.1" },
+          why = "builds the grammars of the call specs (scripts/ci-setup.sh parsers)",
+        },
+      },
+      setup = {
+        {
+          run = { "bash", "scripts/ci-setup.sh", "parsers" },
+          legs = "hosted",
+          why = "the javascript, typescript, tsx, go, python and rust grammars, pinned by commit, into .deps/ts-parsers: without them the call specs skip, and they are the only gates of their resolvers",
+        },
+        {
+          run = { "bash", "scripts/ci-setup.sh", "linux" },
+          why = "PUC Lua 5.4 with lfs and dkjson for the step standalone, and ../lib.nvim for the step map",
+        },
+      },
+      publish = {
+        why = "images.nvim checks out docmap.nvim at ci-verified",
+      },
     },
     steps = {
+      ["workflow-in-sync"] = { preset = "workflow-in-sync" },
       -- `standalone` is in the list because it was not: the parser-less build sat outside the only gate that reads
       -- Lua for unused locals and undefined globals.
       luacheck = { preset = "luacheck", args = { "lua", "TESTS", "scripts", "standalone" } },
