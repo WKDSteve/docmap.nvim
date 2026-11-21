@@ -83,4 +83,105 @@ return function(H)
   local no_repo_ir = scan.scan(cfg.build(no_repo))
   eq(no_repo_ir.meta.repo_url, nil, "scan: repo_url stays nil outside a git repository")
   eq(no_repo_ir.meta.branch, "main", 'scan: branch falls back to "main" outside a git repository')
+
+  -- ---------------------------------------------- no git process per scan
+  -- The remote and the branch are read from `.git/config` and `.git/HEAD`
+  -- (`core/git_files.lua`): a scan -- after every save with `watch = true` --
+  -- must not start `git` for them. Counted through a `vim.system` stand-in
+  -- that passes every other program through.
+  local git_files = require("docmap.core.git_files")
+  local real_system = vim.system
+  local git_starts = {}
+  ---@param fn fun()
+  ---@return string[][] starts The git argv started while `fn` ran.
+  local function count_git(fn)
+    git_starts = {}
+    vim.system = function(cmd, o, cb) ---@diagnostic disable-line: duplicate-set-field
+      if type(cmd) == "table" and cmd[1] == "git" then
+        git_starts[#git_starts + 1] = cmd
+      end
+      return real_system(cmd, o, cb)
+    end
+    local okc, err = pcall(fn)
+    vim.system = real_system
+    assert(okc, err)
+    return git_starts
+  end
+
+  git_files.clear()
+  local counted_ir
+  local starts = count_git(function()
+    counted_ir = scan.scan(cfg.build(git_derived))
+  end)
+  eq(#starts, 0, "scan: deriving remote and branch starts no git process")
+  eq(
+    counted_ir.meta.repo_url,
+    "https://github.com/someone/derived-repo",
+    "...and still finds the remote"
+  )
+  eq(counted_ir.meta.branch, "feature/derived", "...and the branch")
+
+  local traffic_join = require("docmap.core.traffic_join")
+  local traffic_repo
+  starts = count_git(function()
+    traffic_repo = traffic_join.repo({ root = git_derived })
+  end)
+  eq(#starts, 0, "traffic: the repository of :DocBrowse traffic is read without git")
+  eq(traffic_repo, "someone/derived-repo", "...and is the remote's owner/repo")
+
+  -- A linked worktree: `.git` is a file, the config lives in the common dir.
+  local wt = root_dir .. "/derived_wt"
+  git_run(git_derived, { "worktree", "add", "-q", "-b", "wt/branch", wt })
+  starts = count_git(function()
+    counted_ir = scan.scan(cfg.build(wt))
+  end)
+  eq(#starts, 0, "scan: a linked worktree is read without git as well")
+  eq(counted_ir.meta.branch, "wt/branch", "...with the worktree's own branch")
+  eq(
+    counted_ir.meta.repo_url,
+    "https://github.com/someone/derived-repo",
+    "...and the shared remote"
+  )
+
+  -- A detached HEAD: git's short sha is the answer, asked once per HEAD.
+  git_run(git_derived, { "checkout", "-q", "--detach" })
+  local short = vim.trim(
+    real_system({ "git", "-C", git_derived, "rev-parse", "--short", "HEAD" }, { text = true }):wait().stdout
+  )
+  starts = count_git(function()
+    counted_ir = scan.scan(cfg.build(git_derived))
+    scan.scan(cfg.build(git_derived))
+  end)
+  eq(counted_ir.meta.branch, short, "scan: a detached HEAD links git's short sha, as before")
+  eq(#starts, 1, "...asked of git once for two scans of the same HEAD")
+  git_run(git_derived, { "checkout", "-q", "feature/derived" })
+
+  -- A config that rewrites URLs is left to git, which applies the rewrite.
+  local rewrite = repo("rewrite")
+  git_run(rewrite, { "init", "-q", "-b", "main" })
+  git_run(rewrite, { "remote", "add", "origin", "gh:someone/rewritten" })
+  git_run(rewrite, { "config", "url.https://github.com/.insteadOf", "gh:" })
+  git_files.clear()
+  starts = count_git(function()
+    counted_ir = scan.scan(cfg.build(rewrite))
+  end)
+  eq(
+    counted_ir.meta.repo_url,
+    "https://github.com/someone/rewritten",
+    "scan: an insteadOf rewrite is resolved by git"
+  )
+  eq(#starts, 1, "...with one git start, the remote only")
+
+  -- The config reader itself.
+  local url, unsure = git_files.config_url(
+    '[core]\n\tbare = false\n[remote "upstream"]\n\turl = https://x/a/b\n[remote "origin"]\n'
+      .. "\turl = git@github.com:o/r.git\n\turl = https://second/o/r\n",
+    "origin"
+  )
+  eq(url, "git@github.com:o/r.git", "config: the first url of the named remote")
+  eq(unsure, false, "...read with certainty")
+  eq(git_files.config_url("[core]\n", "origin"), nil, "config: no such remote is nil")
+  local _, inc =
+    git_files.config_url('[include]\n\tpath = x\n[remote "origin"]\n\turl = u\n', "origin")
+  eq(inc, true, "config: an include is left to git")
 end

@@ -176,15 +176,19 @@ return function(H)
   -- `vim.*` paths `core/` uses that the shim does **not** provide, each with
   -- the reason it is allowed to be absent.
   --
-  -- All three are `core/luals.lua`, and the reason is one fact: `--full`
+  -- The `vim.fn` ones are `core/luals.lua`, and the reason is one fact: `--full`
   -- shells out to `lua-language-server` and is Neovim-only, so the
-  -- standalone binary never reaches that module. If a fourth ever appears
+  -- standalone binary never reaches that module. `vim.system` is only probed
+  -- by `core/scan.lua` (git derivation is Neovim-only). If another ever appears
   -- here, the question to ask is whether the standalone path can reach it —
   -- not whether the list can grow.
   -- ---------------------------------------------------------------------
   local ALLOWED_ABSENT = {
     ["vim.fn.executable"] = "core/luals.lua — probes for lua-language-server; --full is Neovim-only",
     ["vim.fn.tempname"] = "core/luals.lua — scratch dir for the --doc run, same reason",
+    -- Reached, but only as a probe of its absence: the standalone build never
+    -- derives repo_url/branch from git (standalone/docmap.lua says so).
+    ["vim.system"] = "core/scan.lua — probed, not called: no git derivation without it",
   }
 
   local unprovided = {}

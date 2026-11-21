@@ -3,7 +3,7 @@
 > **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**8 modules** · 8 namespaces · 159 helper files
+**8 modules** · 8 namespaces · 160 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
@@ -79,6 +79,7 @@ flowchart LR
   nlua_docmap_core_find_lua["docmap.core.find"]
   nlua_docmap_core_findings_lua["docmap.core.findings"]
   nlua_docmap_core_functions_lua["docmap.core.functions"]
+  nlua_docmap_core_git_files_lua["docmap.core.git_files"]
   nlua_docmap_core_history_lua["docmap.core.history"]
   nlua_docmap_core_i18n["docmap.core.i18n"]
   nlua_docmap_core_json_lua["docmap.core.json"]
@@ -244,6 +245,7 @@ flowchart LR
   nlua_docmap_core_scan_lua --> nlua_docmap_core_bindings_lua
   nlua_docmap_core_scan_lua --> nlua_docmap_core_calls_lua
   nlua_docmap_core_scan_lua --> nlua_docmap_core_deps_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_git_files_lua
   nlua_docmap_core_scan_lua --> nlua_docmap_core_lang_registry_lua
   nlua_docmap_core_scan_lua --> nlua_docmap_core_markers_lua
   nlua_docmap_core_scan_lua --> nlua_docmap_core_plugins_lua
@@ -259,6 +261,7 @@ flowchart LR
   nlua_docmap_core_telemetry_self_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_core_tools_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_tools_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_traffic_join_lua --> nlua_docmap_core_git_files_lua
   nlua_docmap_core_traffic_join_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_editor_browse --> nlua_docmap_bindings_keymaps_lua
   nlua_docmap_editor_browse --> nlua_docmap_bindings_usrcmds

@@ -893,31 +893,29 @@ function M.scan(opts)
   -- `bindings/usrcmds/init.lua`'s `completion_names()`, which calls it on
   -- every keystroke of a `:DocMap` argument -- a git subprocess there would
   -- have meant every keystroke blocking on `git remote`/`git symbolic-ref`.
-  -- `scan()` already walks the whole tree once per real scan; two more
-  -- short-lived processes here cost nothing relative to that.
+  -- Read from `.git/HEAD` and `.git/config` (`core/git_files.lua`), not
+  -- asked of two `git` processes: those froze the editor ~55 ms per scan on
+  -- Windows, after every save with `watch = true`.
   --
-  -- `pcall`-guarded, not a capability check: `lib.nvim.git` needs
-  -- `vim.system`/`vim.fn.system`, and **`standalone/vim_shim.lua` provides
-  -- neither** (see its own header) -- this module is bundled into the
-  -- parser-less standalone binary and runs there under plain PUC Lua. A
-  -- direct call would crash the standalone build the first time someone ran
-  -- it against a real repo; the `pcall` makes a missing remote, a missing
-  -- `git` binary and a missing `vim.system` all degrade the same way --
-  -- `repo_url`/`branch` simply stay whatever `opts` already had.
+  -- Only where `vim.system` exists: **`standalone/vim_shim.lua` provides
+  -- none** (see its own header) -- this module is bundled into the
+  -- parser-less standalone binary, which has never derived these two and
+  -- documents that (`standalone/docmap.lua`); its rare git fallback could
+  -- not run there either. `pcall`-guarded so an unreadable repository, a
+  -- missing `git` for the fallback and a missing `lib.nvim` all degrade the
+  -- same way -- `repo_url`/`branch` simply stay whatever `opts` already had.
   local repo_url, branch = opts.repo_url, opts.branch
-  if repo_url == nil or branch == nil then
+  if (repo_url == nil or branch == nil) and type(vim.system) == "function" then
     pcall(function()
-      local git = require("lib.nvim.git")
-      local git_remote = require("lib.nvim.git.remote")
+      local git_files = require("docmap.core.git_files")
       if repo_url == nil then
-        local remote_url = git.remote_url("origin", { dir = opts.root })
-        local remote = remote_url and git_remote.parse_remote(remote_url)
+        local remote = git_files.remote(opts.root, "origin")
         if remote then
           repo_url = ("https://%s/%s/%s"):format(remote.host, remote.owner, remote.repo)
         end
       end
       if branch == nil then
-        branch = git.current_ref(opts.root)
+        branch = git_files.ref(opts.root)
       end
     end)
   end
