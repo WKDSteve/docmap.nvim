@@ -82,7 +82,7 @@ return function(H)
     'var card = lookup(el.dataset.kwkind || "kw", el.dataset.kw, kwContext(el));',
     "the card asks the registry and knows no kind itself"
   )
-  has("kwpop.innerHTML = lookupCardHTML(card);", "one card component renders every kind")
+  has("setMarkup(kwpop, lookupCardHTML(card));", "one card component renders every kind")
   has(
     "snipBodyHTML(fn.snippet, path, node ? { fnKey: fnKey(node.id, fn.name) } : null)",
     "a snippet is tokenized with its function as context"

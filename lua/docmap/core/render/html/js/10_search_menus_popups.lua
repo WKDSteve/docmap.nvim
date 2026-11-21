@@ -257,7 +257,7 @@ return [[
     }
     langBars.forEach(function(bar){
       if(!bar) return;
-      bar.innerHTML = h.join("");
+      setMarkup(bar, h.join(""));
       bar.hidden = false;
     });
   }
@@ -582,7 +582,7 @@ return [[
         esc(it.label) + (it.hint !== undefined ? '<span class="hint">' + esc(String(it.hint)) + '</span>' : '') +
         '</div>');
     });
-    ctx.innerHTML = html.join("");
+    setMarkup(ctx, html.join(""));
     ctxItems = items;
     ctxHi = -1;
     ctx.classList.add("open");
@@ -713,7 +713,7 @@ return [[
     // something to show an empty card for.
     if(!card) return;
     kwAnchor = el;
-    kwpop.innerHTML = lookupCardHTML(card);
+    setMarkup(kwpop, lookupCardHTML(card));
     kwpop.scrollTop = 0;
     kwpop.classList.add("on");
     kwPlace(el);
@@ -838,7 +838,7 @@ return [[
     if(sigAnchor && sigAnchor !== el) sigAnchor.classList.remove("on");
     sigAnchor = el;
     el.classList.add("on");
-    sigpop.innerHTML = html;
+    setMarkup(sigpop, html);
     sigpop.classList.add("on");
 
     // Measured after it is in the DOM, then flipped rather than clamped
