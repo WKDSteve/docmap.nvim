@@ -76,7 +76,7 @@ return [[
       // three as if they were.
       h.push('<p class="ntext none">' + prose(t("page.quicks.none")) + '</p>');
       h.push("</div>");
-      el.innerHTML = h.join("");
+      setMarkup(el, h.join(""));
       return;
     }
 
@@ -98,7 +98,7 @@ return [[
       h.push("</div>");
     }
     h.push("</div>");
-    el.innerHTML = h.join("");
+    setMarkup(el, h.join(""));
   }
 
   document.addEventListener("click", function(ev){
@@ -228,20 +228,20 @@ return [[
     var entries = state.marks.map(markEntry).filter(Boolean);
 
     if(!entries.length){
-      body.innerHTML = '<p class="ntext none">' + rich(t("page.compare.none")) + '</p>';
+      setMarkup(body, '<p class="ntext none">' + rich(t("page.compare.none")) + '</p>');
       return;
     }
     if(view === "matrix" && entries.length === 1){
-      body.innerHTML = '<p class="nsub">' + esc(t("page.compare.one")) + '</p>' +
-        '<div class="cmp-stack">' + cmpCardHTML(entries[0]) + '</div>';
+      setMarkup(body, '<p class="nsub">' + esc(t("page.compare.one")) + '</p>' +
+        '<div class="cmp-stack">' + cmpCardHTML(entries[0]) + '</div>');
       return;
     }
 
-    if(view === "matrix"){ body.innerHTML = ceBarHTML(entries) + cmpMatrixHTML(entries); return; }
+    if(view === "matrix"){ setMarkup(body, ceBarHTML(entries) + cmpMatrixHTML(entries)); return; }
 
     var cls = view === "columns" ? "cmp-cols" : "cmp-stack";
-    body.innerHTML = ceBarHTML(entries) + '<div class="' + cls + '">' +
-      entries.map(cmpCardHTML).join("") + "</div>";
+    setMarkup(body, ceBarHTML(entries) + '<div class="' + cls + '">' +
+      entries.map(cmpCardHTML).join("") + "</div>");
   }
 
   // =====================================================================
@@ -946,7 +946,7 @@ return [[
       var keepNode = (inBar && active.dataset) ? active.dataset.sdCenter : null;
       var list = document.getElementById("hshape-body");
       var scrolled = list ? list.scrollTop : 0;
-      shapeBar.innerHTML = shapeBarHTML(s);
+      setMarkup(shapeBar, shapeBarHTML(s));
       list = document.getElementById("hshape-body");
       if(list) list.scrollTop = scrolled;
       var again = keepId ? document.getElementById(keepId) : null;
