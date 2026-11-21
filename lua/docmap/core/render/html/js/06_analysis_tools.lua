@@ -1484,7 +1484,7 @@ return [[
     fetch("/api/traffic").then(function(r){ return r.json(); }).then(function(d){
       if(token !== trafficReqToken) return;
       if(!d || !d.available || !d.rows){
-        box.innerHTML = '<p class="nsub">' + rich(t("page.an.traffic.none")) + '</p>';
+        setMarkup(box, '<p class="nsub">' + rich(t("page.an.traffic.none")) + '</p>');
         return;
       }
       var h = ['<h3>' + esc(t("page.an.traffic.title")) + '</h3>',
@@ -1507,9 +1507,9 @@ return [[
           esc(r.shape || dash) + '</td></tr>');
       });
       h.push('</tbody></table>');
-      box.innerHTML = h.join("");
+      setMarkup(box, h.join(""));
     }).catch(function(){
-      if(token === trafficReqToken) box.innerHTML = '<p class="nsub">' + rich(t("page.an.traffic.none")) + '</p>';
+      if(token === trafficReqToken) setMarkup(box, '<p class="nsub">' + rich(t("page.an.traffic.none")) + '</p>');
     });
   }
 
@@ -1569,7 +1569,7 @@ return [[
     var host = document.getElementById("anbody");
     var key = anCacheKey(atool);
     if(analysisCache[key] === undefined) analysisCache[key] = renderAnalysis(atool);
-    host.innerHTML = analysisCache[key];
+    setMarkup(host, analysisCache[key]);
     if(atool === "endpoints") drawEndpointTraffic(host);
 
     host.querySelectorAll(".anrow").forEach(function(tr){
