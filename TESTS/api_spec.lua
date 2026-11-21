@@ -138,4 +138,45 @@ return function(H)
   -- to a literal `+`, which a decoder that expanded `+` first would then
   -- corrupt into a space.
   eq(api.decode_param("a%2Bb"), "a+b", "decode_param: %2B survives as a literal +")
+  -- ------------------------------------------------------------ traffic
+  -- `/api/traffic`: the recorded history summarised per endpoint, through
+  -- the real `runtime-analysis.traffic` and `shape` and a stand-in for the
+  -- one thing that touches disk, `history.list` (patched in `package.loaded`
+  -- like `browse_endpoints_spec` does, so the production probe path runs).
+  do
+    local saved = package.loaded["runtime-analysis.history"]
+    local root_seen
+    package.loaded["runtime-analysis.history"] = {
+      list = function(o)
+        root_seen = o.root
+        return {
+          { method = "GET", url = "https://api.example.com/users?x=1", status = 200, duration_ms = 30, bytes = 120,
+            shape = { type = "object", keys = { id = "number" } } },
+          { method = "GET", url = "https://api.example.com/users", status = 500, duration_ms = 10 },
+          { method = "POST", url = "https://api.example.com/users" },
+        }
+      end,
+    }
+    local res = api.answer("traffic", { root = "/some/root" }, nil)
+    package.loaded["runtime-analysis.history"] = saved
+    eq(root_seen, "/some/root", "traffic: reads the history of opts.root, not of the cwd")
+    eq(res.available, true, "traffic: answers when sends are recorded")
+    eq(#res.rows, 2, "traffic: one row per method and endpoint (query dropped)")
+    local get = res.rows[1]
+    eq(get.method, "GET")
+    eq(get.endpoint, "https://api.example.com/users")
+    eq(get.sends, 2)
+    eq(get.errors, 1)
+    eq(get.max_ms, 30)
+    eq(res.rows[2].failed, 1, "traffic: a send without an answer is counted as failed")
+    for _, r in ipairs(res.rows) do
+      ok(r.body == nil and r.url == nil, "traffic: metadata only, no url/body fields")
+    end
+
+    package.loaded["runtime-analysis.history"] = { list = function() return {} end }
+    local none = api.answer("traffic", { root = "/some/root" }, nil)
+    package.loaded["runtime-analysis.history"] = saved
+    eq(none.available, false, "traffic: nothing recorded is available=false")
+    eq(none.reason, "no recorded sends")
+  end
 end

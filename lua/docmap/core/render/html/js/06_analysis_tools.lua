@@ -1469,6 +1469,50 @@ return [[
     return renderAnalysisPlugins();
   }
 
+  // Endpoints -> recorded traffic. Fetched from `/api/traffic` after the
+  // (cached, IR-only) table above is in place, never baked into the map:
+  // the numbers change with use. Metadata of what `:RA send` recorded, not
+  // all traffic; a served page only, a file:// page has nothing to ask and
+  // says nothing (the table above is complete without it).
+  var trafficReqToken = 0;
+  function drawEndpointTraffic(host){
+    if(!historyAvailable()) return;
+    var token = ++trafficReqToken;
+    var box = document.createElement("div");
+    box.className = "eptraffic";
+    host.appendChild(box);
+    fetch("/api/traffic").then(function(r){ return r.json(); }).then(function(d){
+      if(token !== trafficReqToken) return;
+      if(!d || !d.available || !d.rows){
+        box.innerHTML = '<p class="nsub">' + rich(t("page.an.traffic.none")) + '</p>';
+        return;
+      }
+      var h = ['<h3>' + esc(t("page.an.traffic.title")) + '</h3>',
+        '<p class="nsub">' + rich(t("page.an.traffic.sub", { count: d.rows.length })) + '</p>',
+        '<table class="antable"><thead><tr>'];
+      [t("page.an.traffic.col.method"), t("page.an.traffic.col.endpoint"), t("page.an.traffic.col.sends"),
+        t("page.an.traffic.col.ok"), t("page.an.traffic.col.errors"), t("page.an.traffic.col.failed"),
+        t("page.an.traffic.col.median"), t("page.an.traffic.col.max"), t("page.an.traffic.col.last"),
+        t("page.an.traffic.col.size"), t("page.an.traffic.col.shape")]
+        .forEach(function(label){ h.push('<th>' + esc(label) + '</th>'); });
+      h.push('</tr></thead><tbody>');
+      var dash = "-";
+      d.rows.forEach(function(r){
+        function ms(v){ return typeof v === "number" ? fmtNum(v) + " ms" : dash; }
+        var size = typeof r.last_bytes === "number" ? fmtNum(r.last_bytes) + " B" : dash;
+        h.push('<tr><td>' + esc(r.method) + '</td><td>' + esc(r.endpoint) + '</td><td>' + fmtNum(r.sends) +
+          '</td><td>' + fmtNum(r.ok) + '</td><td>' + fmtNum(r.errors) + '</td><td>' + fmtNum(r.failed) +
+          '</td><td>' + ms(r.median_ms) + '</td><td>' + ms(r.max_ms) + '</td><td>' +
+          (typeof r.last_status === "number" ? r.last_status : dash) + '</td><td>' + size + '</td><td>' +
+          esc(r.shape || dash) + '</td></tr>');
+      });
+      h.push('</tbody></table>');
+      box.innerHTML = h.join("");
+    }).catch(function(){
+      if(token === trafficReqToken) box.innerHTML = '<p class="nsub">' + rich(t("page.an.traffic.none")) + '</p>';
+    });
+  }
+
   function drawAnalysis(){
     var atool = (state.atool === "doc" || state.atool === "deps" ||
       state.atool === "complexity" || state.atool === "duplicates" ||
@@ -1526,6 +1570,7 @@ return [[
     var key = anCacheKey(atool);
     if(analysisCache[key] === undefined) analysisCache[key] = renderAnalysis(atool);
     host.innerHTML = analysisCache[key];
+    if(atool === "endpoints") drawEndpointTraffic(host);
 
     host.querySelectorAll(".anrow").forEach(function(tr){
       tr.addEventListener("click", function(){

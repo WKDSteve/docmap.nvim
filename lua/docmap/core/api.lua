@@ -252,6 +252,59 @@ function M.loaded_snapshots(opts)
   return { available = true, prefix = prefix, snapshots = (ok_list and list) or {} }
 end
 
+---`/api/traffic` -- what `:RA send` recorded for this project, one row per
+---endpoint, for the Analysis -> Endpoints panel.
+---
+---On demand and never in the committed map, for the reason telemetry is not
+---in it: the numbers change with use. Metadata only: how often an endpoint
+---was sent, how it answered, median and maximum duration, the size and the
+---shape (a one-line summary, no values) of the last answer; never a body,
+---header or credential. The rows are what was *recorded*, not all traffic
+---(`runtime-analysis.traffic`'s own header says the same), and the history
+---is read for `opts.root`, not for whatever the process's cwd is.
+---@param opts table
+---@return table
+function M.traffic(opts)
+  local soft = require("docmap.core.soft_require")
+  local history = soft.probe("runtime-analysis.history")
+  local traffic = soft.probe("runtime-analysis.traffic")
+  if not (history and traffic) then
+    return { available = false, reason = "no data" }
+  end
+
+  local ok_list, entries, err = pcall(history.list, { root = opts.root })
+  if not ok_list then
+    return { available = false, reason = "history unreadable" }
+  end
+  if err then
+    return { available = false, reason = "history unreadable" }
+  end
+
+  local ok_rows, rows = pcall(traffic.summarize, entries)
+  if not ok_rows or #rows == 0 then
+    return { available = false, reason = "no recorded sends" }
+  end
+
+  local shape = soft.probe("runtime-analysis.shape")
+  local out = {}
+  for _, r in ipairs(rows) do
+    out[#out + 1] = {
+      method = r.method,
+      endpoint = r.endpoint,
+      sends = r.sends,
+      ok = r.ok,
+      errors = r.errors,
+      failed = r.failed,
+      median_ms = r.median_ms,
+      max_ms = r.max_ms,
+      last_status = r.last_status,
+      last_bytes = r.last_bytes,
+      shape = shape and r.last_shape and select(2, pcall(shape.summary, r.last_shape)) or nil,
+    }
+  end
+  return { available = true, rows = out }
+end
+
 ---`/api/checklist` — the staleness verdict for the Analysis → Checklist
 ---panel.
 ---
@@ -521,6 +574,7 @@ M.routes = {
   loaded = M.loaded,
   ["loaded/snapshots"] = M.loaded_snapshots,
   checklist = M.checklist,
+  traffic = M.traffic,
   commits = M.commits,
   -- `rules.nvim`'s engine for the Rules tab (`core/rules_api.lua`): the catalog of the configured rulesets, and the
   -- mechanical run of a selection (`param`, see `rules_api.parse_selection`).

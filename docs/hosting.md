@@ -111,6 +111,7 @@ instead of generating anything. Today's routes:
 | `loaded` | The loaded-versus-declared comparison. |
 | `loaded/snapshots` | Which named loaded snapshots exist. |
 | `checklist` | The hand-verified ledger and what has drifted. |
+| `traffic` | What `:RA send` recorded for the project, per endpoint: sends, status counts, median and maximum duration, size and shape of the last answer. Metadata only; read at request time, never in the committed map. |
 | `commits` | Recent commits, for the History tab. |
 | `commit/<sha>` | One commit's diff. Not in `routes` because its name carries the sha. |
 | `shape/<sha>`, `shape/<older>/<newer>` | The shape change between the map committed at a revision and the one on disk, or between two committed maps: nodes added and removed, requires gained and lost, and the same change as text. For the Hierarchy tab's comparison. Not in `routes`, for the same reason. |
