@@ -72,8 +72,8 @@ return [[
   }
 
   function histOffline(msg){
-    document.getElementById("hist-list").innerHTML = "";
-    document.getElementById("hist-detail").innerHTML = msg;
+    document.getElementById("hist-list").replaceChildren();
+    setMarkup(document.getElementById("hist-detail"), msg);
   }
 
   function drawHistory(sha){
@@ -83,7 +83,7 @@ return [[
     }
     if(!histLoaded){
       histLoaded = true;
-      document.getElementById("hist-list").innerHTML = '<p class="hmsg">' + esc(t("page.history.loading")) + '</p>';
+      setMarkup(document.getElementById("hist-list"), '<p class="hmsg">' + esc(t("page.history.loading")) + '</p>');
       fetch("/api/commits?n=100")
         .then(function(r){ return r.json(); })
         .then(function(d){
@@ -104,16 +104,16 @@ return [[
   function renderHistList(){
     var host = document.getElementById("hist-list");
     if(!histCommits || histCommits.length === 0){
-      host.innerHTML = '<p class="hmsg">' + esc(t("page.history.none")) + '</p>';
+      setMarkup(host, '<p class="hmsg">' + esc(t("page.history.none")) + '</p>');
       return;
     }
-    host.innerHTML = histCommits.map(function(c){
+    setMarkup(host, histCommits.map(function(c){
       return '<div class="crow' + (c.sha === histSelected ? " sel" : "") +
         '" data-sha="' + esc(c.sha) + '">' +
         '<div class="csub">' + esc(c.subject) + "</div>" +
         '<div class="cmeta">' + esc(c.short) + " · " + esc(fmtDay(c.date)) + " · " + esc(c.author) +
         "</div></div>";
-    }).join("");
+    }).join(""));
     host.querySelectorAll(".crow").forEach(function(row){
       row.addEventListener("click", function(){
         navigate({ tab: "history", sha: row.dataset.sha });
@@ -126,17 +126,17 @@ return [[
     histSelected = sha;
     renderHistList();
     var det = document.getElementById("hist-detail");
-    det.innerHTML = '<p class="hmsg">' + esc(t("page.history.analysing", { sha: sha.slice(0, 8) })) + "</p>";
+    setMarkup(det, '<p class="hmsg">' + esc(t("page.history.analysing", { sha: sha.slice(0, 8) })) + "</p>");
     fetch("/api/commit/" + encodeURIComponent(sha))
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if(d.error){ det.innerHTML = '<p class="hmsg">' + esc(d.error) + "</p>"; return; }
+        if(d.error){ setMarkup(det, '<p class="hmsg">' + esc(d.error) + "</p>"); return; }
         det.dataset.sha = sha;
-        det.innerHTML = renderCommitDetail(d);
+        setMarkup(det, renderCommitDetail(d));
         wireCommitDetail(det);
       })
       .catch(function(e){
-        explainFetchFailure(e, "history").then(function(msg){ det.innerHTML = msg; });
+        explainFetchFailure(e, "history").then(function(msg){ setMarkup(det, msg); });
       });
   }
 
@@ -301,13 +301,12 @@ return [[
     if(haltBar.querySelector("#htq")) return;
     // Drawn once and kept (the input keeps its caret): the texts carry their keys, and applyI18n says them
     // again at a change of language.
-    haltBar.innerHTML =
-      '<input id="htq" type="search" data-i18n-placeholder="page.tree.filter.placeholder"' +
+    setMarkup(haltBar, '<input id="htq" type="search" data-i18n-placeholder="page.tree.filter.placeholder"' +
       ' data-i18n-aria-label="page.tree.filter.aria" placeholder="' + esc(t("page.tree.filter.placeholder")) +
       '" aria-label="' + esc(t("page.tree.filter.aria")) + '">' +
       '<button id="htopen" type="button" data-i18n="page.tree.expand">' + esc(t("page.tree.expand")) + '</button>' +
       '<button id="htclose" type="button" data-i18n="page.tree.collapse">' + esc(t("page.tree.collapse")) + '</button>' +
-      '<span id="htcount" class="hmuted"></span>';
+      '<span id="htcount" class="hmuted"></span>');
     var input = haltBar.querySelector("#htq");
     input.addEventListener("input", function(){
       // Replaces the history entry instead of pushing one per keystroke, and
@@ -366,8 +365,8 @@ return [[
     })(centerId, 0);
 
     haltBody.setAttribute("role", "tree");
-    haltBody.innerHTML = rows.length ? rows.join("")
-      : '<p class="hmsg">' + esc(t("page.tree.filter.none", { name: byId[centerId].name || centerId, query: q })) + "</p>";
+    setMarkup(haltBody, rows.length ? rows.join("")
+      : '<p class="hmsg">' + esc(t("page.tree.filter.none", { name: byId[centerId].name || centerId, query: q })) + "</p>");
     var first = haltBody.querySelector(".ht-row");
     if(first) first.tabIndex = 0;
     haltBar.querySelector("#htcount").textContent = q ? t("page.tree.filter.shown", { count: fmtNum(shown) }) : "";
@@ -497,21 +496,20 @@ return [[
   function drawTreemap(centerId){
     var metric = state.tm === "functions" ? "functions" : "lines";
     var unit = function(v){ return t(metric === "lines" ? "page.tree.lines" : "page.tree.fn", { count: v }); };
-    haltBar.innerHTML =
-      '<span class="hmuted">' + esc(t("page.treemap.area")) + '</span><div class="hview-toggle">' +
+    setMarkup(haltBar, '<span class="hmuted">' + esc(t("page.treemap.area")) + '</span><div class="hview-toggle">' +
       '<button type="button" class="tm-metric' + (metric === "lines" ? " active" : "") + '" data-tm="lines">' +
       esc(t("page.treemap.lines")) + '</button>' +
       '<button type="button" class="tm-metric' + (metric === "functions" ? " active" : "") + '" data-tm="functions">' +
       esc(t("page.treemap.functions")) + '</button></div>' +
-      '<span class="hmuted">' + esc(t("page.treemap.hint")) + '</span>';
+      '<span class="hmuted">' + esc(t("page.treemap.hint")) + '</span>');
     haltBar.querySelectorAll(".tm-metric").forEach(function(b){
       b.addEventListener("click", function(){ navigate({ tm: b.dataset.tm === "functions" ? "functions" : null }); });
     });
 
     var kids = weighed(centerId, metric);
     if(!kids.length){
-      haltBody.innerHTML = '<p class="hmsg">' + esc(t(metric === "lines" ? "page.treemap.empty.lines" : "page.treemap.empty.functions",
-        { name: byId[centerId].name || centerId })) + "</p>";
+      setMarkup(haltBody, '<p class="hmsg">' + esc(t(metric === "lines" ? "page.treemap.empty.lines" : "page.treemap.empty.functions",
+        { name: byId[centerId].name || centerId })) + "</p>");
       return;
     }
     var size = altViewSize("treemap", haltBody.clientWidth, window.innerHeight,
@@ -539,7 +537,7 @@ return [[
       }
     });
     haltBody.removeAttribute("role");
-    haltBody.innerHTML = '<div class="tm" style="width:' + W + "px;height:" + H + 'px">' + html.join("") + "</div>";
+    setMarkup(haltBody, '<div class="tm" style="width:' + W + "px;height:" + H + 'px">' + html.join("") + "</div>");
   }
 
   // A view as the path line names it, in lower case beside the module ("lua/app · module calls").
@@ -558,11 +556,11 @@ return [[
     halt.hidden = false;
     clearGraph();
     hgraphWrap.parentNode.querySelectorAll(".htrunc").forEach(function(el){ el.remove(); });
-    hlegendEl.innerHTML = '<span class="lg">' + esc(t(view === "tree" ? "page.legend.tree"
+    setMarkup(hlegendEl, '<span class="lg">' + esc(t(view === "tree" ? "page.legend.tree"
       : view === "coupling" ? "page.legend.coupling"
-      : state.tm === "functions" ? "page.legend.treemap.functions" : "page.legend.treemap.lines")) + '</span>';
+      : state.tm === "functions" ? "page.legend.treemap.functions" : "page.legend.treemap.lines")) + '</span>');
     hpathEl.textContent = (center.module || center.path) + " · " + viewName(view);
-    if(haltBar.dataset.view !== view) haltBar.innerHTML = "";
+    if(haltBar.dataset.view !== view) haltBar.replaceChildren();
     haltBar.dataset.view = view;
     altDrawn = null;
     if(view === "tree") drawTree(hcenter);
@@ -695,7 +693,7 @@ return [[
       // invisible for that reason; a normal-flow child of the relative #hgraph
       // gives it height on its own, with nothing measured off the DOM (which
       // would read 0 anyway while the pane is display:none).
-      hgraph.insertAdjacentHTML("beforeend", emptyMessage(view, center));
+      appendMarkup(hgraph, emptyMessage(view, center));
       return;
     }
 
