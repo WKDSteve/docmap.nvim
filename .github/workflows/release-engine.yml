@@ -154,24 +154,36 @@ jobs:
       # exactly one such layer, with nothing else on PATH to collide with.
       #
       # Node comes from actions/setup-node, not MSYS2: MSYS2 stopped
-      # building `mingw-w64-x86_64-nodejs` (nodejs ships for ucrt64/clang64
-      # only now), and pacman's "target not found" for it failed this job
-      # from 2026-11-21 on. The setup-node build is a native Windows Node
-      # as well, and `path-type: inherit` below puts it on the msys2
-      # shell's PATH.
+      # building `mingw-w64-x86_64-nodejs` for MINGW64, and pacman's
+      # "target not found" for it failed this job from 2026-11-21 on.
+      # UCRT64 does package nodejs again (`mingw-w64-ucrt-x86_64-nodejs`),
+      # but setup-node stays: Node only runs the tree-sitter CLI and never
+      # ends up in the release, and tying it to MSYS2's package set again
+      # would bring back both the package churn and the npm-prefix
+      # surprises scripts/build_engine_release.sh records. The setup-node
+      # build is a native Windows Node, and `path-type: inherit` below puts
+      # it on the msys2 shell's PATH.
       - uses: actions/setup-node@v5
         with:
           node-version: lts/*
+      # UCRT64, not MINGW64: MSYS2 deprecated MINGW64 (setup-msys2 annotates
+      # every run with "MINGW64 is deprecated. Migrate to UCRT64 or
+      # CLANG64") and is dropping its packages one by one, nodejs first.
+      # UCRT64 keeps the same gcc + `make mingw` recipe, only the C runtime
+      # changes from msvcrt.dll to the Universal CRT, which every Windows
+      # 10+ ships in-box -- so the .exe still needs nothing from MSYS2,
+      # checked by the `standalone .exe outside msys2` step below. CLANG64
+      # would change the compiler too, for no gain this build needs.
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
-          # gcc is mingw64-prefixed on purpose: this session's compiler
+          msystem: UCRT64
+          # gcc is ucrt64-prefixed on purpose: this session's compiler
           # needs to be a native Windows tool, producing real .exe/.dll,
           # not the POSIX-emulated MSYS build of the same name. `make`
           # stays the plain MSYS package -- it only orchestrates commands
           # and is the package practically every msys2/setup-msys2
-          # workflow installs it as, mingw64-prefixed or not.
-          install: mingw-w64-x86_64-gcc make git curl tar
+          # workflow installs it as, ucrt64-prefixed or not.
+          install: mingw-w64-ucrt-x86_64-gcc make git curl tar
           path-type: inherit
       - shell: msys2 {0}
         run: npm install -g tree-sitter-cli
@@ -182,6 +194,31 @@ jobs:
           EXE_EXT: ".exe"
           OUT_DIR: release-out
           REQUIRE_CAPABILITIES: rules rules-agent
+      # The script's own --capabilities probe runs inside the msys2 shell,
+      # where /ucrt64/bin is on PATH: an .exe that needed libgcc_s, a
+      # libwinpthread or any other MSYS2 DLL would still start there and
+      # pass. Here the published file runs from plain PowerShell in an empty
+      # directory with PATH cut down to the Windows system directories --
+      # the runner image itself puts other MinGW builds on PATH
+      # (C:\mingw64\bin, Strawberry Perl's gcc) whose DLLs would mask the
+      # same gap. A missing DLL makes it fail to start; the imports are
+      # logged in the step before.
+      - shell: msys2 {0}
+        run: objdump -p release-out/docmap-x86_64-pc-windows-msvc.exe | grep 'DLL Name'
+      - name: standalone .exe outside msys2
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path release-out/docmap-x86_64-pc-windows-msvc.exe).Path
+          $probe = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'exe-probe')
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          Remove-Item Env:RULES_NVIM_DIR -ErrorAction SilentlyContinue
+          Push-Location $probe
+          $caps = & $exe --capabilities
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { throw "docmap.exe exited with $code outside msys2" }
+          if ("$caps" -notmatch '"rules-agent"') { throw "unexpected --capabilities output: $caps" }
+          Write-Output "capabilities outside msys2: $caps"
       - uses: actions/upload-artifact@v7
         with:
           name: engine-windows
