@@ -34,6 +34,7 @@
 
 local i18n = require("docmap.core.i18n")
 local list = require("lib.nvim.ui.list")
+local git_async = require("docmap.bindings.usrcmds.git_async")
 
 local M = {}
 
@@ -64,26 +65,13 @@ local function runtime_reach(cfg, ir)
   return next(reach) ~= nil and reach or nil
 end
 
+---The answer of `run`'s two git requests, on the main loop.
 ---@param ctx Docmap.Bindings.Ctx
----@param arg string Everything after "impact" — a revision, or "" for HEAD.
-function M.run(ctx, arg)
-  local ref = vim.trim(arg or "")
-  if ref == "" then
-    ref = "HEAD"
-  end
-  local out_dir = ctx.cfg.out_dir or "docs/map"
-
-  local dproc = vim
-    .system({
-      "git",
-      "diff",
-      "--unified=0",
-      ref,
-      "--",
-      ".",
-      (":(exclude)%s"):format(out_dir),
-    }, { cwd = ctx.cfg.root, text = true })
-    :wait()
+---@param ref string
+---@param out_dir string
+---@param dproc Docmap.GitAsync.Result `git diff`
+---@param sproc Docmap.GitAsync.Result `git show` of the committed map
+local function answer(ctx, ref, out_dir, dproc, sproc)
   if dproc.code ~= 0 then
     ctx.notify.warn(
       i18n.t("editor.impact.cannot-diff", { ref = ref, error = vim.trim(dproc.stderr or "") })
@@ -100,10 +88,6 @@ function M.run(ctx, arg)
   -- revision that predates the map. So a failure here is a notice, not an
   -- abort.
   local before
-  local rel = out_dir .. "/module_map.json"
-  local sproc = vim
-    .system({ "git", "show", ("%s:%s"):format(ref, rel) }, { cwd = ctx.cfg.root, text = true })
-    :wait()
   if sproc.code == 0 then
     local ok_decode, doc = pcall(vim.json.decode, sproc.stdout, {
       luanil = { object = true, array = true },
@@ -156,6 +140,37 @@ function M.run(ctx, arg)
     }))
   end
   vim.cmd("copen")
+end
+
+---@param ctx Docmap.Bindings.Ctx
+---@param arg string Everything after "impact" — a revision, or "" for HEAD.
+function M.run(ctx, arg)
+  local ref = vim.trim(arg or "")
+  if ref == "" then
+    ref = "HEAD"
+  end
+  local out_dir = ctx.cfg.out_dir or "docs/map"
+  local rel = out_dir .. "/module_map.json"
+
+  -- The changed lines and the committed map are independent questions, so
+  -- both run at once (`git_async.all`) and the command answers once, when
+  -- the later of the two is in. Nothing waits on the editor thread, and a
+  -- newer `:DocMap impact` takes the slot: the older answer is dropped.
+  local token = git_async.take("impact")
+  git_async.all(
+    {
+      { "git", "diff", "--unified=0", ref, "--", ".", (":(exclude)%s"):format(out_dir) },
+      { "git", "show", ("%s:%s"):format(ref, rel) },
+    },
+    ctx.cfg.root,
+    function(results)
+      if not git_async.current("impact", token) then
+        return
+      end
+      git_async.release("impact", token)
+      answer(ctx, ref, out_dir, results[1], results[2])
+    end
+  )
 end
 
 return M

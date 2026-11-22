@@ -13,6 +13,7 @@ per action.
 | [`why.lua`](why.lua) | `why <a> <b>` |
 | [`diff.lua`](diff.lua) | `diff [ref]` |
 | [`impact.lua`](impact.lua) | `impact [ref]` |
+| [`git_async.lua`](git_async.lua) | the git requests of `diff` and `impact`, off the editor thread (one slot per command, `idle()`) |
 | [`churn.lua`](churn.lua) | `churn [range]` |
 | [`serve.lua`](serve.lua) | `serve [stop]` |
 | [`browse.lua`](browse.lua) | the whole of `:DocBrowse` |

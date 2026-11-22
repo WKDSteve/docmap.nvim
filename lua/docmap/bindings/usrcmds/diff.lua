@@ -5,26 +5,22 @@
 --- without generating anything. `git show <ref>:<artifact>` is the whole
 --- retrieval; the comparison itself is `docmap.core.diff`, which is pure
 --- and therefore also usable from a CI job with no editor involved.
+---
+--- The `git show` runs off the editor thread (`git_async`): the command
+--- returns at once and answers when git does. A newer `:DocMap diff` takes the
+--- slot, and the late answer of the older one is dropped.
 
 local i18n = require("docmap.core.i18n")
+local git_async = require("docmap.bindings.usrcmds.git_async")
 
 local M = {}
 
+---The answer of `run`'s `git show`, on the main loop.
 ---@param ctx Docmap.Bindings.Ctx
----@param arg string Everything after "diff" — a revision, or "" for HEAD.
-function M.run(ctx, arg)
-  local ref = vim.trim(arg or "")
-  if ref == "" then
-    ref = "HEAD"
-  end
-  local rel = (ctx.cfg.out_dir or "docs/map") .. "/module_map.json"
-
-  local proc = vim
-    .system({ "git", "show", ("%s:%s"):format(ref, rel) }, {
-      cwd = ctx.cfg.root,
-      text = true,
-    })
-    :wait()
+---@param ref string
+---@param rel string
+---@param proc Docmap.GitAsync.Result
+local function answer(ctx, ref, rel, proc)
   if proc.code ~= 0 then
     ctx.notify.warn(
       i18n.t(
@@ -74,6 +70,25 @@ function M.run(ctx, arg)
       ref = ref,
     }))
   end
+end
+
+---@param ctx Docmap.Bindings.Ctx
+---@param arg string Everything after "diff" — a revision, or "" for HEAD.
+function M.run(ctx, arg)
+  local ref = vim.trim(arg or "")
+  if ref == "" then
+    ref = "HEAD"
+  end
+  local rel = (ctx.cfg.out_dir or "docs/map") .. "/module_map.json"
+
+  local token = git_async.take("diff")
+  git_async.run({ "git", "show", ("%s:%s"):format(ref, rel) }, ctx.cfg.root, function(proc)
+    if not git_async.current("diff", token) then
+      return
+    end
+    git_async.release("diff", token)
+    answer(ctx, ref, rel, proc)
+  end)
 end
 
 return M
