@@ -49,7 +49,7 @@ local safe_fs = require("docmap.core.safe_fs")
 ---The single running server, if any. Module-level state, which this file is the only owner of -- the
 ---alternative (a handle the caller stores) would put lifecycle management on every call site for a thing there
 ---is only ever one of per editor session.
----@type { handle: Lib.Net.Server.Handle, port: integer, cfg: table }|nil
+---@type { handle: Lib.Net.Server.Handle, port: integer, cfg: table, token: table }|nil
 local current = nil
 
 ---Two paths name the same repository when they normalise the same.
@@ -76,8 +76,11 @@ end
 
 ---Run git in the repo and return stdout, or nil plus stderr.
 ---
----Only ever called from a `vim.schedule`d handler — `:wait()` is `vim.wait`
----underneath and would fail in the libuv callback the request arrives on.
+---Inside a request's coroutine (`run_request`) it does not wait: it hands the driver a function that starts git with
+---a callback and yields until that callback resumes it, so the editor keeps running while git does. `core/api.lua`
+---stays synchronous code and never learns the difference. Anywhere it cannot yield (no coroutine, or one entered
+---through a C call) it falls back to `:wait()`, which is only ever reached from a `vim.schedule`d handler -- `:wait()`
+---is `vim.wait` underneath and would fail in the libuv callback the request arrives on.
 ---@param cfg table
 ---@param args string[]
 ---@return string|nil stdout
@@ -85,11 +88,62 @@ end
 local function git(cfg, args)
   local cmd = { "git" }
   vim.list_extend(cmd, args)
-  local proc = vim.system(cmd, { cwd = cfg.root, text = true }):wait()
+  local sys_opts = { cwd = cfg.root, text = true }
+  local co, is_main = coroutine.running()
+  local yieldable = co ~= nil and not is_main
+  -- LuaJIT 2.1 has it (a 5.3 extension); false inside a coroutine entered through a C call, where a yield throws.
+  local isyieldable = rawget(coroutine, "isyieldable")
+  if yieldable and isyieldable then
+    yieldable = isyieldable()
+  end
+  local proc
+  if yieldable then
+    proc = coroutine.yield(function(resume)
+      local started, err = pcall(vim.system, cmd, sys_opts, function(done)
+        vim.schedule(function()
+          resume(done)
+        end)
+      end)
+      if not started then
+        vim.schedule(function()
+          resume({ code = -1, stderr = tostring(err) })
+        end)
+      end
+    end)
+  else
+    proc = vim.system(cmd, sys_opts):wait()
+  end
   if proc.code ~= 0 then
     return nil, vim.trim(proc.stderr or "git failed")
   end
   return proc.stdout or ""
+end
+
+---Drive one asynchronous request: `fn` runs in a coroutine, every `git` call in it yields a starter, and the answer
+---(`fn`'s three return values, or a 500 for a throw) goes to `respond`. Once `alive()` is false -- the server was
+---stopped or replaced while git ran -- a late git result is dropped and nothing further is started for this request.
+---@param fn fun(): integer, string, string
+---@param respond fun(code: integer, ctype: string?, body: string?)
+---@param alive fun(): boolean
+local function run_request(fn, respond, alive)
+  local co = coroutine.create(fn)
+  local function step(...)
+    if not alive() then
+      return
+    end
+    local ok, a, b, c = coroutine.resume(co, ...)
+    if not ok then
+      return respond(error_answer(500, tostring(a)))
+    end
+    if coroutine.status(co) == "dead" then
+      return respond(a, b, c)
+    end
+    if type(a) ~= "function" then
+      return respond(error_answer(500, "request yielded no git starter"))
+    end
+    a(step)
+  end
+  step()
 end
 
 -- Moved to `core/api.lua`, which now owns every git-backed route and needs
@@ -318,6 +372,13 @@ function M.start(cfg)
   end
   local query = { snapshot = plain, n = plain, select = plain }
 
+  -- This start's own identity: a request still running git when the server is stopped or replaced drops its late
+  -- answer instead of resuming against a config that is no longer served.
+  local token = {}
+  local function alive()
+    return current ~= nil and current.token == token
+  end
+
   local handle, serr = require("lib.nvim.net.server").start({
     name = "docmap",
     port = port_wanted ~= 0 and port_wanted or nil,
@@ -342,21 +403,30 @@ function M.start(cfg)
         query = { select = plain },
         body = true,
         body_required = true,
-        handler = function(req)
+        async = true,
+        handler = function(req, respond)
           local with_answer = vim.tbl_extend("force", {}, cfg, { rules_answer = req.body })
-          return api_answer("rules/validate", with_answer, query_param(req.query))
+          run_request(function()
+            return api_answer("rules/validate", with_answer, query_param(req.query))
+          end, respond, alive)
         end,
       },
       -- Every route `core/api.lua` owns, dispatched by name: the set is data on that module, so a route added
       -- there reaches this host and the standalone one without either being told. `commit/<sha>` is not a fixed
       -- key there -- `core.api` itself recognises and validates that shape, so anything under `/api/` is handed
       -- to it and `core.api` says no rather than this re-deciding the shape.
+      --
+      -- Asynchronous, like the validate route: `/api/commits` (`git log`), `/api/commit/<sha>` (three `git show`)
+      -- and the rest of the git-backed routes run their git without the editor waiting for it (`run_request`).
       {
         pattern = "^/api/(.+)$",
         captures = { plain },
         query = query,
-        handler = function(req)
-          return api_answer(req.params[1], cfg, query_param(req.query))
+        async = true,
+        handler = function(req, respond)
+          run_request(function()
+            return api_answer(req.params[1], cfg, query_param(req.query))
+          end, respond, alive)
         end,
       },
       -- Everything else is a bare filename in `out_dir` (the empty one is `index.html`).
@@ -402,7 +472,7 @@ function M.start(cfg)
       )
   end
 
-  current = { handle = handle, port = handle.port, cfg = cfg }
+  current = { handle = handle, port = handle.port, cfg = cfg, token = token }
   return M.info().url
 end
 

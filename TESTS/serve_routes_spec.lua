@@ -14,6 +14,17 @@ return function(H)
 
   local base = (vim.fn.tempname():gsub("\\", "/")) .. "_serve_routes"
 
+  ---What an asynchronous route answered by now: its `respond` arguments, or nil while it is still waiting.
+  local function answer_of(route, req)
+    local got
+    route.handler(req, function(code, ctype, body)
+      got = { code, ctype, body }
+    end)
+    if got then
+      return got[1], got[2], got[3]
+    end
+  end
+
   local function run()
     H.write(base .. "/docs/map/index.html", { "<html>INDEX</html>" })
     H.write(base .. "/docs/map/module_map.json", { "{}" })
@@ -61,7 +72,7 @@ return function(H)
         return { available = false, reason = "stub" }
       end
       local vok, vcode =
-        pcall(validate.handler, { query = { select = "DEP-07" }, body = '{"results":[]}' })
+        pcall(answer_of, validate, { query = { select = "DEP-07" }, body = '{"results":[]}' })
       core_api.answer = real_answer
       ok(vok, "serve: the validate handler runs")
       eq(vcode, 200, "serve: validate answers 200")
@@ -80,9 +91,9 @@ return function(H)
         ok(api.query[key] ~= nil, "serve: the api route declares the query key " .. key)
       end
       eq(vim.tbl_count(api.query), 3, "serve: ...and no other query key")
-      local nope_code = api.handler({ params = { "no-such-endpoint" }, query = {} })
+      local nope_code = answer_of(api, { params = { "no-such-endpoint" }, query = {} })
       eq(nope_code, 404, "serve: an unknown api route is a 404 from core.api")
-      local bad_commit = api.handler({ params = { "commit/not-a-sha" }, query = {} })
+      local bad_commit = answer_of(api, { params = { "commit/not-a-sha" }, query = {} })
       eq(bad_commit, 404, "serve: a commit name that is no sha never reaches git")
       -- the routes that write into the project are not offered here at all: a 404 before core.api is asked
       local asked = {}
@@ -93,7 +104,7 @@ return function(H)
       end
       -- `rules/attach` too: it reads, but any file a request may carry
       for _, name in ipairs({ "rules/accept", "rules/waive", "rules/attach" }) do
-        local wcode, _, wbody = api.handler({ params = { name }, query = { select = "DEP-07" } })
+        local wcode, _, wbody = answer_of(api, { params = { name }, query = { select = "DEP-07" } })
         eq(wcode, 404, "serve: " .. name .. " is not offered")
         ok(
           not tostring(wbody):find("rules", 1, true),
@@ -153,6 +164,96 @@ return function(H)
       eq(stopped, 1, "serve: ...by stopping the server handle")
       eq(serve.stop(), false, "serve: a second stop is a no-op")
       eq(stopped, 1, "serve: ...it does not stop the handle again")
+
+      -- the git-backed api routes do not wait for git: a stand-in for `vim.system` whose `wait()` throws, and whose
+      -- processes end when the spec says so
+      local real_system = vim.system
+      local started = {}
+      ---@diagnostic disable-next-line: duplicate-set-field
+      vim.system = function(cmd, _, on_exit)
+        started[#started + 1] = { cmd = cmd, on_exit = on_exit }
+        return {
+          wait = function()
+            error("serve: waited for git on the editor's thread")
+          end,
+        }
+      end
+      local function finish(i, proc)
+        started[i].on_exit(proc)
+        vim.wait(1000, function()
+          return false
+        end, 5)
+      end
+      local async_ok, async_err = pcall(function()
+        serve.start(config.build(base, {}))
+        local aroute = captured.routes[3]
+        eq(aroute.async, true, "serve: the api route is asynchronous")
+        eq(captured.routes[2].async, true, "serve: ...and so is the validate route")
+
+        -- /api/commits: one git log, started with a callback, answered when it ends
+        local got
+        aroute.handler({ params = { "commits" }, query = { n = "5" } }, function(c, _, b)
+          got = { code = c, body = b }
+        end)
+        eq(#started, 1, "serve: /api/commits starts one git")
+        eq(started[1].cmd[2], "log", "serve: ...git log")
+        ok(type(started[1].on_exit) == "function", "serve: ...with a callback, not a wait")
+        eq(got, nil, "serve: ...and has not answered while git runs")
+        finish(1, { code = 0, stdout = "aaaaaaa1\31aaaaaaa\31me\0312026-11-22\31second\30" })
+        ok(got ~= nil, "serve: the answer comes when git ends")
+        eq(got.code, 200, "serve: ...200")
+        eq(vim.json.decode(got.body).commits[1].subject, "second", "serve: ...with git's commits")
+
+        -- /api/commit/<sha>: several gits one after another, each without a wait
+        started, got = {}, nil
+        aroute.handler({ params = { "commit/abcdef0" }, query = {} }, function(c, _, b)
+          got = { code = c, body = b }
+        end)
+        eq(#started, 1, "serve: /api/commit/<sha> starts its first git")
+        finish(1, { code = 0, stdout = "abcdef0\31abcdef0\31me\0312026-11-22\31s\31" })
+        eq(#started, 2, "serve: ...then the next, once the first ended")
+        eq(got, nil, "serve: ...still without an answer")
+        finish(2, { code = 0, stdout = "" })
+        for i = 3, 10 do
+          if got or not started[i] then
+            break
+          end
+          finish(i, { code = 1, stderr = "no such path" })
+        end
+        eq(got and got.code, 200, "serve: ...and answers when the last git ended")
+
+        -- a throw after git ended is a 500, not a lost request
+        started, got = {}, nil
+        ---@diagnostic disable-next-line: duplicate-set-field
+        core_api.answer = function(_, c)
+          c.git(c, { "log" })
+          error("boom after git")
+        end
+        aroute.handler({ params = { "commits" }, query = {} }, function(c, _, b)
+          got = { code = c, body = b }
+        end)
+        finish(1, { code = 0, stdout = "" })
+        core_api.answer = real_answer
+        eq(got and got.code, 500, "serve: a throw after git ended answers 500")
+        ok(got.body:find("boom after git", 1, true) ~= nil, "serve: ...naming the error")
+
+        -- stopped while git ran: the late result is dropped and nothing further starts
+        started, got = {}, nil
+        aroute.handler({ params = { "commit/abcdef0" }, query = {} }, function(c)
+          got = { code = c }
+        end)
+        eq(#started, 1, "serve: a commit request runs its first git")
+        serve.stop()
+        finish(1, { code = 0, stdout = "abcdef0\31abcdef0\31me\0312026-11-22\31s\31" })
+        eq(got, nil, "serve: after stop, the late git result answers nothing")
+        eq(#started, 1, "serve: ...and starts no further git")
+      end)
+      vim.system = real_system
+      serve.stop()
+      stopped = 0
+      if not async_ok then
+        error(async_err, 0)
+      end
 
       -- a fixed port is handed on; a bad one never reaches the server
       captured = nil
