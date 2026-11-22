@@ -18,7 +18,14 @@ return function(H)
   local root = (vim.fn.getcwd():gsub("\\", "/"))
 
   -- ── No string sink in the script ─────────────────────────────────────────
-  local sinks = { "innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "DOMParser", "createContextualFragment" }
+  local sinks = {
+    "innerHTML",
+    "outerHTML",
+    "insertAdjacentHTML",
+    "document.write",
+    "DOMParser",
+    "createContextualFragment",
+  }
   local script = require("docmap.core.render.html.js")
   -- the comments of a slice may name the sinks (they explain why there are none): only code counts
   local code = script:gsub("//[^\n]*", "")
@@ -56,8 +63,14 @@ return function(H)
   vim.list_extend(cmd, files)
   local result = vim.system(cmd, { text = true, timeout = 600000 }):wait()
   if result.code == 77 then
-    H.skip("trusted types: " .. vim.trim(result.stdout or ""))
+    -- No node, playwright or chromium here: not applicable, said out loud (the harness has no skip).
+    print("n/a  trusted types: " .. vim.trim(result.stdout or ""))
     return
   end
-  ok(result.code == 0, "trusted types: the pages run clean under the policy — " .. vim.trim(result.stdout or "") .. vim.trim(result.stderr or ""))
+  ok(
+    result.code == 0,
+    "trusted types: the pages run clean under the policy — "
+      .. vim.trim(result.stdout or "")
+      .. vim.trim(result.stderr or "")
+  )
 end
