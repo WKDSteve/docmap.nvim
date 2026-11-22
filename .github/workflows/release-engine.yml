@@ -152,18 +152,26 @@ jobs:
       # "Cannot create temporary file in C:\Windows\" failure that had
       # nothing to do with this recipe. `msys2/setup-msys2` gives this job
       # exactly one such layer, with nothing else on PATH to collide with.
+      #
+      # Node comes from actions/setup-node, not MSYS2: MSYS2 stopped
+      # building `mingw-w64-x86_64-nodejs` (nodejs ships for ucrt64/clang64
+      # only now), and pacman's "target not found" for it failed this job
+      # from 2026-11-21 on. The setup-node build is a native Windows Node
+      # as well, and `path-type: inherit` below puts it on the msys2
+      # shell's PATH.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
-          # gcc and node are mingw64-prefixed on purpose: this session's
-          # compiler and the Node that runs `tree-sitter build` (which
-          # shells out to a C compiler itself) both need to be native
-          # Windows tools, producing/calling real .exe/.dll, not the
-          # POSIX-emulated MSYS builds of the same names. `make` stays
-          # the plain MSYS package -- it only orchestrates commands and
-          # is the package practically every msys2/setup-msys2 workflow
-          # installs it as, mingw64-prefixed or not.
-          install: mingw-w64-x86_64-gcc make git curl tar mingw-w64-x86_64-nodejs
+          # gcc is mingw64-prefixed on purpose: this session's compiler
+          # needs to be a native Windows tool, producing real .exe/.dll,
+          # not the POSIX-emulated MSYS build of the same name. `make`
+          # stays the plain MSYS package -- it only orchestrates commands
+          # and is the package practically every msys2/setup-msys2
+          # workflow installs it as, mingw64-prefixed or not.
+          install: mingw-w64-x86_64-gcc make git curl tar
           path-type: inherit
       - shell: msys2 {0}
         run: npm install -g tree-sitter-cli
@@ -182,6 +190,10 @@ jobs:
 
   publish:
     needs: [linux, windows]
+    # A workflow_dispatch from another branch (a `ci/**` check branch,
+    # say) builds both platforms but never replaces the release: only
+    # main's own state goes out as `standalone-latest`.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
