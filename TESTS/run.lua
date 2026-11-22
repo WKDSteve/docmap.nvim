@@ -297,6 +297,7 @@ local specs = {
   "map_offer_spec.lua",
   "usrcmds_git_spec.lua",
   "usrcmds_git_async_spec.lua",
+  "usrcmds_revisions_spec.lua",
   "pick_spec.lua",
   "functions_doc_tag_spacing_spec.lua",
   "config_build_defaults_spec.lua",

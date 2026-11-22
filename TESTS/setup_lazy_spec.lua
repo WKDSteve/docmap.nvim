@@ -6,7 +6,8 @@
 -- The handle `setup()` returns is lazy now: the first read scans.
 
 return function(H)
-  H.with_restore(nil, function()
+  -- `setup()` registers the revision-completion autocmds (`docmap.revisions.<command>`); they go with the spec.
+  H.with_restore({ groups = { "docmap.revisions." } }, function()
     local eq, ok = H.eq, H.ok
 
     local root = vim.fn.tempname():gsub("\\", "/")

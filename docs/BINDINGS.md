@@ -136,3 +136,10 @@ Flush pinned trails to `stdpath('state')`. Never into the repository — a trail
 **Lifetime:** Created by `lib.nvim.net.server` when `start()` first runs it (one hook for every server of the session); the socket itself is closed by `stop()`.
 
 Shut the local map server down with the editor, so no listening socket outlives the Neovim session that opened it.
+
+### `CmdlineChanged`, `CmdlineLeave` — global
+
+**Owner:** `docmap.bindings.usrcmds`  
+**Lifetime:** Created by `setup()` in the augroup `docmap.revisions.<command_name>` (`:` command lines only); a second `setup()` for the same command replaces them. Nothing is fetched by `setup()` itself.
+
+Fetch the refs for `:DocMap diff`/`churn` completion in the background once the command line shows one of them (one `git for-each-ref` per command line at most), so `<Tab>` reads a cache instead of starting git; leaving the line drops a query still on its way.

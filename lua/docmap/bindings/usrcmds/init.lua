@@ -168,26 +168,88 @@ local function starting_with(candidates, lead)
   end, candidates)
 end
 
----Named revisions of `root`, for completing `diff`'s and `churn`'s argument.
+---The refs cache of the revision completion.
 ---
 ---Cached for a few seconds rather than per session: branches come and go
 ---while an editor is open (a checkout, a new branch), so a session-long cache
 ---would go stale in the ordinary case. The TTL is only there to keep a held
 ---`<Tab>` from spawning one `git for-each-ref` per keystroke.
+local function revisions_cache()
+  return require("lib.nvim.cache.memory").namespace("docmap.revisions", { ttl = 5 })
+end
+
+---How long a `<Tab>` waits for the one query already on its way before it offers nothing.
+local REVISIONS_WAIT_MS = 3000
+
+---The background `for-each-ref` per repository root, at most one each. The entry itself is the token: an answer
+---whose entry is no longer the one under its root (dropped on leaving the command line) is thrown away.
+---@type table<string, { handle: { stop: fun() }, done: boolean, refs: string[]|nil }>
+local revisions_pending = {}
+
+---Start fetching the refs of `root` in the background, unless they are cached or already on their way.
 ---@param root string
----@return string[]
-local function revisions(root)
-  local ns = require("lib.nvim.cache.memory").namespace("docmap.revisions", { ttl = 5 })
-  local hit = ns.get(root)
-  if hit then
-    return hit
+---@return { handle: { stop: fun() }, done: boolean, refs: string[]|nil }|nil entry The query on its way, nil on a cache hit.
+local function prefetch_revisions(root)
+  local ns = revisions_cache()
+  if ns.get(root) then
+    return nil
   end
+  local pending = revisions_pending[root]
+  if pending then
+    return pending
+  end
+  local entry = { done = false }
+  revisions_pending[root] = entry
   -- Capped: past the first few dozen, a candidate list is not something
   -- anyone reads, and the newest-first ordering means the cut falls on the
   -- refs least likely to be wanted.
-  local refs = require("lib.nvim.git").refs(root, { limit = 50 })
-  ns.set(root, refs)
-  return refs
+  entry.handle = require("lib.nvim.git").refs_async(
+    root,
+    { limit = 50, timeout_ms = 5000 },
+    function(refs, err)
+      if revisions_pending[root] ~= entry then
+        return
+      end
+      revisions_pending[root] = nil
+      entry.done, entry.refs = true, refs
+      if not err then
+        ns.set(root, refs)
+      end
+    end
+  )
+  return entry
+end
+
+---Drop every background query: their late answers are discarded and git is stopped.
+local function drop_revision_prefetches()
+  for root, entry in pairs(revisions_pending) do
+    revisions_pending[root] = nil
+    if entry.handle then
+      pcall(entry.handle.stop)
+    end
+  end
+end
+
+---Named revisions of `root`, for completing `diff`'s and `churn`'s argument.
+---
+---The completion has to answer synchronously, but it never starts git synchronously: the refs were usually fetched
+---in the background while the command line was typed (`CmdlineChanged`, see `M.setup`) and come from the cache; a
+---`<Tab>` typed faster than that waits for that one query instead of starting a second.
+---@param root string
+---@return string[]
+local function revisions(root)
+  local hit = revisions_cache().get(root)
+  if hit then
+    return hit
+  end
+  local entry = prefetch_revisions(root)
+  if not entry then
+    return revisions_cache().get(root) or {}
+  end
+  vim.wait(REVISIONS_WAIT_MS, function()
+    return entry.done
+  end, 5)
+  return entry.refs or {}
 end
 
 ---@param p string
@@ -415,6 +477,41 @@ function M.setup(opts)
         return starting_with(refs, lead)
       end
       return starting_with(action_names(), lead)
+    end,
+  })
+
+  -- The refs for `diff`/`churn` completion are fetched in the background as soon as the command line shows one of
+  -- them, so the `<Tab>` that follows reads a cache instead of starting git. Only registered here, nothing is fetched
+  -- by `setup()`. Per keystroke the cost is one `find` on the line, and only until the line has asked once: at most
+  -- one `for-each-ref` per command line. Leaving the line drops what is still on its way.
+  local revisions_line = "^[%s:]*" .. vim.pesc(command_name) .. "!?%s+(%a+)%s"
+  local revisions_asked = false
+  local cmdline_group =
+    vim.api.nvim_create_augroup("docmap.revisions." .. command_name, { clear = true })
+  vim.api.nvim_create_autocmd("CmdlineChanged", {
+    group = cmdline_group,
+    pattern = ":",
+    desc = "docmap: fetch the refs for :"
+      .. command_name
+      .. " diff/churn completion in the background",
+    callback = function()
+      if revisions_asked then
+        return
+      end
+      local verb = vim.fn.getcmdline():match(revisions_line)
+      if verb == "diff" or verb == "churn" then
+        revisions_asked = true
+        prefetch_revisions(resolve_root())
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd("CmdlineLeave", {
+    group = cmdline_group,
+    pattern = ":",
+    desc = "docmap: drop the background refs query of the command line just left",
+    callback = function()
+      revisions_asked = false
+      drop_revision_prefetches()
     end,
   })
 

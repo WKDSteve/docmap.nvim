@@ -15,7 +15,7 @@
 -- already proven elsewhere.
 
 return function(H)
-  H.with_restore({ groups = { "ra_telemetry_" } }, function()
+  H.with_restore({ groups = { "ra_telemetry_", "docmap.revisions." } }, function()
     local eq, ok = H.eq, H.ok
 
     local repo_root = (debug.getinfo(1, "S").source:sub(2):match("(.*)[/\\]TESTS[/\\]")) or "."

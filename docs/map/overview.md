@@ -314,7 +314,7 @@ flowchart LR
 | Module | Description | Fns | Docs |
 |---|---|---|---|
 | `bindings` |  |  |  |
-| &nbsp;&nbsp;`docmap.bindings.usrcmds` | The user commands: `:DocMap` and `:DocBrowse` — registration, argument dispatch and completion. | 7 | [README](../../lua/docmap/bindings/usrcmds/README.md) · [src](../../lua/docmap/bindings/usrcmds/init.lua) |
+| &nbsp;&nbsp;`docmap.bindings.usrcmds` | The user commands: `:DocMap` and `:DocBrowse` — registration, argument dispatch and completion. | 10 | [README](../../lua/docmap/bindings/usrcmds/README.md) · [src](../../lua/docmap/bindings/usrcmds/init.lua) |
 | `docmap.config` | Resolving a full `Docmap.Opts` for a repository: the defaults in [`DEFAULTS.lua`](../../lua/docmap/config/DEFAULTS.lua), what can be derived from `root`, and the merge rule every… | 7 | [README](../../lua/docmap/config/README.md) · [src](../../lua/docmap/config/init.lua) |
 | `core` |  |  | [README](../../lua/docmap/core/README.md) |
 | &nbsp;&nbsp;`docmap.core.i18n` | The interface catalog: one JSON file per locale, and the Lua `t(key, params)` that reads it. | 20 | [src](../../lua/docmap/core/i18n/init.lua) |

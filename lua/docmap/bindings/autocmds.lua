@@ -79,6 +79,13 @@ M.list = {
     lifetime = "Created by `lib.nvim.net.server` when `start()` first runs it (one hook for every server of the session); the socket itself is closed by `stop()`.",
     why = "Shut the local map server down with the editor, so no listening socket outlives the Neovim session that opened it.",
   },
+  {
+    events = { "CmdlineChanged", "CmdlineLeave" },
+    owner = "docmap.bindings.usrcmds",
+    scope = "global",
+    lifetime = "Created by `setup()` in the augroup `docmap.revisions.<command_name>` (`:` command lines only); a second `setup()` for the same command replaces them. Nothing is fetched by `setup()` itself.",
+    why = "Fetch the refs for `:DocMap diff`/`churn` completion in the background once the command line shows one of them (one `git for-each-ref` per command line at most), so `<Tab>` reads a cache instead of starting git; leaving the line drops a query still on its way.",
+  },
 }
 
 ---The user commands this plugin registers, for the same reason as above:
