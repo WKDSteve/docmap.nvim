@@ -86,10 +86,11 @@ return function(H)
 
   -- ---------------------------------------------- no git process per scan
   -- The remote and the branch are read from `.git/config` and `.git/HEAD`
-  -- (`core/git_files.lua`): a scan -- after every save with `watch = true` --
+  -- (`lib.nvim.git`'s `remote_url_fast`/`current_ref_fast`, reader
+  -- `lib.nvim.git.files`): a scan -- after every save with `watch = true` --
   -- must not start `git` for them. Counted through a `vim.system` stand-in
   -- that passes every other program through.
-  local git_files = require("docmap.core.git_files")
+  local git_files = require("lib.nvim.git.files")
   local real_system = vim.system
   local git_starts = {}
   ---@param fn fun()
@@ -171,17 +172,6 @@ return function(H)
     "scan: an insteadOf rewrite is resolved by git"
   )
   eq(#starts, 1, "...with one git start, the remote only")
-
-  -- The config reader itself.
-  local url, unsure = git_files.config_url(
-    '[core]\n\tbare = false\n[remote "upstream"]\n\turl = https://x/a/b\n[remote "origin"]\n'
-      .. "\turl = git@github.com:o/r.git\n\turl = https://second/o/r\n",
-    "origin"
-  )
-  eq(url, "git@github.com:o/r.git", "config: the first url of the named remote")
-  eq(unsure, false, "...read with certainty")
-  eq(git_files.config_url("[core]\n", "origin"), nil, "config: no such remote is nil")
-  local _, inc =
-    git_files.config_url('[include]\n\tpath = x\n[remote "origin"]\n\turl = u\n', "origin")
-  eq(inc, true, "config: an include is left to git")
+  -- The config reader itself is lib.nvim's (`lib.nvim.git.files.config_url`)
+  -- and tested there; this file pins what docmap's scan makes of it.
 end

@@ -893,9 +893,10 @@ function M.scan(opts)
   -- `bindings/usrcmds/init.lua`'s `completion_names()`, which calls it on
   -- every keystroke of a `:DocMap` argument -- a git subprocess there would
   -- have meant every keystroke blocking on `git remote`/`git symbolic-ref`.
-  -- Read from `.git/HEAD` and `.git/config` (`core/git_files.lua`), not
-  -- asked of two `git` processes: those froze the editor ~55 ms per scan on
-  -- Windows, after every save with `watch = true`.
+  -- Read from `.git/HEAD` and `.git/config` (`lib.nvim.git`'s
+  -- `remote_url_fast`/`current_ref_fast`), not asked of two `git` processes:
+  -- those froze the editor ~55 ms per scan on Windows, after every save with
+  -- `watch = true`.
   --
   -- Only where `vim.system` exists: **`standalone/vim_shim.lua` provides
   -- none** (see its own header) -- this module is bundled into the
@@ -907,15 +908,16 @@ function M.scan(opts)
   local repo_url, branch = opts.repo_url, opts.branch
   if (repo_url == nil or branch == nil) and type(vim.system) == "function" then
     pcall(function()
-      local git_files = require("docmap.core.git_files")
+      local git = require("lib.nvim.git")
       if repo_url == nil then
-        local remote = git_files.remote(opts.root, "origin")
+        local url = git.remote_url_fast("origin", { dir = opts.root })
+        local remote = url and require("lib.nvim.git.remote").parse_remote(url)
         if remote then
           repo_url = ("https://%s/%s/%s"):format(remote.host, remote.owner, remote.repo)
         end
       end
       if branch == nil then
-        branch = git_files.ref(opts.root)
+        branch = git.current_ref_fast(opts.root)
       end
     end)
   end

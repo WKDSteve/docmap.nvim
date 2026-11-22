@@ -34,7 +34,7 @@ end
 ---@return string
 local function root_prefix(root)
   local abs = vim.fn.fnamemodify(root, ":p"):gsub("\\", "/"):gsub("/+$", "")
-  local info = require("docmap.core.git_files").find(abs)
+  local info = require("lib.nvim.git.files").find(abs)
   if not info then
     return ""
   end

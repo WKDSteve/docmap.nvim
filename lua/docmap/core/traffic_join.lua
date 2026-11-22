@@ -50,9 +50,10 @@ function M.repo(opts)
   if type(opts.root) ~= "string" then
     return nil
   end
-  -- Read from `.git/config`, no `git` process (`core/git_files.lua`).
+  -- Read from `.git/config`, no `git` process (`lib.nvim.git.remote_url_fast`).
   local ok, repo = pcall(function()
-    local remote = require("docmap.core.git_files").remote(opts.root, "origin")
+    local url = require("lib.nvim.git").remote_url_fast("origin", { dir = opts.root })
+    local remote = url and require("lib.nvim.git.remote").parse_remote(url)
     return remote and ("%s/%s"):format(remote.owner, remote.repo)
   end)
   if ok and repo then
