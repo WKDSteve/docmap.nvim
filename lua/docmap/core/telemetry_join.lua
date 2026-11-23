@@ -34,6 +34,17 @@ local M = {}
 ---@field calls integer Every call ever recorded for this key, across every session since `data.started_at`.
 ---@field calls_recent integer Calls in the last `M.RECENT_DAYS` calendar days, from `data.days`. `0` is a real answer and a different one from `calls == 0`: a function with a large `calls` and a `calls_recent` of zero is a cold path, which is the reading `calls` alone cannot give.
 ---@field has_static_caller boolean Whether `check.used_keys(ir)` already considers this function used
+---@field errors integer? Raised errors; `nil` when the error count was not measured for this key (`nil` is not `0`)
+---@field timed integer? Calls that were timed; `nil` when duration was not measured
+---@field mean_ms number? Mean duration of the timed calls
+---@field max_ms number? Slowest timed call
+---@field callers Docmap.TelemetryJoin.Top? Most frequent callers (`short_src:line`); `nil` when `call_tree` was not on
+---@field args Docmap.TelemetryJoin.Top? Most frequent argument fingerprints; `nil` unless `profile_args` was on
+
+---@class Docmap.TelemetryJoin.Top
+---@field top { value: string, n: integer }[] Highest counts first, at most `M.TOP_N`
+---@field distinct integer Distinct values seen, including evicted ones
+---@field other integer Calls whose value did not fit in the stored table
 
 ---How many calendar days `Row.calls_recent` looks back over.
 ---
@@ -47,6 +58,37 @@ local M = {}
 ---reader all say the same number, and so changing it is one edit rather than
 ---a search for `7`.
 M.RECENT_DAYS = 7
+
+---How many callers / argument fingerprints a row carries. The stored tables hold up to 32; a detail pane wants the head.
+M.TOP_N = 5
+
+---The head of an `RA.Telemetry.ArgStats` table, or `nil` when the stats do not exist.
+---
+---Values are passed through untouched: runtime-analysis already shortened them and kept the text out
+---(`fingerprint.lua`), so nothing here may widen them again. Ties sort by value so one data set gives one order.
+---@param stats RA.Telemetry.ArgStats?
+---@return Docmap.TelemetryJoin.Top?
+local function top_of(stats)
+  if type(stats) ~= "table" or type(stats.values) ~= "table" then
+    return nil
+  end
+  local list = {}
+  for value, n in pairs(stats.values) do
+    if type(n) == "number" then
+      list[#list + 1] = { value = tostring(value), n = n }
+    end
+  end
+  table.sort(list, function(a, b)
+    if a.n ~= b.n then
+      return a.n > b.n
+    end
+    return a.value < b.value
+  end)
+  for i = #list, M.TOP_N + 1, -1 do
+    list[i] = nil
+  end
+  return { top = list, distinct = stats.distinct or #list, other = stats.other or 0 }
+end
 
 ---How a runtime column reads, or `""` when nobody measured this at all.
 ---
@@ -248,6 +290,8 @@ function M.rows(ir, data)
       -- needs to actually find the node.
       local ir_key = node.id .. "#" .. fn_name
       local stats = data.functions[key]
+      local timing = stats and stats.timing
+      local timed = type(timing) == "table" and type(timing.n) == "number" and timing.n > 0
       rows[#rows + 1] = {
         id = node.id,
         fn = fn_name,
@@ -255,6 +299,12 @@ function M.rows(ir, data)
         calls = stats and stats.calls or 0,
         calls_recent = recent_calls(data, key),
         has_static_caller = used[ir_key] == true,
+        errors = stats and type(stats.errors) == "number" and stats.errors or nil,
+        timed = timed and timing.n or nil,
+        mean_ms = timed and (timing.total_ms or 0) / timing.n or nil,
+        max_ms = timed and timing.max_ms or nil,
+        callers = top_of(stats and stats.callers),
+        args = top_of(stats and stats.args),
       }
     end
   end

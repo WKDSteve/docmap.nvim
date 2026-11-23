@@ -78,6 +78,71 @@ return function(H)
       eq(telemetry_join.namespace({}), nil, "namespace: nil when neither is set")
     end
 
+    -- Runtime detail: duration, errors, callers and argument fingerprints ride on the row only when they were
+    -- measured; an unmeasured field is nil, never 0, and an unresolved key never produces a row.
+    do
+      local ir = fake_ir()
+      ---@type RA.Telemetry.Data
+      local data = {
+        version = 1,
+        started_at = 0,
+        sessions = 1,
+        functions = {
+          ["mod.callee"] = {
+            calls = 10,
+            errors = 3,
+            timing = { n = 4, total_ms = 20, min_ms = 1, max_ms = 9 },
+            callers = {
+              values = { ["x.lua:5"] = 2, ["y.lua:9"] = 7, ["a.lua:1"] = 7 },
+              other = 1,
+              distinct = 4,
+            },
+            args = { values = { ["<string:3:abcd1234>"] = 6, ["1"] = 4 }, other = 0, distinct = 2 },
+          },
+          ["mod.used_by_edge"] = { calls = 0 },
+          ["mod.unresolved"] = {
+            calls = 50,
+            timing = { n = 1, total_ms = 1, min_ms = 1, max_ms = 1 },
+          },
+        },
+        days = {},
+        reminded = {},
+        modules = { ["mod.callee"] = "a", ["mod.used_by_edge"] = "a" },
+        info = {},
+      }
+      local by_key = telemetry_join.by_key(ir, data)
+      local r = by_key["a#callee"]
+      eq(r.errors, 3, "runtime detail: errors carried")
+      eq(r.timed, 4, "runtime detail: timed calls")
+      eq(r.mean_ms, 5, "runtime detail: mean = total / n")
+      eq(r.max_ms, 9, "runtime detail: slowest call")
+      eq(r.callers.top[1].value, "a.lua:1", "runtime detail: callers by count, ties by value")
+      eq(r.callers.top[2].value, "y.lua:9", "runtime detail: second caller")
+      eq(r.callers.top[3].n, 2, "runtime detail: third caller count")
+      eq(r.callers.distinct, 4, "runtime detail: distinct includes evicted values")
+      eq(
+        r.args.top[1].value,
+        "<string:3:abcd1234>",
+        "runtime detail: top argument fingerprint, as stored"
+      )
+      local z = by_key["a#used_by_edge"]
+      eq(z.calls, 0, "runtime detail: wrapped and never called is 0")
+      eq(z.errors, nil, "runtime detail: errors not measured stays nil, not 0")
+      eq(z.timed, nil, "runtime detail: duration not measured stays nil")
+      eq(z.callers, nil, "runtime detail: callers not measured stays nil")
+      eq(z.args, nil, "runtime detail: arguments not measured stays nil")
+      eq(
+        by_key["a#seen_by_see"],
+        nil,
+        "runtime detail: a function with no telemetry key has no row"
+      )
+      eq(
+        #telemetry_join.rows(ir, data),
+        2,
+        "runtime detail: an unresolved key is dropped, never guessed"
+      )
+    end
+
     -- telemetry_join.rows / by_key: pure join logic against a hand-built
     -- Data table — no real telemetry instance needed for this half.
     do

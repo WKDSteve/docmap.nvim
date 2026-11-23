@@ -132,6 +132,37 @@ return [[
     }
   }
 
+  // Runtime data per function, from `/api/telemetry` (served pages only, like the Telemetry panel). Only rows the
+  // join resolved to this function are shown; a function with no row says it was not measured, which is not "0".
+  function rtTop(top, fmt){
+    return top.top.map(function(e){ return '<code>' + esc(fmt ? fmt(e.value) : e.value) + '</code> ×' + fmtNum(e.n); }).join(", ") +
+      (top.distinct > top.top.length ? ' (' + esc(t("page.detail.fn.rt.more", { distinct: fmtNum(top.distinct) })) + ')' : '');
+  }
+  function rtHTML(r){
+    if(!r) return '<div class="fn-desc fn-rt">' + esc(t("page.detail.fn.rt.unmeasured")) + '</div>';
+    var l = [];
+    l.push(r.calls === 0 ? esc(t("page.detail.fn.rt.none"))
+      : esc(t("page.detail.fn.rt.calls", { calls: fmtNum(r.calls), recent: fmtNum(r.calls_recent) })));
+    l.push(r.timed ? esc(t("page.detail.fn.rt.time", { mean: (Math.round(r.mean_ms * 100) / 100), max: (Math.round(r.max_ms * 100) / 100), n: fmtNum(r.timed) }))
+      : esc(t("page.detail.fn.rt.notime")));
+    l.push(r.errors ? esc(t("page.detail.fn.rt.err", { count: fmtNum(r.errors) })) : esc(t("page.detail.fn.rt.noerr")));
+    l.push(r.callers && r.callers.top.length ? esc(t("page.detail.fn.rt.callers")) + ': ' + rtTop(r.callers) : esc(t("page.detail.fn.rt.nocallers")));
+    l.push(r.args && r.args.top.length ? esc(t("page.detail.fn.rt.args")) + ': ' + rtTop(r.args) : esc(t("page.detail.fn.rt.noargs")));
+    return '<div class="fn-desc fn-rt"><b>' + esc(t("page.detail.fn.rt.head")) + '</b><br>' + l.join('<br>') + '</div>';
+  }
+  function fillRuntime(n){
+    if(!historyAvailable() || !n.functions || !n.functions.length) return;
+    telFetch(null).then(function(d){
+      if(!d || !d.available) return;
+      var by = {};
+      (d.rows || []).forEach(function(r){ by[r.ir_key] = r; });
+      detailEl.querySelectorAll(".fn[data-fn]").forEach(function(block){
+        if(block.querySelector(".fn-rt")) return;
+        appendMarkup(block, rtHTML(by[block.getAttribute("data-fn")]));
+      });
+    }).catch(function(){});
+  }
+
   function renderDetail(n){
     var h = [];
     h.push('<h2>'+esc(n.name)+'</h2>');
@@ -364,6 +395,7 @@ return [[
     h.push('<div class="sec">'+esc(t("page.detail.meta"))+'</div><ul class="lst"><li>'+esc(meta.join("  ·  "))+'</li></ul>');
 
     setMarkup(detailEl, h.join(""));
+    fillRuntime(n);
 
     // One handler per link family. `fn: null` on the Deps/Hierarchy hops is
     // not redundant: leaving a stale function centered would make a later
