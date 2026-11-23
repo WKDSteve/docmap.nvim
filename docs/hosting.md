@@ -351,12 +351,14 @@ not a special case — nothing happens.
 **Where the reader is**, on every navigation:
 
 ```js
-{ source: "docmap", tab: "hierarchy", atool: null, view: "calls" }
+{ source: "docmap", tab: "hierarchy", atool: null, view: "calls", id: null, fn: null }
 ```
 
-Coarse on purpose. `tab`, the Analysis sub-tool, and the Hierarchy view —
-not scroll position, not selection. It is sent only when one of the three
-changes, so a host is not woken by every interaction. This is what lets a
+Coarse on purpose. `tab`, the Analysis sub-tool, the Hierarchy view, and on
+the tree tab the chosen node `id` and function key `fn` (the same two fields
+as the link fragment `#tab=tree&id=<node>&fn=<key>`; `null` elsewhere, and
+`fn` `null` when no function is chosen) — not scroll position. It is sent
+only when one of the five changes, so a host is not woken by every interaction. This is what lets a
 host put a note over a panel it knows something about, and what lets it
 return the reader to the same panel after a reload.
 

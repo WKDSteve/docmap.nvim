@@ -1095,11 +1095,15 @@ return [[
   // `postMessage` is the one channel that crosses the iframe boundary in
   // either direction.
   //
-  // Coarse on purpose — `tab`/`atool`/`view` only, not the full state
-  // object: a host reacting to "which panel" does not need `center`,
-  // `depth`, or any of the dozen other keys the URL hash already carries,
-  // and sending them would make this page's own internal state shape part
-  // of a cross-origin contract other code depends on.
+  // Coarse on purpose — `tab`/`atool`/`view` plus the tree's `id`/`fn`, not
+  // the full state object: a host reacting to "which panel" does not need
+  // `center`, `depth`, or any of the dozen other keys the URL hash already
+  // carries, and sending them would make this page's own internal state
+  // shape part of a cross-origin contract other code depends on. `id` and
+  // `fn` are the two fragment fields (`#tab=tree&id=…&fn=…`) a host already
+  // writes to open the map at a node, so a host that reloads its frame can
+  // hand back the node the reader chose; they are null off the tree tab,
+  // where the page's own hash carries neither.
   //
   // `"*"` as the target origin, not this page's own: the parent's origin
   // (`tauri://…`, `file://`, whatever embeds this) is not something a page
@@ -1109,8 +1113,10 @@ return [[
   var lastPostedContext = null;
   function postContext(s){
     if(window.parent === window) return;
-    var ctx = { source: "docmap", tab: s.tab || null, atool: s.atool || null, view: s.view || null };
-    var key = ctx.tab + "|" + ctx.atool + "|" + ctx.view;
+    var onTree = s.tab === "tree" && s.id;
+    var ctx = { source: "docmap", tab: s.tab || null, atool: s.atool || null, view: s.view || null,
+                id: onTree ? s.id : null, fn: onTree && s.fn ? s.fn : null };
+    var key = ctx.tab + "|" + ctx.atool + "|" + ctx.view + "|" + ctx.id + "|" + ctx.fn;
     if(key === lastPostedContext) return;
     lastPostedContext = key;
     try { window.parent.postMessage(ctx, "*"); } catch(e){ /* no listening host, or postMessage unavailable — silent, same as no host at all */ }
