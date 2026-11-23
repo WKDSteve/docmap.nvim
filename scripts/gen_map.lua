@@ -115,7 +115,8 @@ local code = require("docmap.core.cli").run(opts, _G.arg or {})
 -- appears in the rendered output.
 local checking = false
 for _, a in ipairs(_G.arg or {}) do
-  if a == "--check" then
+  -- `--at=` only answers a question: it writes nothing, so no BINDINGS.md either.
+  if a == "--check" or a:match("^%-%-at=") then
     checking = true
   end
 end

@@ -431,6 +431,19 @@ separate future step, deliberately kept out of this one: confirmed with
 the user to ship the simpler, `bindings/`-only version first rather than
 bundle a `core/` change into the same pass.
 
+### Which node holds a position (`--at=<file>:<line>[-<last>]`)
+
+```
+nvim --headless -l scripts/gen_map.lua --at=lua/lib/nvim/fs/init.lua:42
+```
+
+Scans the tree, writes nothing and prints one tab-separated line: the node id,
+the function key (`<node id>#<name>`, `-` when no function holds the line) and
+the page fragment (`#tab=tree&id=…&fn=…`) that opens the map there. Exit `0`:
+found. Exit `1`: the map has no node for the file. Exit `2`: no position given.
+Without function data (the Neovim-free build without tree-sitter) the answer is
+the module. Other apps call this to share the resolution of `:DocMap here`.
+
 ### Breaking-change gate (`--breaking=<ref>`)
 
 Fails a branch that removes or changes a published function:

@@ -118,6 +118,33 @@ Open the generated HTML in the system browser. Prefers the local server when
 one is running (see `serve`), because the History tab needs an origin that
 `fetch` is allowed on.
 
+### `:DocMap here [file[:line[-last]]] [--print]`
+
+Open the map at the function that holds a position — the cursor, a visual
+selection or a `file:line` you name. The page opens on the Tree tab at the
+module that owns the file, with the function's block marked and its tree row
+selected; a line between functions (or a file without any) opens the module.
+
+```vim
+:DocMap here                          " the line under the cursor
+:'<,'>DocMap here                     " the selection
+:DocMap here lua/lib/nvim/fs/init.lua:42
+:DocMap here lua/x.lua:10-30 --print
+```
+
+`--print` opens nothing and writes one line, tab separated: the node id, the
+function key (`<node id>#<name>`, `-` for a module) and the fragment. Where
+a position falls on a range, the function holding its first line wins, else
+the function the range overlaps most. The resolution is `find.at(ir, file,
+line [, last [, root]])` in [`core/find.lua`](../lua/docmap/core/find.lua) (a
+`Docmap.FindHit`, or nil for a file the map does not know) and
+`find.fragment(hit)`; the fragment is `#tab=tree&id=<node>[&fn=<key>]`.
+
+Without a generated map you are offered to make it, as for `open`. Neovim-free,
+the same answer comes from the CLI: `--at=<file>:<line>[-<last>]` prints that
+line (exit 1 when the map has no node for the file, 2 for a bad position) and
+writes nothing.
+
 ### `:DocMap graph <kind> [name]`
 
 The same page as `open`, opened **at a state** instead of at the root — the

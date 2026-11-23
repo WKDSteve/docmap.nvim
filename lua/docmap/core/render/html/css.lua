@@ -216,6 +216,7 @@ main{grid-template-columns:minmax(300px,1.1fr) minmax(0,1.4fr);gap:0;align-items
 .lst li{font-family:var(--mono);font-size:12.5px;padding:2px 0;color:var(--muted)}
 .empty{color:var(--muted);font-size:13px;font-style:italic}
 .fn{margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed var(--line)}
+.fn.focus{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent);padding-left:8px}
 .fn:last-child{border-bottom:0;padding-bottom:0;margin-bottom:0}
 .scope{margin:14px 0 0;padding-left:11px;border-left:2px solid var(--line)}
 .scope-head{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-weight:600;

@@ -341,8 +341,32 @@ local function run_breaking(opts, root, ref)
   return 0
 end
 
+---`--at=<file>:<line>[-<last>]`: which node of the map holds that position. Writes one tab-separated line
+---(`<node id>`, `<function key or ->`, `<fragment>`) and nothing to disk. Exit 0 when found, 1 when the map has
+---no node for the file, 2 for an argument that is no position.
+---@param opts Docmap.Opts
+---@param root string
+---@param spec string
+---@return integer exit_code
+local function run_at(opts, root, spec)
+  local find = require("docmap.core.find")
+  local file, first, last = find.parse_position(spec)
+  if file == "" or not first then
+    io.stderr:write(i18n.t("cli.at.usage") .. "\n")
+    return REFUSED
+  end
+  local ir = require("docmap").scan_full(opts)
+  local hit = find.at(ir, file, first, last, root)
+  if not hit then
+    io.stderr:write(i18n.t("editor.here.no-node", { file = file }) .. "\n")
+    return 1
+  end
+  io.stdout:write(table.concat({ hit.id, hit.key or "-", find.fragment(hit) }, "\t") .. "\n")
+  return 0
+end
+
 ---Run the CLI over `opts` with `argv` (`_G.arg`-shaped: `--check`, `--lenient`,
----`--full`, `--breaking=<ref>`, `--exclude=<path>`, `--languages=<a,b>`, `--locale=<tag>`). Writes to stdout/stderr
+---`--full`, `--breaking=<ref>`, `--at=<file>:<line>`, `--exclude=<path>`, `--languages=<a,b>`, `--locale=<tag>`). Writes to stdout/stderr
 ---as a side effect; returns the process exit code rather than calling
 ---`os.exit`/`vim.cmd("cq ...")`, so the caller decides how to actually exit.
 ---
@@ -369,8 +393,12 @@ function M.run(opts, argv)
   local cli_languages = {}
   ---@type string?
   local cli_locale = nil
+  ---@type string?
+  local at_spec = nil
   for _, a in ipairs(argv) do
-    if a:match("^%-%-locale=") then
+    if a:match("^%-%-at=") then
+      at_spec = a:sub(#"--at=" + 1)
+    elseif a:match("^%-%-locale=") then
       cli_locale = a:sub(#"--locale=" + 1)
     elseif a == "--check" then
       check_only = true
@@ -463,6 +491,10 @@ function M.run(opts, argv)
       unknown = table.concat(unknown, ", "),
       known = table.concat(known_language_names(), ", "),
     }) .. "\n")
+  end
+
+  if at_spec then
+    return run_at(opts, root, at_spec)
   end
 
   if breaking_ref then

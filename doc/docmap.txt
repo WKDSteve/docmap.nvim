@@ -442,6 +442,14 @@ key and then regretted.
 :DocMap open            Open the generated HTML in the system browser. Prefers
                         the local server when one is running.
 
+:DocMap here [file[:line[-last]]] [--print]
+                        Open the map at the function that holds the cursor, the
+                        visual selection (`:'<,'>DocMap here`) or the named
+                        position; the module when no function does. `--print`
+                        writes `<node id> <function key> <fragment>` (tab
+                        separated) instead of opening. The CLI answers the
+                        same with `--at=<file>:<line>[-<last>]`.
+
 :DocMap graph {kind} [name]
                         The same page, opened at a state instead of at the
                         root. {kind} is `deps`, `calls` or `types`. [name]

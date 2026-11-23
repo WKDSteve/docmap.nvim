@@ -8,6 +8,7 @@ per action.
 | [`init.lua`](init.lua) | `setup()`, the `ACTIONS` table, dispatch, completion. |
 | [`generate.lua`](generate.lua) | bare `:DocMap`, `full`, `check` |
 | [`open.lua`](open.lua) | `open` — and the opener `graph` reuses |
+| [`here.lua`](here.lua) | `here [file[:line[-last]]] [--print]` — the map at the function under the cursor or selection |
 | [`graph.lua`](graph.lua) | `graph {deps\|calls} [module]` |
 | [`dot.lua`](dot.lua) | `dot [deps\|calls] [module]` |
 | [`why.lua`](why.lua) | `why <a> <b>` |

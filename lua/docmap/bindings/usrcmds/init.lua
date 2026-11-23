@@ -48,6 +48,9 @@ local ACTIONS = {
   graph = function(ctx, arg)
     require("docmap.bindings.usrcmds.graph").run(ctx, arg)
   end,
+  here = function(ctx, arg)
+    require("docmap.bindings.usrcmds.here").run(ctx, arg)
+  end,
   dot = function(ctx, arg)
     require("docmap.bindings.usrcmds.dot").run(ctx, arg)
   end,
@@ -134,7 +137,7 @@ M.action_names = action_names
 -- the guarantee now lives in TESTS/usrcmds_actions_spec.lua instead of
 -- "nobody forgets to update this by hand."
 ---@type string
-M.action_usage_hints = "[check|full|open|graph|why <a> <b>|dot|mermaid|consumers|diff <ref>|impact <ref>"
+M.action_usage_hints = "[check|full|open|here [file:line] [--print]|graph|why <a> <b>|dot|mermaid|consumers|diff <ref>|impact <ref>"
   .. "|churn [range]|untested|pick|checklist [all]|plugins|bindings|tools|endpoints|serve [stop]"
   .. "|helptags|annotate [--write|--sidecar]|all [full]]"
 
@@ -328,7 +331,7 @@ function M.setup(opts)
   ---which is the work the user asked for by naming a new tree.
   ---@param root string
   ---@return Docmap.Bindings.Ctx
-  local function ctx_for(root)
+  local function ctx_for(root, range)
     -- Always through `config.build`: a caller passing a partial table (the
     -- common case from a plugin spec's `opts`) would otherwise arrive here with
     -- no `out_dir`, no `command_name` and no `source`, and every downstream
@@ -355,6 +358,7 @@ function M.setup(opts)
         return require("docmap.core.find").node(ir, name, lua_root)
       end,
       generate_all = opts and opts.generate_all,
+      range = range,
     }
     return ctx
   end
@@ -411,7 +415,7 @@ function M.setup(opts)
   -- itself goes through, rather than a second, hand-rolled call to the
   -- `generate_all` handler that could drift from this one.
   ---@param action string Raw argument text, already trimmed — "" for bare `:DocMap`.
-  local function dispatch(action)
+  local function dispatch(action, range)
     local verb, rest
     if action ~= "" then
       verb, rest = action:match("^(%S+)%s*(.-)$")
@@ -426,7 +430,7 @@ function M.setup(opts)
       end
     end
 
-    local ctx = ctx_for(resolve_root())
+    local ctx = ctx_for(resolve_root(), range)
 
     -- Empty, and only empty, is the generate action. Anything typed that is
     -- not a known verb is a mistake, and saying so beats writing files.
@@ -439,9 +443,11 @@ function M.setup(opts)
   end
 
   usercmd.create(command_name, function(args)
-    dispatch(vim.trim(args.args or ""))
+    -- Only `here` reads the range: `:'<,'>DocMap here` is the selection as the position.
+    dispatch(vim.trim(args.args or ""), args.range > 0 and { args.line1, args.line2 } or nil)
   end, {
     nargs = "*",
+    range = true,
     desc = "Regenerate the module map (:" .. command_name .. " " .. M.action_usage_hints .. ")",
     complete = function(lead, line)
       -- Two completion levels: the action, then — once an action that takes a

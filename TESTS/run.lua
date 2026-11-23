@@ -292,6 +292,7 @@ local specs = {
   "rules_corpus_spec.lua",
   "generate_all_spec.lua",
   "usrcmds_generate_all_spec.lua",
+  "find_at_spec.lua",
   "usrcmds_actions_spec.lua",
   "usrcmds_readonly_spec.lua",
   "map_offer_spec.lua",

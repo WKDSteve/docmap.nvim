@@ -48,7 +48,7 @@ return [[
         '<span class="nm">' + esc(fn.signature) + '</span>' +
         '<span class="sm">' + prose(fn.summary || "") + '</span>');
       r.addEventListener("click", function(){
-        navigate({ tab: "tree", id: n.id });
+        navigate({ tab: "tree", id: n.id, fn: key });
       });
       list.appendChild(r);
     });
@@ -106,6 +106,30 @@ return [[
     var cur = treeEl.querySelector('.row[data-id="'+CSS.escape(id)+'"]');
     if(cur) cur.classList.add("sel");
     renderDetail(n);
+  }
+
+  // A link may name one function of the selected node (`&fn=<node>#<name>`, what `:DocMap here` builds): open
+  // the node's function group, mark its row and bring its block in the detail pane into view. A key that no
+  // longer resolves (renamed since the link was made) leaves the module shown, as before.
+  function focusFunction(key){
+    treeEl.querySelectorAll(".row.k-fn.sel").forEach(function(r){ r.classList.remove("sel"); });
+    detailEl.querySelectorAll(".fn.focus").forEach(function(b){ b.classList.remove("focus"); });
+    if(!key || !fnByKey[key]) return;
+    var row = treeEl.querySelector('.row.k-fn[data-fn="' + CSS.escape(key) + '"]');
+    if(row){
+      var list = row.parentNode;
+      if(list.classList.contains("hide")){
+        list.classList.remove("hide");
+        var tw = list.previousSibling && list.previousSibling.querySelector(".tw");
+        if(tw) tw.textContent = "▾";
+      }
+      row.classList.add("sel");
+    }
+    var block = detailEl.querySelector('.fn[data-fn="' + CSS.escape(key) + '"]');
+    if(block){
+      block.classList.add("focus");
+      block.scrollIntoView({ block: "start" });
+    }
   }
 
   function renderDetail(n){

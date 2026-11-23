@@ -816,6 +816,7 @@ return [[
     var parts = ["tab=" + encodeURIComponent(s.tab)];
     if(s.tab === "tree"){
       if(s.id) parts.push("id=" + encodeURIComponent(s.id));
+      if(s.id && s.fn) parts.push("fn=" + encodeURIComponent(s.fn));
     } else if(s.tab === "notes"){
       // Nothing else to carry: a flat aggregate over the whole map, with no
       // center, view or direction to remember. Falling through to the
@@ -1050,7 +1051,7 @@ return [[
       v.classList.toggle("active", v.id === "view-" + s.tab);
     });
 
-    if(s.tab === "tree" && s.id && byId[s.id]) selectRow(s.id);
+    if(s.tab === "tree" && s.id && byId[s.id]){ selectRow(s.id); focusFunction(s.fn); }
     if(s.tab === "hierarchy") drawHierarchy(s.center || IR.root, s.view || "modules", false, !s.center);
     if(s.tab === "notes") drawNotes();
     if(s.tab === "index") drawIndex();
