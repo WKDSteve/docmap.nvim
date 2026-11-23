@@ -264,6 +264,7 @@ local specs = {
   "backend_contract_spec.lua",
   "host_lua_determinism_spec.lua",
   "shim_contract_spec.lua",
+  "standalone_telemetry_spec.lua",
   "shim_behavior_spec.lua",
   "shim_links_spec.lua",
   "shell_quote_spec.lua",

@@ -2974,6 +2974,13 @@ local ok_real, real = pcall(function()
 end)
 vim.treesitter = (ok_real and real) or inert_treesitter
 
+-- LuaJIT's `bit`, which plain Lua has not: `runtime-analysis.telemetry.fingerprint` requires it, and without it the
+-- whole telemetry tree fails to load here and `--api=telemetry` says "no data" for a store that is on disk
+-- (`standalone/bit.lua`). Under LuaJIT the real library answers and nothing is installed.
+if not pcall(require, "bit") then
+  package.loaded["bit"] = require("standalone.bit")
+end
+
 _G.vim = vim
 
 return vim
