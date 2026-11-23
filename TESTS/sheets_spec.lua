@@ -1,6 +1,6 @@
 -- TESTS/sheets_spec.lua — the live checks of TESTS/sheets/*.sheet.lua (testing.sheet). Busted style on
 -- purpose: each sheet is its own case named `sheet:<id>`, the name `testing sheets report` finds the result by.
--- @cache-inputs TESTS/sheets/ TESTS/shape_host.lua TESTS/fixtures/keyword_page/ TESTS/fixtures/maps_page/ TESTS/fixtures/routes_page/ TESTS/fixtures/lookup_page/ lua/docmap/
+-- @cache-inputs TESTS/sheets/ TESTS/shape_host.lua TESTS/telemetry_host.lua TESTS/fixtures/keyword_page/ TESTS/fixtures/maps_page/ TESTS/fixtures/routes_page/ TESTS/fixtures/lookup_page/ lua/docmap/
 ---@diagnostic disable: undefined-global
 -- luacheck: read globals describe it
 

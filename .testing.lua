@@ -15,6 +15,9 @@ return {
   -- "none" = all specs in one nvim, "file" = one nvim per spec file
   -- (nothing leaks from one file into the next).
   isolated = "none",
+  -- A browser sheet over a served page starts a host process, a chromium and a page load: served-runtime-detail came
+  -- within half a second of the default 10 s on an idle machine.
+  timeouts = { case_ms = 30000 },
   -- Guards (safety nets, see testing.nvim docs/GUARDS.md).
   guards = {
     -- TESTS/sheets/out holds the page the browser sheets open and their screenshots (git-ignored)
@@ -87,6 +90,23 @@ return {
     apps = {
       ["shape-host"] = {
         run = { "nvim", "--headless", "-u", "NONE", "-l", "TESTS/shape_host.lua", "${temp}", "0" },
+        ready = { stdout = "^http://", as = "host", timeout_ms = 30000 },
+      },
+      -- `:DocMap serve` over the lookup-page fixture with a telemetry store of known content (TESTS/telemetry_host.lua).
+      -- The store lives below stdpath("state"), so that is moved into the run's folder; the host refuses to write
+      -- anywhere else.
+      ["telemetry-host"] = {
+        run = {
+          "nvim",
+          "--headless",
+          "-u",
+          "NONE",
+          "-l",
+          "TESTS/telemetry_host.lua",
+          "${temp}",
+          "0",
+        },
+        env = { XDG_STATE_HOME = "${temp}/state" },
         ready = { stdout = "^http://", as = "host", timeout_ms = 30000 },
       },
     },
