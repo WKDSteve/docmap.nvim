@@ -130,7 +130,14 @@ local function ensure_soft(modname, dirname)
   candidates[#candidates + 1] = self_root .. "/../" .. dirname
   for _, dir in ipairs(candidates) do
     package.path = dir .. "/lua/?.lua;" .. dir .. "/lua/?/init.lua;" .. package.path
-    if pcall(require, modname) then
+    local loaded, err = pcall(require, modname)
+    if loaded then
+      return
+    end
+    -- Found but it does not load (one of its own requires fails): that is the answer, and `--api=telemetry` reports
+    -- it. Looking on would let a later checkout hide the failure of the one the environment named.
+    local not_found = "module '" .. modname .. "' not found"
+    if tostring(err):sub(1, #not_found) ~= not_found then
       return
     end
   end
