@@ -3,7 +3,7 @@
 > **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**8 modules** · 8 namespaces · 163 helper files
+**8 modules** · 8 namespaces · 164 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
@@ -73,11 +73,13 @@ flowchart LR
   nlua_docmap_core_diff_lua["docmap.core.diff"]
   nlua_docmap_core_doccoverage_lua["docmap.core.doccoverage"]
   nlua_docmap_core_docs_lua["docmap.core.docs"]
+  nlua_docmap_core_duplicates_lua["docmap.core.duplicates"]
   nlua_docmap_core_endpoint_coverage_lua["docmap.core.endpoint_coverage"]
   nlua_docmap_core_endpoints_lua["docmap.core.endpoints"]
   nlua_docmap_core_features_lua["docmap.core.features"]
   nlua_docmap_core_find_lua["docmap.core.find"]
   nlua_docmap_core_findings_lua["docmap.core.findings"]
+  nlua_docmap_core_fleet_lua["docmap.core.fleet"]
   nlua_docmap_core_functions_lua["docmap.core.functions"]
   nlua_docmap_core_history_lua["docmap.core.history"]
   nlua_docmap_core_i18n["docmap.core.i18n"]
@@ -212,6 +214,8 @@ flowchart LR
   nlua_docmap_core_features_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_find_lua --> nlua_docmap_core_check_lua
   nlua_docmap_core_findings_lua --> nlua_docmap_core_i18n
+  nlua_docmap_core_fleet_lua --> nlua_docmap_core_duplicates_lua
+  nlua_docmap_core_fleet_lua --> nlua_docmap_core_report_lua
   nlua_docmap_core_functions_lua --> nlua_docmap_core_bindings_lua
   nlua_docmap_core_functions_lua --> nlua_docmap_core_calls_lua
   nlua_docmap_core_functions_lua --> nlua_docmap_core_deps_lua
@@ -338,13 +342,13 @@ flowchart LR
 
 ## Drift
 
-0 errors · 0 warnings · 46 info
+0 errors · 0 warnings · 47 info
 
 No errors or warnings.
 
 
 <details>
-<summary>46 informational findings</summary>
+<summary>47 informational findings</summary>
 
 
 | Check | Message |
@@ -357,6 +361,7 @@ No errors or warnings.
 | `unreferenced-module` | docmap.bindings.docs is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.cli is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.config is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.fleet is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.asm is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.c is required by no other file in the tree |
 | `unreferenced-module` | docmap.core.lang.cpp is required by no other file in the tree |
