@@ -207,6 +207,66 @@ return function(H)
     )
     eq(row and row.calls, 2, "standalone telemetry: the two recorded calls arrive in the row")
 
+    -- `--capabilities` says the telemetry module loads in this engine, without asking a route
+    local caps_run = vim
+      .system(
+        { lua, root .. "/standalone/docmap.lua", "--capabilities" },
+        { cwd = root, env = env, text = true }
+      )
+      :wait(60000)
+    local caps_ok, caps = pcall(vim.json.decode, caps_run.stdout or "")
+    ok(
+      caps_ok and vim.tbl_contains(caps.capabilities or {}, "telemetry"),
+      "standalone telemetry: --capabilities lists 'telemetry' (" .. tostring(caps_run.stdout) .. ")"
+    )
+
+    -- an engine whose soft dependency throws while loading answers with the load error, not 'no data', and does
+    -- not claim the capability
+    local broken_ra = host .. "/broken-ra"
+    vim.fn.mkdir(broken_ra .. "/lua/runtime-analysis/telemetry", "p")
+    vim.fn.writefile(
+      { "error(\"module 'bit' not found: nothing to load here\", 0)" },
+      broken_ra .. "/lua/runtime-analysis/telemetry/init.lua"
+    )
+    local broken_env = vim.tbl_extend("force", env, { RUNTIME_ANALYSIS_NVIM_DIR = broken_ra })
+    local broken_run = vim
+      .system(
+        { lua, root .. "/standalone/docmap.lua", host, "--api=telemetry" },
+        { cwd = root, env = broken_env, text = true }
+      )
+      :wait(60000)
+    local broken_decoded, broken = pcall(vim.json.decode, broken_run.stdout or "")
+    broken = broken_decoded and broken or {}
+    eq(
+      broken.available,
+      false,
+      "standalone telemetry: a dependency that does not load is not available"
+    )
+    eq(
+      broken.reason_code,
+      "runtime-analysis-load-failed",
+      "standalone telemetry: the load failure has its own code ("
+        .. tostring(broken_run.stdout)
+        .. ")"
+    )
+    ok(
+      tostring(broken.reason):find("bit", 1, true) ~= nil,
+      "standalone telemetry: the reason carries the load error, not 'no data' ("
+        .. tostring(broken.reason)
+        .. ")"
+    )
+    local broken_caps = vim
+      .system(
+        { lua, root .. "/standalone/docmap.lua", "--capabilities" },
+        { cwd = root, env = broken_env, text = true }
+      )
+      :wait(60000)
+    local broken_caps_ok, broken_caps_json = pcall(vim.json.decode, broken_caps.stdout or "")
+    ok(
+      broken_caps_ok and not vim.tbl_contains(broken_caps_json.capabilities or {}, "telemetry"),
+      "standalone telemetry: --capabilities does not list 'telemetry' when it does not load"
+    )
+
     vim.fn.delete(host, "rf")
   end)
 end

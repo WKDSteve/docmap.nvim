@@ -60,7 +60,7 @@ binary with anything.
 
 | Field | What it says |
 |---|---|
-| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, `rules` when `rules.nvim`'s engine is part of it, `rules-agent` when its agent functions are too (`rules/plan`, `rules/validate`), `rules-attach` with them (`rules/attach`), and `rules-write` when its two writers are too (`rules/accept`, `rules/waive`). The `rules/*` routes are listed in `routes` either way and answer with a reason without the engine; an older engine lacks the route names, so a missing route is read off this answer, never from an error. A host that wants one thing can test for it without parsing the rest. |
+| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, `rules` when `rules.nvim`'s engine is part of it, `rules-agent` when its agent functions are too (`rules/plan`, `rules/validate`), `rules-attach` with them (`rules/attach`), and `rules-write` when its two writers are too (`rules/accept`, `rules/waive`). `telemetry` when `runtime-analysis.telemetry` actually loads in this engine (the route is listed either way; without the capability it answers with the reason below). The `rules/*` routes are listed in `routes` either way and answer with a reason without the engine; an older engine lacks the route names, so a missing route is read off this answer, never from an error. A host that wants one thing can test for it without parsing the rest. |
 | `schema` | The artifact schema this build writes. The release is rolling (`standalone-latest`), so there is no version number to report that would not be fiction; the schema is what actually decides whether two artifacts are comparable, and it is bumped deliberately. |
 | `build` | Commit, commit date, and whether the tree it was built from was clean. **Present only in a bundled binary** — `scripts/package.lua` writes it at bundle time and never into the source tree, so a run from a checkout answers `null` rather than claiming a provenance it does not have. |
 | `routes` | Every `/api/*` route name this build answers, read from `core/api.routes`. A route added there is advertised here without this being told. |
@@ -106,7 +106,7 @@ instead of generating anything. Today's routes:
 
 | Route | Answers |
 |---|---|
-| `telemetry` | The telemetry join for this repository. |
+| `telemetry` | The telemetry join for this repository. When it cannot answer, `available` is `false` and `reason` says why: `no data` (nothing stored, or the namespace is unknown to the store), `runtime-analysis.nvim was not found`, or `runtime-analysis.nvim is installed but does not load: <one line>` (no paths). The last two also carry `reason_code` (`runtime-analysis-not-found`, `runtime-analysis-load-failed`) for a host that must not parse text; the text follows `--locale`. |
 | `telemetry/snapshots` | Which named telemetry snapshots exist. |
 | `loaded` | The loaded-versus-declared comparison. |
 | `loaded/snapshots` | Which named loaded snapshots exist. |

@@ -160,7 +160,8 @@ end
 ---@return RA.Telemetry.Data? data `nil` when `runtime-analysis.nvim` is not
 ---installed, or nothing was ever persisted for `namespace` — the same "no
 ---opinion" case, never distinguished further by this function since every
----caller already has to treat both as "no data".
+---caller already has to treat both as "no data". A caller that must tell
+---the cases apart (`api.telemetry`) asks `M.availability` first.
 function M.load(namespace)
   local telemetry = require("docmap.core.soft_require").probe("runtime-analysis.telemetry")
   if not telemetry then
@@ -171,6 +172,16 @@ function M.load(namespace)
     return nil
   end
   return data
+end
+
+---Whether `runtime-analysis.telemetry` can be used at all, and if not, why: the question `M.load` cannot answer
+---because it folds "not installed", "does not load" and "nothing stored" into one `nil`.
+---@return "ok"|"missing"|"error" state `missing`: not found; `error`: found, but it (or one of its requires) throws
+---@return string? err One line without paths, only with `"error"`
+function M.availability()
+  local _, state, err =
+    require("docmap.core.soft_require").probe_detail("runtime-analysis.telemetry")
+  return state, err
 end
 
 ---`node.module` (dotted, from an `@module` header) to the node itself —

@@ -60,6 +60,8 @@
     "check.unreferenced-module.why": "A module nothing requires is either an entry point or dead; the map cannot tell which, so it says that the question is open.",
     "check.unused-require.compares": "Every `local x = require(...)` against the uses of `x` in the same file.",
     "check.unused-require.why": "A require nobody uses still loads the module, costs startup time and draws a dependency edge in the map that is not real.",
+    "cli.api.telemetry.load-failed": "runtime-analysis.nvim is installed but does not load: {error}",
+    "cli.api.telemetry.not-found": "runtime-analysis.nvim was not found",
     "cli.at.usage": "usage: --at=<file>:<line>[-<last>]",
     "cli.breaking.cannot-read": "docmap: refusing to compare: cannot read {file} at {ref}: {error}",
     "cli.breaking.found": "{count} breaking change(s) to the published surface since {ref}.",

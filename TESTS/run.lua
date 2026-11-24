@@ -264,6 +264,7 @@ local specs = {
   "backend_contract_spec.lua",
   "host_lua_determinism_spec.lua",
   "shim_contract_spec.lua",
+  "telemetry_load_reason_spec.lua",
   "puc_lua_spec.lua",
   "standalone_telemetry_spec.lua",
   "shim_behavior_spec.lua",

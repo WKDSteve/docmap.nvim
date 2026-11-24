@@ -134,9 +134,9 @@ local function ensure_soft(modname, dirname)
       return
     end
   end
-  -- Silent otherwise, on purpose: telemetry_join.lua already reports "no
-  -- data" for this exact case, and that message is correct enough to
-  -- stand alone without a second one only visible on stderr.
+  -- Silent otherwise, on purpose: `--api=telemetry` says why (`telemetry_join.availability`: not found, or does
+  -- not load, with the one-line error) and `--capabilities` leaves `telemetry` out, which a host sees without
+  -- reading stderr.
 end
 
 package.path = self_root .. "/lua/?.lua;" .. self_root .. "/lua/?/init.lua;" .. package.path
@@ -199,6 +199,11 @@ if capabilities_only then
   -- listed (they answer `available = false` without it), so the route list alone cannot tell a host whether this
   -- build can run rules. An older engine has neither, and that is the same answer: no `rules`.
   local caps = { "api", "languages", "schema" }
+  -- `telemetry`: `runtime-analysis.telemetry` loads here, so `--api=telemetry` can read a store. Without it the
+  -- route answers with the reason (`reason_code`), and a host sees that without asking the route.
+  if require("docmap.core.telemetry_join").availability() == "ok" then
+    caps[#caps + 1] = "telemetry"
+  end
   local rules_api = require("docmap.core.rules_api")
   if rules_api.engine() then
     caps[#caps + 1] = "rules"

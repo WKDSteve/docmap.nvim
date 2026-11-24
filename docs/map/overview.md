@@ -158,6 +158,7 @@ flowchart LR
   nlua_docmap_core_api_lua --> nlua_docmap_core_checklist_lua
   nlua_docmap_core_api_lua --> nlua_docmap_core_diff_lua
   nlua_docmap_core_api_lua --> nlua_docmap_core_history_lua
+  nlua_docmap_core_api_lua --> nlua_docmap_core_i18n
   nlua_docmap_core_api_lua --> nlua_docmap_core_loaded_diff_lua
   nlua_docmap_core_api_lua --> nlua_docmap_core_rules_api_lua
   nlua_docmap_core_api_lua --> nlua_docmap_core_soft_require_lua

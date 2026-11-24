@@ -35,4 +35,40 @@ function M.probe(modname)
   return nil
 end
 
+---One line of a load failure that is safe to show: the first line of the message, without the `file:line:` prefix
+---Lua puts in front of it, and with every path (the user's home included) replaced by `<path>`.
+---@param message any
+---@return string
+local function one_line(message)
+  local line = tostring(message):match("[^\r\n]*")
+  line = line:gsub("^%S+:%d+: ", "")
+  line = line:gsub("[%w_%.%-:]*[/\\][^%s'\"]*", "<path>")
+  if #line > 200 then
+    line = line:sub(1, 200)
+  end
+  return line
+end
+
+---Like `probe`, but says *why* a module is not there.
+---
+---`probe` answers `nil` for two different things: the module is not installed, and it is installed but one of
+---its own requires fails (a standalone engine without `bit`, found 2026-11-23). The first is "not found" by the
+---name asked for; anything else is "error", with a one-line text.
+---@param modname string
+---@return any? mod
+---@return "ok"|"missing"|"error" state
+---@return string? err One line, no paths; only with `"error"`.
+function M.probe_detail(modname)
+  local ok, mod = pcall(require, modname)
+  if ok then
+    return mod, "ok", nil
+  end
+  local text = tostring(mod)
+  local not_found = "module '" .. modname .. "' not found"
+  if text:sub(1, #not_found) == not_found then
+    return nil, "missing", nil
+  end
+  return nil, "error", one_line(text)
+end
+
 return M

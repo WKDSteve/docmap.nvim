@@ -127,6 +127,21 @@ function M.telemetry(opts, snapshot)
     return { available = false, namespace = namespace, reason = ir_err or "no map generated yet" }
   end
 
+  -- "not installed" and "does not load" are not "no store": a host shows them differently, and the second is
+  -- the one that hid a missing `bit` in the standalone engine behind "no data" (2026-11-23)
+  local state, load_err = telemetry_join.availability()
+  if state ~= "ok" then
+    local i18n = require("docmap.core.i18n")
+    return {
+      available = false,
+      namespace = namespace,
+      reason_code = state == "missing" and "runtime-analysis-not-found"
+        or "runtime-analysis-load-failed",
+      reason = state == "missing" and i18n.t("cli.api.telemetry.not-found")
+        or i18n.t("cli.api.telemetry.load-failed", { error = load_err }),
+    }
+  end
+
   local data
   if snapshot and snapshot ~= "" then
     local telemetry = require("docmap.core.soft_require").probe("runtime-analysis.telemetry")

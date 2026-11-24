@@ -60,6 +60,8 @@
     "check.unreferenced-module.why": "Ein Modul, das von nichts geladen wird, ist entweder ein Einstiegspunkt oder tot; die Karte kann nicht sagen, was davon, also sagt sie, dass die Frage offen ist.",
     "check.unused-require.compares": "Jedes `local x = require(...)` mit den Verwendungen von `x` in derselben Datei.",
     "check.unused-require.why": "Ein require, das niemand verwendet, lädt das Modul trotzdem, kostet Startzeit und zeichnet eine Abhängigkeitskante in die Karte, die nicht echt ist.",
+    "cli.api.telemetry.load-failed": "runtime-analysis.nvim ist installiert, lädt aber nicht: {error}",
+    "cli.api.telemetry.not-found": "runtime-analysis.nvim wurde nicht gefunden",
     "cli.at.usage": "Verwendung: --at=<datei>:<zeile>[-<letzte>]",
     "cli.breaking.cannot-read": "docmap: Vergleich verweigert: {file} bei {ref} nicht lesbar: {error}",
     "cli.breaking.found": "{count} inkompatible Änderung(en) an der veröffentlichten Oberfläche seit {ref}.",
