@@ -7,7 +7,7 @@
 ---
 --- Options:
 ---   --dir=<folder>      add every subfolder that holds a `.git` (repeatable); `--skip=` filters them
----   --skip=<pattern>    a Lua pattern of folder names to leave out of `--dir` (default `%-wt%-`: worktree copies)
+---   --skip=<pattern>    a Lua pattern of folder names to leave out of `--dir`, repeatable; `%-wt%-` (worktree copies) is always skipped
 ---   --json              the joined data instead of Markdown
 ---   --top=<n>           rows per table (default 25)
 ---   --with-generated    keep built output (`dist-*`, bundles, `node_modules`), left out by default
@@ -54,20 +54,22 @@ local function usage(message)
   io.stderr:write("fleet_report: " .. message .. "\n")
   io.stderr:write(
     "usage: nvim -n -i NONE --headless -u NONE -l scripts/fleet_report.lua "
-      .. "[--dir=<folder>]... [--skip=<pattern>] [--json] [--top=<n>] [--with-generated] [<root>...]\n"
+      .. "[--dir=<folder>]... [--skip=<pattern>]... [--json] [--top=<n>] [--with-generated] [<root>...]\n"
   )
   os.exit(2)
 end
 
 local dirs, roots = {}, {}
-local skip = "%-wt%-"
+-- A folder name that matches one of these Lua patterns is not taken by `--dir`; `--skip=` adds one (a Lua pattern has
+-- no alternation, so each pattern is its own option).
+local skips = { "%-wt%-" }
 local as_json, with_generated = false, false
 local top = 25
 for _, a in ipairs(_G.arg or {}) do
   if a:match("^%-%-dir=") then
     dirs[#dirs + 1] = a:sub(#"--dir=" + 1)
   elseif a:match("^%-%-skip=") then
-    skip = a:sub(#"--skip=" + 1)
+    skips[#skips + 1] = a:sub(#"--skip=" + 1)
   elseif a == "--json" then
     as_json = true
   elseif a == "--with-generated" then
@@ -90,11 +92,14 @@ for _, dir in ipairs(dirs) do
   end
   local names = {}
   for name, kind in vim.fs.dir(dir) do
-    if
-      kind == "directory"
-      and not name:find(skip)
-      and vim.uv.fs_stat(dir .. "/" .. name .. "/.git")
-    then
+    local skipped = false
+    for _, pattern in ipairs(skips) do
+      if name:find(pattern) then
+        skipped = true
+        break
+      end
+    end
+    if kind == "directory" and not skipped and vim.uv.fs_stat(dir .. "/" .. name .. "/.git") then
       names[#names + 1] = name
     end
   end

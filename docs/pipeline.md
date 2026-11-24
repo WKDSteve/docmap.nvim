@@ -516,7 +516,7 @@ nvim -n -i NONE --headless -u NONE -l scripts/fleet_report.lua --dir=E:/repos --
 |---|---|
 | `<root>...` | repositories to scan (any number) |
 | `--dir=<folder>` | add every subfolder that holds a `.git`; repeatable |
-| `--skip=<pattern>` | Lua pattern of folder names `--dir` leaves out (default `%-wt%-`, worktree copies) |
+| `--skip=<pattern>` | Lua pattern of folder names `--dir` leaves out; repeatable (a Lua pattern has no alternation); `%-wt%-`, worktree copies, is always skipped |
 | `--top=<n>` | rows per table (default 25) |
 | `--json` | the joined data instead of Markdown |
 | `--with-generated` | keep built output |
