@@ -69,7 +69,12 @@ Two scripts remain shell, deliberately:
 ### The `standalone` gate skips, and what that costs
 
 The `standalone` gate runs the parser-less CLI build under a Lua that is **not**
-the LuaJIT Neovim embeds. It needs PUC Lua on `PATH` with `lfs` and `dkjson`;
+the LuaJIT Neovim embeds. It needs PUC Lua **5.3 or newer** on `PATH` with `lfs`
+and `dkjson` (the engine does not load under 5.1). Every candidate is probed in
+[`scripts/puc_lua.lua`](../scripts/puc_lua.lua), the one place the gate and
+`TESTS/standalone_telemetry_spec.lua` share, so a Lua 5.1 first on `PATH` does
+not hide a usable 5.4 behind it, and a machine with only 5.1 skips with
+"only Lua 5.1 found";
 where it cannot find one it prints *skipped* and exits `77`, the `skip_exit`
 of its step in `.testing.lua`. `testing ci` then marks the step `skipped` and
 the whole run **partial** (`standalone skipped itself`): exit `0`, but no

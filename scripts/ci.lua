@@ -84,62 +84,12 @@ end
 
 local GATES = {}
 
----A PUC Lua that can actually run the standalone build, or nil.
----
----`lua5.4` before `lua` because Debian-family images ship both and the bare
----name is often 5.1; this gate wants the *other* Lua from the one Neovim
----embeds, which is the entire point of it existing.
----
----**Being on `$PATH` is not the question; being able to `require` the two
----rocks the build needs is.** A machine can easily have more than one PUC
----Lua — this was found on one with 5.1 first on `$PATH` and `lfs`/`dkjson`
----installed for 5.4 — and picking by name alone hands the gate an
----interpreter that dies at its first `require`. That failure reads as a
----broken build rather than a missing dependency, and it makes the gate red
----before anyone has touched anything, which `GATES.standalone`'s own
----comment gives as the reason such a gate gets switched off.
----
----So each candidate is probed rather than assumed, and a machine with no
----usable interpreter takes the stated skip below instead of failing.
----@return string? exe The first interpreter that loaded both rocks.
----@return string[]? found Every PUC Lua on PATH, returned only when none of
----them worked -- "none installed" and "one installed that cannot load the
----rocks" are different problems, and the caller reports which it is.
-local function puc_lua()
-  -- Which interpreters exist at all, kept apart from which of them work.
-  -- "no PUC Lua here" and "a PUC Lua that cannot load the rocks" are
-  -- different problems with different fixes, and one message for both sends
-  -- half its readers looking for the wrong thing. Reported by the caller.
-  local found = {}
-  for _, exe in ipairs({ "lua5.4", "lua5.3", "lua" }) do
-    if vim.fn.executable(exe) == 1 then
-      found[#found + 1] = exe
-      local probe = vim.system({ exe, "-e", "require('lfs') require('dkjson')" }):wait()
-      if probe.code == 0 then
-        return exe
-      end
-    end
-  end
-  return nil, found
-end
-
----Which of the two rocks `exe` cannot load, in order.
----
----Probed one at a time rather than reusing the combined check above: the
----point of this is the *name*, and `require('lfs') require('dkjson')`
----failing tells you only that one of them did.
----@param exe string
----@return string[]
-local function missing_rocks(exe)
-  local out = {}
-  for _, rock in ipairs({ "lfs", "dkjson" }) do
-    local probe = vim.system({ exe, "-e", ("require('%s')"):format(rock) }):wait()
-    if probe.code ~= 0 then
-      out[#out + 1] = rock
-    end
-  end
-  return out
-end
+---The PUC Lua for the standalone build comes from `scripts/puc_lua.lua`, shared with
+---`TESTS/standalone_telemetry_spec.lua` so the two can never disagree: each candidate is probed (Lua 5.3 or newer, and
+---`lfs` plus `dkjson` loadable) rather than picked by name, and a Lua 5.1 first on `$PATH` does not hide a usable 5.4.
+---A machine with no usable interpreter takes the stated skip below instead of failing, because a gate that is red
+---before anyone touched anything gets switched off.
+local puc = dofile(root .. "/scripts/puc_lua.lua")
 
 --- The standalone build, run under a Lua that is **not** LuaJIT.
 ---
@@ -163,25 +113,42 @@ end
 --- the artifact it is checking is not a gate.
 function GATES.standalone()
   step("standalone (non-LuaJIT host)")
-  local lua, found = puc_lua()
+  local lua, found = puc.find()
   if not lua then
     -- Two different situations, and until now they shared one sentence.
     if #found == 0 then
       skip("standalone", "no PUC Lua on PATH — this gate is about the *other* Lua, not Neovim's")
     else
-      -- Somebody has a PUC Lua. That is a machine one `luarocks install`
-      -- away from running this gate, so the message names the rock instead
-      -- of leaving them to work it out.
-      local exe = found[1]
-      local rocks = missing_rocks(exe)
-      skip(
-        "standalone",
-        ("%s is on PATH but cannot require %s — `luarocks install %s`"):format(
-          exe,
-          table.concat(rocks, " or "),
-          table.concat(rocks, " ")
+      local modern
+      for _, f in ipairs(found) do
+        if puc.is_modern(f.version) then
+          modern = f
+          break
+        end
+      end
+      if not modern then
+        local versions = {}
+        for _, f in ipairs(found) do
+          versions[#versions + 1] = f.version:gsub("^Lua ", "")
+        end
+        skip(
+          "standalone",
+          ("only Lua %s found — the standalone engine needs Lua 5.3 or newer"):format(
+            table.concat(versions, ", ")
+          )
         )
-      )
+      else
+        -- A PUC Lua one `luarocks install` away from running this gate: name the rock.
+        local rocks = puc.missing_rocks(modern.exe)
+        skip(
+          "standalone",
+          ("%s is on PATH but cannot require %s — `luarocks install %s`"):format(
+            modern.exe,
+            table.concat(rocks, " or "),
+            table.concat(rocks, " ")
+          )
+        )
+      end
     end
     return
   end

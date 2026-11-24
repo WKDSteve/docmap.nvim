@@ -19,25 +19,14 @@ return function(H)
       return
     end
 
-    local lua
-    for _, exe in ipairs({ "lua5.4", "lua5.3", "lua" }) do
-      if
-        vim.fn.executable(exe) == 1
-        and vim
-            .system({ exe, "-e", "assert(_VERSION >= 'Lua 5.3') require('lfs') require('dkjson')" })
-            :wait().code
-          == 0
-      then
-        lua = exe
-        break
-      end
-    end
+    local root = (vim.fn.getcwd():gsub("\\", "/"))
+
+    -- the same pick as the `standalone` gate of `scripts/ci.lua` (Lua 5.3+ with lfs and dkjson), from one place
+    local lua = dofile(root .. "/scripts/puc_lua.lua").find()
     if not lua then
-      print("n/a  no PUC Lua with lfs and dkjson on PATH")
+      print("n/a  no PUC Lua 5.3+ with lfs and dkjson on PATH")
       return
     end
-
-    local root = (vim.fn.getcwd():gsub("\\", "/"))
 
     -- `standalone/bit.lua` against the editor's own `bit` (LuaJIT): the module runs under the PUC Lua, which prints
     -- what it answers for values around the edges of 32 bits, and the editor computes the same with the real one
