@@ -365,6 +365,37 @@ local function run_at(opts, root, spec)
   return 0
 end
 
+---`--report[=duplicates,quicks,findings]` (`--json`): what the Duplicates, Quicks and Findings tabs show, for this
+---repository, on stdout. Nothing is written and no committed map is compared, so the verdict is the report, not an
+---exit code: 0 when it was made, 2 for a section that does not exist. Text for a person, JSON (`--json`, one
+---object, stable key order) for a loop over many repositories.
+---@param opts Docmap.Opts
+---@param root string
+---@param spec string? What follows `--report=`.
+---@param as_json boolean
+---@return integer exit_code
+local function run_report(opts, root, spec, as_json)
+  local rep = require("docmap.core.report")
+  local sections, unknown = rep.parse_sections(spec)
+  if not sections then
+    io.stderr:write(i18n.t("cli.report.unknown", {
+      name = tostring(unknown),
+      known = table.concat(rep.SECTIONS, ", "),
+    }) .. "\n")
+    return REFUSED
+  end
+  local ir, findings = require("docmap").scan_full(opts)
+  report_skipped_links()
+  local name = root:match("([^/]+)$") or root
+  local built = rep.build(ir, findings, sections, name)
+  if as_json then
+    io.stdout:write(require("docmap.core.json").encode(built) .. "\n")
+  else
+    io.stdout:write(table.concat(rep.render_text(built), "\n") .. "\n")
+  end
+  return 0
+end
+
 ---Run the CLI over `opts` with `argv` (`_G.arg`-shaped: `--check`, `--lenient`,
 ---`--full`, `--breaking=<ref>`, `--at=<file>:<line>`, `--exclude=<path>`, `--languages=<a,b>`, `--locale=<tag>`). Writes to stdout/stderr
 ---as a side effect; returns the process exit code rather than calling
@@ -395,8 +426,17 @@ function M.run(opts, argv)
   local cli_locale = nil
   ---@type string?
   local at_spec = nil
+  ---@type string? `--report` alone is the empty string: every section.
+  local report_spec = nil
+  local as_json = false
   for _, a in ipairs(argv) do
-    if a:match("^%-%-at=") then
+    if a == "--report" then
+      report_spec = ""
+    elseif a:match("^%-%-report=") then
+      report_spec = a:sub(#"--report=" + 1)
+    elseif a == "--json" then
+      as_json = true
+    elseif a:match("^%-%-at=") then
       at_spec = a:sub(#"--at=" + 1)
     elseif a:match("^%-%-locale=") then
       cli_locale = a:sub(#"--locale=" + 1)
@@ -495,6 +535,10 @@ function M.run(opts, argv)
 
   if at_spec then
     return run_at(opts, root, at_spec)
+  end
+
+  if report_spec then
+    return run_report(opts, root, report_spec, as_json)
   end
 
   if breaking_ref then

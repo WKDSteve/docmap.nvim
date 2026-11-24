@@ -116,7 +116,8 @@ local code = require("docmap.core.cli").run(opts, _G.arg or {})
 local checking = false
 for _, a in ipairs(_G.arg or {}) do
   -- `--at=` only answers a question: it writes nothing, so no BINDINGS.md either.
-  if a == "--check" or a:match("^%-%-at=") then
+  -- `--report` is the same kind of question: the tabs' answers on stdout, no files.
+  if a == "--check" or a:match("^%-%-at=") or a == "--report" or a:match("^%-%-report=") then
     checking = true
   end
 end

@@ -461,6 +461,45 @@ Exit `0`: no breaking change. Exit `1`: at least one, listed on stdout. Exit
 is refused), the map is absent there or unreadable, or `out_dir` is unsafe.
 It runs instead of the map check, not alongside it: use `--check` in its own step.
 
+### Reporting from the command line (`--report`)
+
+What the **Duplicates**, **Quicks** and **Findings** tabs show, for one
+repository, on stdout, without writing a file and without comparing the
+committed map:
+
+```
+nvim --headless -l scripts/gen_map.lua --report                      # all three, as text
+nvim --headless -l scripts/gen_map.lua --report=duplicates,quicks    # a subset
+nvim --headless -l scripts/gen_map.lua --report --json               # one JSON object
+```
+
+The standalone binary takes the same flags after its root:
+`docmap <root> --report --json`. Sections are printed in the order
+duplicates, quicks, findings whatever order they were asked in. The JSON has
+`repo`, `title` and one key per section: `duplicates` (`groups` with
+`identical`, `nodes` and the `members` with `signature`, `module`, `node`,
+`line`, plus `functions`, `considered`, `min_size`), `quicks` (`bad` and `good`
+verdicts with `id`, `tab`, `value`, `unit`, `weight`, `distance`) and `findings`
+(`tally` and `items`, every finding, messages in the source locale). The text
+lists errors and warnings and counts info findings only.
+
+The Quicks tab's sentences belong to the page; the report gives the id and the
+measured value of each verdict, which is what a loop compares across
+repositories.
+
+Exit `0` when the report was made, `2` for a section that does not exist. The
+report is the answer, not a gate: use `--check` for a verdict.
+
+Over many repositories, one run each (PowerShell, standalone binary):
+
+```
+Get-ChildItem E:\repos -Directory | ForEach-Object {
+  docmap $_.FullName --report=quicks,findings --json | ConvertFrom-Json
+} | Select-Object repo, @{n='bad';e={$_.quicks.total_bad}}, @{n='errors';e={$_.findings.tally.error}}
+```
+
+Each line of output is one repository's object.
+
 ### SARIF for CI (`--sarif=<path>`)
 
 The same findings in the format GitHub code scanning ingests, so every drift

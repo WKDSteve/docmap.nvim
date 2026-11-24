@@ -93,6 +93,7 @@
     "cli.links.skipped-one": "{count} Link nicht verfolgt:",
     "cli.out-dir.unsafe": "docmap: opts.out_dir ist kein sicherer relativer Pfad: {out_dir}",
     "cli.report.tally": "{errors} Fehler, {warnings} Warnungen, {info} Info",
+    "cli.report.unknown": "unbekannter Report-Abschnitt {name} (vorhanden: {known})",
     "cli.sarif.drive-relative": "ein Pfad relativ zum aktuellen Verzeichnis eines Laufwerks lässt sich nicht auf Links prüfen. Mit einem Schrägstrich nach dem Laufwerksbuchstaben schreiben.",
     "cli.sarif.link": "{link} ist ein Link, der Bericht würde also dorthin geschrieben, wohin er führt. Den Link entfernen.",
     "cli.sarif.refused": "docmap: Schreiben von {path} verweigert: {reason}",

@@ -93,6 +93,7 @@
     "cli.links.skipped-one": "{count} link not followed:",
     "cli.out-dir.unsafe": "docmap: opts.out_dir is not a safe relative path: {out_dir}",
     "cli.report.tally": "{errors} errors, {warnings} warnings, {info} info",
+    "cli.report.unknown": "unknown report section {name} (have: {known})",
     "cli.sarif.drive-relative": "a path relative to a drive's current directory cannot be checked for links. Spell it with a slash after the drive letter.",
     "cli.sarif.link": "{link} is a link, so the report would be written wherever it leads. Remove it.",
     "cli.sarif.refused": "docmap: refusing to write {path}: {reason}",
