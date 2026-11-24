@@ -255,6 +255,7 @@ local specs = {
   "check_overload_credit_spec.lua",
   "check_applicability_spec.lua",
   "cli_report_spec.lua",
+  "fleet_spec.lua",
   "annotate_spec.lua",
   "markers_spec.lua",
   "ts_parse_spec.lua",

@@ -500,6 +500,35 @@ Get-ChildItem E:\repos -Directory | ForEach-Object {
 
 Each line of output is one repository's object.
 
+#### Over many repositories at once (`scripts/fleet_report.lua`)
+
+`--report` is one repository. A function that two repositories grew separately is invisible to both, so the same
+tabs are also joined across repositories: which structural shapes appear in two or more, which pairs of
+repositories share the most, which quicks are bad and which checks fire in several.
+
+```
+nvim -n -i NONE --headless -u NONE -l scripts/fleet_report.lua E:/repos/lib.nvim E:/repos/ui.nvim
+nvim -n -i NONE --headless -u NONE -l scripts/fleet_report.lua --dir=E:/repos          # every repository in a folder
+nvim -n -i NONE --headless -u NONE -l scripts/fleet_report.lua --dir=E:/repos --json   # the joined data as one object
+```
+
+| Option | Meaning |
+|---|---|
+| `<root>...` | repositories to scan (any number) |
+| `--dir=<folder>` | add every subfolder that holds a `.git`; repeatable |
+| `--skip=<pattern>` | Lua pattern of folder names `--dir` leaves out (default `%-wt%-`, worktree copies) |
+| `--top=<n>` | rows per table (default 25) |
+| `--json` | the joined data instead of Markdown |
+| `--with-generated` | keep built output |
+
+Built output (`dist-*`, `build/`, `out/`, `node_modules/`, minified and content-hashed bundles) is left out by
+default: the library inside an app bundle is a copy of somebody else's code and would be the biggest "duplicate" of
+the fleet. Nothing is written into any repository. Progress goes to stderr, the report to stdout. Exit `0` when a
+report was made, `1` when a repository could not be scanned (the others are still reported), `2` for wrong
+arguments. The same limits as the Duplicates tab apply: a shape ignores names and literals, one edited line breaks
+the match, and two functions can share a shape and nothing else, so a hit is a question for a person, not a
+finding. The logic is `docmap.core.fleet`; the first report over 58 repositories came from it.
+
 ### SARIF for CI (`--sarif=<path>`)
 
 The same findings in the format GitHub code scanning ingests, so every drift
