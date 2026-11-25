@@ -898,6 +898,72 @@ local function walk(root, src, lang)
   return functions, requires, symbols
 end
 
+---Lines of a comment that are not prose about the file: a tool pragma
+---(`// @ts-nocheck`, `// eslint-disable`, `/// <reference .../>`) or a
+---license banner.
+---@param line string
+---@return boolean
+local function is_pragma_line(line)
+  return line:match("^@ts%-") ~= nil
+    or line:match("^eslint") ~= nil
+    or line:match("^prettier") ~= nil
+    or line:match("^<reference") ~= nil
+    or line:match("^SPDX") ~= nil
+    or line:match("^[Cc]opyright") ~= nil
+    or line:match("^[Ll]icen[sc]e") ~= nil
+end
+
+---The prose of a leading run of `//` line comments, when it is a file
+---header: it starts the file, is followed by a blank line (or by nothing),
+---and is not a pragma or a license banner. A run that touches the next
+---statement documents that statement, not the file — the same rule the
+---JSDoc path gets for free by only reading `/**` blocks.
+---@param root TSNode
+---@param src string
+---@return string|nil prose Lines joined with newlines, `//` stripped.
+local function line_comment_header(root, src)
+  local lines = {}
+  local last
+  local idx = 0
+  while true do
+    local node = root:child(idx)
+    if not node or node:type() ~= "comment" then
+      break
+    end
+    local text = vim.treesitter.get_node_text(node, src)
+    if not text:match("^//") then
+      break
+    end
+    local srow = node:range()
+    if last and srow ~= last + 1 then
+      break
+    end
+    local _, _, erow = node:range()
+    last = erow
+    lines[#lines + 1] = (text:gsub("^//+!?%s?", ""):gsub("%s+$", ""))
+    idx = idx + 1
+  end
+  if #lines == 0 then
+    return nil
+  end
+  local nxt = root:child(idx)
+  if nxt and (nxt:range()) <= last + 1 then
+    return nil
+  end
+  if is_pragma_line(lines[1]) then
+    return nil
+  end
+  for i = #lines, 1, -1 do
+    if is_pragma_line(lines[i]) then
+      table.remove(lines, i)
+    end
+  end
+  if #lines == 0 then
+    return nil
+  end
+  return table.concat(lines, "\n")
+end
+
 ---The leading module-level JSDoc block, if the very first statement-level
 ---sibling of the program root is a comment shaped like one. Used for
 ---`Docmap.Header.summary`/`body` only — `module` is never set here,
@@ -911,6 +977,11 @@ local function file_header(root, src)
     local text = vim.treesitter.get_node_text(first, src)
     if text:match("^/%*%*") then
       local parsed = parse_jsdoc(text)
+      return { module = nil, summary = parsed.summary, body = parsed.body, tags = {} }
+    end
+    local prose = line_comment_header(root, src)
+    if prose then
+      local parsed = parse_jsdoc("/**\n" .. prose .. "\n*/")
       return { module = nil, summary = parsed.summary, body = parsed.body, tags = {} }
     end
   end
