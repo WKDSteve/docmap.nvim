@@ -444,7 +444,17 @@ function M.parse_header(path)
   local module = module_path_of(path)
   local _, inner = doc_comments(root, src)
   if #inner == 0 then
-    -- A module with no `//!` block still has an identity worth recording.
+    -- A module with no `//!` block still has an identity worth recording. Most
+    -- repositories open a file with a plain `//` block instead, read as the summary.
+    local prose = require("docmap.core.lang.line_header").read(src)
+    if prose then
+      return {
+        module = module,
+        summary = require("docmap.core.scan").split_summary(prose),
+        body = prose,
+        tags = {},
+      }
+    end
     return { module = module, summary = "", body = "", tags = {} }
   end
   while inner[#inner] == "" do

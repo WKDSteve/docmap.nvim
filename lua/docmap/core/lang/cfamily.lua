@@ -491,8 +491,22 @@ function M.backend(name, grammar, extensions, roots)
         break
       end
     end
+    -- No declaration at all, or no Doxygen block: the plain `//` block most
+    -- repositories open a file with is the summary, by the rule JS follows.
+    local function line_header()
+      local prose = require("docmap.core.lang.line_header").read(src)
+      if not prose then
+        return empty
+      end
+      return {
+        module = nil,
+        summary = require("docmap.core.scan").split_summary(prose),
+        body = prose,
+        tags = {},
+      }
+    end
     if not first then
-      return empty
+      return line_header()
     end
     local first_row = first:start()
     local attached = doc_above(blocks, first_row)
@@ -508,7 +522,7 @@ function M.backend(name, grammar, extensions, roots)
       end
     end
     if not earliest or earliest == attached then
-      return empty
+      return line_header()
     end
     local doc = earliest
     local parsed = parse_doc(doc)
