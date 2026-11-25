@@ -337,6 +337,10 @@ local function extract_requires(stmt_node, src)
       and vim.treesitter.get_node_text(source_node, src):gsub("^[\"']", ""):gsub("[\"']$", "")
     if module then
       local req = { module = module, line = srow + 1 }
+      -- `import type { X } from './y'` is erased at compile time: it loads nothing, so it cannot close a load-time loop.
+      if vim.treesitter.get_node_text(stmt_node, src):match("^import%s+type[%s{*]") then
+        req.unordered = true
+      end
 
       -- Which names the import binds, so `calls.lua` can resolve a bare
       -- `helper()` to another file.s function. This is the piece that was

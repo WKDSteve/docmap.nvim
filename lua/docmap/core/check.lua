@@ -1156,7 +1156,7 @@ function M.require_cycles(ir)
     adj[id] = {}
   end
   for _, edge in ipairs(ir.edges or {}) do
-    if edge.kind == "require" and not edge.deferred and adj[edge.from] then
+    if edge.kind == "require" and not edge.deferred and not edge.unordered and adj[edge.from] then
       adj[edge.from][#adj[edge.from] + 1] = edge.to
     end
   end
@@ -1642,14 +1642,40 @@ end
 ---@param findings Docmap.Finding[]
 ---@param opts Docmap.Opts
 local function check_require_not_declared(ir, findings, opts)
-  local own = {}
+  -- The first segments this tree claims, per file extension: a Kotlin package `io.x` is no claim about what a
+  -- Python file means by `import io`, and `lua/telescope/_extensions/x.lua` plugs into Telescope's namespace
+  -- rather than owning it, so `require("telescope.pickers")` is the third-party plugin, not a typo.
+  -- A directory (a package, `lua/demo/init.lua`) has no extension of its own: it speaks for the languages of the
+  -- files below it.
+  local function ext_of(path)
+    return (path or ""):match("%.([^./]+)$")
+  end
+  local exts_of = {}
   for _, id in ipairs(ir.order) do
-    local mod = ir.nodes[id].module
-    if mod then
-      own[mod:match("^[^.]+") or mod] = true
+    local ext = ext_of(ir.nodes[id].path)
+    local up = ir.nodes[id].parent
+    while ext and up and ir.nodes[up] do
+      exts_of[up] = exts_of[up] or {}
+      exts_of[up][ext] = true
+      up = ir.nodes[up].parent
     end
   end
-  if not next(own) then
+  local own = {}
+  local any = false
+  for _, id in ipairs(ir.order) do
+    local node = ir.nodes[id]
+    local mod = node.module
+    if mod and not mod:find("._extensions", 1, true) then
+      local mine = ext_of(node.path)
+      -- A package whose module is its own `init` file has no file node below it: any language may mean it.
+      for ext in pairs(mine and { [mine] = true } or exts_of[id] or { ["*"] = true }) do
+        own[ext] = own[ext] or {}
+        own[ext][mod:match("^[^.]+") or mod] = true
+        any = true
+      end
+    end
+  end
+  if not any then
     return
   end
 
@@ -1679,10 +1705,12 @@ local function check_require_not_declared(ir, findings, opts)
     -- checks run against the in-memory IR straight after the scan — it is
     -- deliberately not serialized into the artifact.
     local reported = {}
+    local own_here = own[ext_of(node.path) or ""] or {}
+    local own_any = own["*"] or {}
     for _, req in ipairs(node.requires_raw or {}) do
       local mod = req.module
       if
-        own[mod:match("^[^.]+")]
+        (own_here[mod:match("^[^.]+")] or own_any[mod:match("^[^.]+")])
         and mod ~= node.module
         and not by_module[mod]
         and not reported[mod]

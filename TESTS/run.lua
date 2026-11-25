@@ -191,6 +191,7 @@ local specs = {
   "go_calls_spec.lua",
   "c_calls_spec.lua",
   "python_calls_spec.lua",
+  "require_checks_languages_spec.lua",
   "rust_calls_spec.lua",
   "lang_rust_spec.lua",
   "lang_php_spec.lua",

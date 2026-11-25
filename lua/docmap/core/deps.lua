@@ -463,6 +463,9 @@ function M.build(ir)
             existing.deferred = nil
             existing.line = math.min(existing.line, req.line)
           end
+          if not req.unordered then
+            existing.unordered = nil
+          end
         else
           local edge = {
             kind = "require",
@@ -470,6 +473,7 @@ function M.build(ir)
             to = target,
             to_module = reading.module,
             deferred = req.deferred or nil,
+            unordered = req.unordered or nil,
             line = req.line,
           }
           seen[target] = edge

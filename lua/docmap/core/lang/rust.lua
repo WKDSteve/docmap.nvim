@@ -962,6 +962,12 @@ function M.scan_file(path)
     bind(use.node, nil, use.scope)
   end
 
+  -- Rust resolves its module tree at compile time: a child that reaches back into its parent (`use super::*`)
+  -- beside the parent's `mod child;` is the normal shape, not a load-order hazard.
+  for _, req in ipairs(requires) do
+    req.unordered = true
+  end
+
   return fns, extract_calls(), requires, symbols, {}, {}, lines, {}
 end
 
