@@ -215,6 +215,7 @@ flowchart LR
   nlua_docmap_core_find_lua --> nlua_docmap_core_check_lua
   nlua_docmap_core_findings_lua --> nlua_docmap_core_i18n
   nlua_docmap_core_fleet_lua --> nlua_docmap_core_duplicates_lua
+  nlua_docmap_core_fleet_lua --> nlua_docmap_core_json_lua
   nlua_docmap_core_fleet_lua --> nlua_docmap_core_report_lua
   nlua_docmap_core_functions_lua --> nlua_docmap_core_bindings_lua
   nlua_docmap_core_functions_lua --> nlua_docmap_core_calls_lua
