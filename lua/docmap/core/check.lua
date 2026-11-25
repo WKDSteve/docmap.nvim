@@ -1705,12 +1705,26 @@ local function check_require_not_declared(ir, findings, opts)
     -- checks run against the in-memory IR straight after the scan — it is
     -- deliberately not serialized into the artifact.
     local reported = {}
-    local own_here = own[ext_of(node.path) or ""] or {}
-    local own_any = own["*"] or {}
+    -- A package node (`lua/demo/init.lua` as `lua/demo`) reads as the languages of the files below it.
+    local mine = ext_of(node.path)
+    local langs = mine and { [mine] = true } or exts_of[id] or {}
+    ---@param segment string
+    ---@return boolean
+    local function is_own(segment)
+      if own["*"] and own["*"][segment] then
+        return true
+      end
+      for ext in pairs(langs) do
+        if own[ext] and own[ext][segment] then
+          return true
+        end
+      end
+      return false
+    end
     for _, req in ipairs(node.requires_raw or {}) do
       local mod = req.module
       if
-        (own_here[mod:match("^[^.]+")] or own_any[mod:match("^[^.]+")])
+        is_own(mod:match("^[^.]+"))
         and mod ~= node.module
         and not by_module[mod]
         and not reported[mod]

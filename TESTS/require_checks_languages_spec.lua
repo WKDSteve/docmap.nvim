@@ -123,6 +123,21 @@ return function(H)
     "the one reported is the typo of the tree's own module"
   )
 
+  -- A package whose `init.lua` has a sibling file: the typo in the init is still found.
+  local pkg = tree({
+    ["lua/pk/init.lua"] = {
+      "---@module 'pk'",
+      'local gone = require("pk.gone")',
+      "return { gone }",
+    },
+    ["lua/pk/store.lua"] = { "---@module 'pk.store'", "return {}" },
+  })
+  eq(
+    #findings_of(pkg, { source = "lua", lua_root = "lua" }, "require-not-declared"),
+    1,
+    "a package's own init is checked against the namespace of the files beside it"
+  )
+
   -- A Kotlin package against a Python import.
   if has("python") and has("kotlin") then
     local mixed = tree({
