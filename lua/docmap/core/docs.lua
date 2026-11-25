@@ -436,7 +436,7 @@ end
 ---@return Docmap.Docs.Index
 function M.build_index(ir)
   ---@type Docmap.Docs.Index
-  local idx = { exact = {}, bare = {}, modules = {}, fns_by_module = {} }
+  local idx = { exact = {}, bare = {}, modules = {}, fns_by_module = {}, members = {}, fields = {} }
   local bare_count = {}
 
   for _, id in ipairs(ir.order) do
@@ -446,6 +446,14 @@ function M.build_index(ir)
       idx.exact[node.module] = { kind = "module", node = id }
       idx.modules[node.module] = id
       idx.fns_by_module[node.module] = {}
+      idx.members[node.module] = {}
+      -- `M.CATEGORY_ORDER = {...}`: an exported value, not a function. Only the
+      -- dotted spelling counts; a bare `local X` is not part of the module's surface.
+      for _, sym in ipairs(node.symbols or {}) do
+        if sym.name:find(".", 1, true) then
+          idx.members[node.module][M.bare_name(sym.name)] = true
+        end
+      end
     end
 
     for _, fn in ipairs(node.functions or {}) do
@@ -512,6 +520,61 @@ function M.build_index(ir)
   end
 
   return idx
+end
+
+---Add the `---@field` names of a tree's Lua sources to the index.
+---
+---A config option (`diff.url_timeout_ms`) is documented as a member of the
+---plugin's module because that is the name of its options table, but no code
+---declares it as a member; the one place that names it is the `---@field` line
+---of the options class. Reads each Lua node's own file, its type files and a `@types.lua` beside it, so
+---it needs no LuaLS run. A name a class declares as a field is data, and a
+---document naming it is not describing a function that went away; a function
+---that was removed and shares a name with a field would hide, which is the
+---price of not flagging every option a README mentions.
+---@param idx Docmap.Docs.Index
+---@param ir Docmap.IR
+---@param root string
+function M.index_fields(idx, ir, root)
+  local seen = {}
+  local function read(rel)
+    if type(rel) ~= "string" or seen[rel] or not rel:match("%.lua$") then
+      return
+    end
+    seen[rel] = true
+    local fd = io.open(root .. "/" .. rel, "r")
+    if not fd then
+      return
+    end
+    for line in fd:lines() do
+      local body = line:match("^%s*%-%-%-@field%s+(.*)$")
+      -- `private`/`protected`/`package`/`public` may precede the name.
+      body = body
+        and body
+          :gsub("^private%s+", "")
+          :gsub("^protected%s+", "")
+          :gsub("^package%s+", "")
+          :gsub("^public%s+", "")
+      local name = body and body:match("^([%a_][%w_]*)%??%s")
+      if name then
+        idx.fields[name] = true
+      end
+    end
+    fd:close()
+  end
+  for _, id in ipairs(ir.order) do
+    local node = ir.nodes[id]
+    read(node.source)
+    -- A single `@types.lua` beside the module: the scanner takes a `@types/`
+    -- folder as an attribute of its module but passes this spelling by.
+    local dir = type(node.source) == "string" and node.source:match("^(.*)/[^/]+$")
+    if dir then
+      read(dir .. "/@types.lua")
+    end
+    for _, t in ipairs(node.types or {}) do
+      read(t)
+    end
+  end
 end
 
 ---Resolve one code-span mention.
@@ -645,6 +708,11 @@ function M.missing_member(idx, text)
     return nil
   end
   if (idx.fns_by_module[best_mod] or {})[best_rest] then
+    return nil
+  end
+  -- An exported constant, or a declared config/data field: the document is
+  -- right, the function index just cannot hold it.
+  if (idx.members[best_mod] or {})[best_rest] or (idx.fields or {})[best_rest] then
     return nil
   end
   return best_mod, best_rest
@@ -795,6 +863,7 @@ end
 function M.resolve_all(ir, opts)
   local root = opts.root:gsub("\\", "/"):gsub("/+$", "")
   local idx = M.build_index(ir)
+  M.index_fields(idx, ir, root)
 
   local context_max = (type(opts.context_max) == "number" and opts.context_max > 0)
       and opts.context_max

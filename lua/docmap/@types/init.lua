@@ -705,6 +705,8 @@
 ---@field bare table<string, Docmap.Docs.Entity> Unqualified function names that are unique tree-wide.
 ---@field modules table<string, string> Module path -> node id.
 ---@field fns_by_module table<string, table<string, string>> Module path -> bare name -> declared name.
+---@field members table<string, table<string, boolean>> Module path -> bare name of an exported non-function (`M.NAME = value`).
+---@field fields table<string, boolean> Names declared by a `---@field` anywhere in the tree's Lua sources; filled by `index_fields`.
 
 --- One documentation file in the corpus.
 ---@class Docmap.Docs.File

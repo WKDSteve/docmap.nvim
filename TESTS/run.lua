@@ -179,6 +179,7 @@ local specs = {
   "diff_surface_spec.lua",
   "example_parse_spec.lua",
   "docs_spec.lua",
+  "docs_members_spec.lua",
   "quicks_spec.lua",
   "lang_js_spec.lua",
   "lang_zig_spec.lua",
