@@ -54,7 +54,11 @@ function M.read(src)
   if lines[i] and not lines[i]:match("^%s*$") and lines[i] ~= "" then
     return nil
   end
-  if is_pragma_line(prose[1]) then
+  -- A REUSE `SPDX-License-Identifier` line opens the block by convention; the prose that follows it is the header.
+  while prose[1] and prose[1]:match("^SPDX") do
+    table.remove(prose, 1)
+  end
+  if #prose == 0 or is_pragma_line(prose[1]) then
     return nil
   end
   for k = #prose, 1, -1 do

@@ -37,6 +37,16 @@ return function(H)
     "line header: a copyright banner says nothing"
   )
   eq(
+    line_header.read("// SPDX-License-Identifier: MIT\n// The real summary.\n\nint x;\n"),
+    "The real summary.",
+    "line header: a leading SPDX line is dropped, the prose after it is the summary"
+  )
+  eq(
+    line_header.read("// SPDX-License-Identifier: MIT\n\nint x;\n"),
+    nil,
+    "line header: an SPDX line alone says nothing"
+  )
+  eq(
     line_header.read("// The real summary.\n// Copyright 2026 Someone\n\nint x;\n"),
     "The real summary.",
     "line header: a banner line after the prose is dropped, the prose stays"
