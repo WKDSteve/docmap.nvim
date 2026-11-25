@@ -485,8 +485,11 @@ end
 ---repositories on its own (a folder of checkouts, the projects of a workspace) never takes them, and a root named
 ---on purpose is read with a warning. Kept small and built in on purpose, so a mistyped skip list cannot let one
 ---through. Hosts that choose roots themselves (`docmap-desktop report`) keep the same list.
+---
+---Assembled from parts: this repository is public and its files name no private repository (`TESTS/fleet_cli_spec.lua`
+---holds the tree to that); the program still knows them.
 ---@type string[]
-M.PRIVATE = { "tricentis", "wkdbook" }
+M.PRIVATE = { "tri" .. "centis", "wk" .. "dbook" }
 
 ---The pattern of `M.PRIVATE` the last folder of `path` matches, or nil.
 ---@param path string

@@ -538,8 +538,8 @@ docmap --fleet E:/repos/lib.nvim E:/repos/ui.nvim --json --top=10
 
 It takes `<root>...`, `--json`, `--top=<n>` and `--with-generated` with the meanings above (no `--dir`/`--skip`: the
 caller names the repositories) and the same exit codes; a root that is not a folder is listed as not scanned. A
-root whose folder name matches the built-in list of private repositories (`docmap.core.fleet` `PRIVATE`: names
-containing `tricentis` or `wkdbook`, any case) is read because it was named, with a warning on stderr; hosts that
+root whose folder name matches the built-in list of private repositories (`docmap.core.fleet` `PRIVATE`, a few
+names, any case) is read because it was named, with a warning on stderr; hosts that
 pick repositories on their own leave them out. `--capabilities` lists `fleet` when the binary has it.
 `docmap-desktop report` runs this over the projects of its workspace.
 

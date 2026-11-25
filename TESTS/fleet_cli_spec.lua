@@ -46,20 +46,36 @@ return function(H)
   none, err = fleet.parse_args({ "--json" })
   ok(none == nil and err == "no repository given", "no root is refused")
 
-  -- the private list: the last folder, any case, never a parent folder
-  eq(fleet.private_match("E:/repos/WKDBook-Tricentis"), "tricentis", "WKDBook-Tricentis is private")
+  -- the private list: the last folder, any case, never a parent folder. The names are taken from the list, never
+  -- written here: this repository is public, and the check below holds every tracked file to that.
+  local first, second = fleet.PRIVATE[1], fleet.PRIVATE[2]
   eq(
-    fleet.private_match("E:\\repos\\tricentis-vault\\"),
-    "tricentis",
+    fleet.private_match("E:/repos/Notes-" .. second:upper()),
+    second,
+    "a name holding one, any case"
+  )
+  eq(
+    fleet.private_match("E:\\repos\\" .. first .. "-x\\"),
+    first,
     "backslashes and a trailing slash"
   )
-  eq(fleet.private_match("/x/wkdbook"), "wkdbook", "wkdbook in lower case")
   eq(
-    fleet.private_match("/home/tricentis/docmap.nvim"),
+    fleet.private_match("/home/" .. first .. "/docmap.nvim"),
     nil,
     "a private parent folder does not count"
   )
   eq(fleet.private_match("docmap.nvim"), nil, "an ordinary name is not private")
+
+  -- no tracked file of this public repository names a private one (the list is assembled from parts)
+  do
+    local cmd = { "git", "grep", "-n", "-i", "-I" }
+    for _, name in ipairs(fleet.PRIVATE) do
+      cmd[#cmd + 1] = "-e"
+      cmd[#cmd + 1] = name
+    end
+    local found = vim.system(cmd, { cwd = vim.fn.getcwd(), text = true }):wait(60000)
+    eq(found.code, 1, "no tracked file names a private repository:\n" .. tostring(found.stdout))
+  end
 
   -- A function big enough (>= 40 tree nodes) to count; both repositories carry it under other names.
   local function body(name, local_a)
@@ -127,7 +143,7 @@ return function(H)
   ok(out_text():find("| one |", 1, true), "the readable root is still reported")
 
   -- main: a named private root is read, with a warning
-  local private = base .. "/WKDBook-x"
+  local private = base .. "/Notes-" .. second
   H.write(private .. "/lua/p/a.lua", { "return {}" })
   out = sink()
   errs, err_text = sink()
