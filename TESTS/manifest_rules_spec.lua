@@ -47,7 +47,27 @@ return function(H)
     "commit needs history"
   )
 
+  -- `--fleet` is a mode of the entry point, measured like a route: without docmap.core.fleet the binary would
+  -- answer `docmap --fleet` with "module not found"
+  local fleet_missing = rules.missing({}, { "--fleet" })
+  eq(#fleet_missing, 1, "a --fleet probe without docmap.core.fleet is reported")
+  ok(fleet_missing[1]:find("docmap.core.fleet", 1, true), "the report names docmap.core.fleet")
+  ok(
+    fleet_missing[1]:find("the probe of --fleet did", 1, true),
+    "and the mode, not an --api= route"
+  )
+  eq(
+    #rules.missing({ ["docmap.core.fleet"] = true }, { "--fleet" }),
+    0,
+    "with it nothing is missing"
+  )
+
   local script = read("scripts/bundle_manifest.lua")
+  ok(script:find('probe("--fleet", {', 1, true), "the build probes --fleet")
+  ok(
+    script:find('probed_routes[#probed_routes + 1] = "--fleet"', 1, true),
+    "and asks the rule about it"
+  )
   ok(
     script:find("manifest_rules.missing(staged, probed_routes)", 1, true),
     "the build asks for its route probes"

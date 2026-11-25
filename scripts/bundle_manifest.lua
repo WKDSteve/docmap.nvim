@@ -152,6 +152,12 @@ end
 
 probe(langs_root, { "--source=src", "--out-dir=out" })
 
+-- **`--fleet <root>...`, the report over many repositories.** It short-circuits before `core/cli.run` like
+-- `--api=` does and is the only mode that reaches `core/fleet` (the join and the tables). Over the language
+-- fixture, so it is quick; its JSON goes to stdout, which `scripts/package.lua` filters to `.lua` lines anyway.
+-- Listed in `probed_routes` below as `--fleet`, so `manifest_rules.missing` stops a build whose probe missed it.
+probe("--fleet", { langs_root, "--json" })
+
 -- **A third mode, because the closure depends on what was asked for, not
 -- only on what was scanned.** `--api=<route>` short-circuits before
 -- `core/cli.run` entirely and reaches modules a scan does not:
@@ -290,6 +296,7 @@ if head_pipe then
 end
 -- The routes probed here, for `manifest_rules.missing` below: each must have loaded its module.
 local probed_routes = {}
+probed_routes[#probed_routes + 1] = "--fleet"
 if head_sha and head_sha:match("^%x%x%x%x%x%x%x+$") then
   probe(root, { "--api=commit/" .. head_sha, "--out-dir=.deps/bundle-manifest-probe" })
   probed_routes[#probed_routes + 1] = "commit/" .. head_sha

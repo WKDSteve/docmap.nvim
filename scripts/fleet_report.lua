@@ -119,14 +119,5 @@ local repos, failed = fleet.scan_roots(roots, {
     io.stderr:write(line .. "\n")
   end,
 })
-local joined = fleet.join(repos)
-if as_json then
-  joined.failed = failed
-  io.stdout:write(require("docmap.core.json").encode(joined) .. "\n")
-else
-  io.stdout:write(table.concat(fleet.render(joined, { top = top }), "\n") .. "\n")
-  for _, f in ipairs(failed) do
-    io.stdout:write(("\nNot scanned: %s (%s)\n"):format(f.root, (f.error:match("[^\n]*"))))
-  end
-end
+fleet.write(fleet.join(repos), failed, { json = as_json, top = top }, io.stdout)
 vim.cmd("cq " .. (#failed > 0 and 1 or 0))

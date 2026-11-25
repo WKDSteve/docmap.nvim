@@ -46,6 +46,11 @@ local root = (arg[1] or "."):gsub("\\", "/"):gsub("/+$", "")
 -- single observation, which is what a host actually needs.
 local capabilities_only = (root == "--capabilities")
 
+-- `--fleet <root>...`: the report over many repositories (`core/fleet.lua`, `M.main`), the same tables as
+-- `scripts/fleet_report.lua`. In root position for the same reason as `--capabilities`: an older binary rejects it
+-- with its usage line instead of generating a map into a directory called `--fleet`.
+local fleet_mode = (root == "--fleet")
+
 -- this file lives at <repo>/standalone/docmap.lua; its own repo root is
 -- always on package.path so `docmap.*` resolves regardless of the
 -- scanned root above (which is normally a *different* directory).
@@ -177,7 +182,7 @@ end
 
 -- Below the dependency search rather than above it since the usage line comes out of the catalog, which is
 -- only reachable once this repository's `lua/` is on the path. Still before any work is done.
-if not capabilities_only and root:sub(1, 1) == "-" then
+if not capabilities_only and not fleet_mode and root:sub(1, 1) == "-" then
   io.stderr:write(i18n.t("cli.usage") .. "\n")
   os.exit(2)
 end
@@ -206,6 +211,10 @@ if capabilities_only then
   -- listed (they answer `available = false` without it), so the route list alone cannot tell a host whether this
   -- build can run rules. An older engine has neither, and that is the same answer: no `rules`.
   local caps = { "api", "languages", "schema" }
+  -- `fleet`: `--fleet <root>...` is answered here (its module is in this build; a bundle that lacks it says so)
+  if pcall(require, "docmap.core.fleet") then
+    caps[#caps + 1] = "fleet"
+  end
   -- `telemetry`: `runtime-analysis.telemetry` loads here, so `--api=telemetry` can read a store. Without it the
   -- route answers with the reason (`reason_code`), and a host sees that without asking the route.
   if require("docmap.core.telemetry_join").availability() == "ok" then
@@ -245,6 +254,14 @@ if capabilities_only then
     languages = require("docmap.core.lang_registry").report(),
   }))
   os.exit(0)
+end
+
+if fleet_mode then
+  local rest = {}
+  for i = 2, #arg do
+    rest[#rest + 1] = arg[i]
+  end
+  os.exit(require("docmap.core.fleet").main(rest, io.stdout, io.stderr))
 end
 
 local argv = {}

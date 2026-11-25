@@ -1,6 +1,7 @@
 ---@module 'docmap.core.fleet'
 --- The Duplicates, Quicks and Findings tabs over many repositories at once, and what turns up in more than one of
---- them. `scripts/fleet_report.lua` is the command line around it.
+--- them. `docmap --fleet` (`M.main`, reached from `standalone/docmap.lua`) and `scripts/fleet_report.lua` are the
+--- command lines around it.
 ---
 --- A repository on its own can only say "these two functions are the same". A function that two repositories grew
 --- separately is invisible to both, and it is exactly the kind a shared library should hold. So each repository is
@@ -478,6 +479,123 @@ function M.render(fleet, opts)
     rows
   )
   return out
+end
+
+---Lua patterns (matched against the lower-cased folder name) of repositories that are private: a run that picks
+---repositories on its own (a folder of checkouts, the projects of a workspace) never takes them, and a root named
+---on purpose is read with a warning. Kept small and built in on purpose, so a mistyped skip list cannot let one
+---through. Hosts that choose roots themselves (`docmap-desktop report`) keep the same list.
+---@type string[]
+M.PRIVATE = { "tricentis", "wkdbook" }
+
+---The pattern of `M.PRIVATE` the last folder of `path` matches, or nil.
+---@param path string
+---@return string?
+function M.private_match(path)
+  local clean = path:gsub("\\", "/"):gsub("/+$", "")
+  local name = (clean:match("([^/]+)$") or clean):lower()
+  for _, pattern in ipairs(M.PRIVATE) do
+    if name:find(pattern) then
+      return pattern
+    end
+  end
+  return nil
+end
+
+M.USAGE = "usage: docmap --fleet <root>... [--json] [--top=<n>] [--with-generated]"
+
+---The arguments after `--fleet`.
+---@param args string[]
+---@return { roots: string[], json: boolean, top: integer, with_generated: boolean, locale: string? }? opts
+---@return string? err What was wrong, for the usage message.
+function M.parse_args(args)
+  local opts = { roots = {}, json = false, top = 25, with_generated = false }
+  for _, a in ipairs(args) do
+    if a == "--json" then
+      opts.json = true
+    elseif a == "--with-generated" then
+      opts.with_generated = true
+    elseif a:match("^%-%-top=") then
+      local n = tonumber(a:sub(#"--top=" + 1))
+      if not n or n < 1 or n ~= math.floor(n) then
+        return nil, "--top wants a positive whole number"
+      end
+      opts.top = math.floor(n)
+    elseif a:match("^%-%-locale=") then
+      -- read by the entry point before anything is printed; accepted here so it may stand anywhere
+      opts.locale = a:sub(#"--locale=" + 1)
+    elseif a:sub(1, 1) == "-" then
+      return nil, "unknown option " .. a
+    else
+      opts.roots[#opts.roots + 1] = a
+    end
+  end
+  if #opts.roots == 0 then
+    return nil, "no repository given"
+  end
+  return opts
+end
+
+---Write a joined fleet: Markdown with a "Not scanned" line per failed root, or one JSON object with `failed`.
+---@param joined table From `M.join`.
+---@param failed { root: string, error: string }[]
+---@param opts { json: boolean?, top: integer? }
+---@param out file*
+function M.write(joined, failed, opts, out)
+  if opts.json then
+    joined.failed = failed
+    out:write(require("docmap.core.json").encode(joined) .. "\n")
+    return
+  end
+  out:write(table.concat(M.render(joined, { top = opts.top }), "\n") .. "\n")
+  for _, f in ipairs(failed) do
+    out:write(("\nNot scanned: %s (%s)\n"):format(f.root, (f.error:match("[^\n]*"))))
+  end
+end
+
+---`docmap --fleet <root>...`: scan every root, print the report to `out`, progress and warnings to `err`.
+---Exit code 0 when every root was scanned, 1 when at least one was not (the report lists the others), 2 for wrong
+---arguments.
+---@param args string[] The arguments after `--fleet`.
+---@param out file*
+---@param err file*
+---@return integer code
+function M.main(args, out, err)
+  local opts, problem = M.parse_args(args)
+  if not opts then
+    err:write("docmap --fleet: " .. tostring(problem) .. "\n" .. M.USAGE .. "\n")
+    return 2
+  end
+  local roots, failed = {}, {}
+  for _, root in ipairs(opts.roots) do
+    local clean = root:gsub("\\", "/"):gsub("/+$", "")
+    local private = M.private_match(clean)
+    if private then
+      err:write(
+        ("warning: %s looks like a private repository (its name matches %q); read because it was named\n"):format(
+          clean,
+          private
+        )
+      )
+    end
+    if vim.fn.isdirectory(clean) == 1 then
+      roots[#roots + 1] = clean
+    else
+      failed[#failed + 1] = { root = clean, error = "not a folder" }
+      err:write(("%s: not scanned: not a folder\n"):format(clean))
+    end
+  end
+  local repos, scan_failed = M.scan_roots(roots, {
+    with_generated = opts.with_generated,
+    progress = function(line)
+      err:write(line .. "\n")
+    end,
+  })
+  for _, f in ipairs(scan_failed) do
+    failed[#failed + 1] = f
+  end
+  M.write(M.join(repos), failed, opts, out)
+  return #failed > 0 and 1 or 0
 end
 
 return M

@@ -16,6 +16,8 @@ M.COMPANIONS = {
 M.ROUTE_MODULES = {
   { route = "commit/", needs = "docmap.core.history" },
   { route = "shape/", needs = "docmap.core.diff" },
+  -- not a route but a mode of the entry point (`docmap --fleet <root>...`), probed the same way
+  { route = "--fleet", needs = "docmap.core.fleet", probe = "--fleet" },
 }
 
 ---The modules a manifest lacks.
@@ -32,7 +34,8 @@ function M.missing(names, routes)
   for _, route in ipairs(routes or {}) do
     for _, rule in ipairs(M.ROUTE_MODULES) do
       if route:sub(1, #rule.route) == rule.route and not names[rule.needs] then
-        out[#out + 1] = rule.needs .. " (the probe of --api=" .. route .. " did not load it)"
+        local probe = rule.probe or ("--api=" .. route)
+        out[#out + 1] = rule.needs .. " (the probe of " .. probe .. " did not load it)"
       end
     end
   end

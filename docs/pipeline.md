@@ -529,6 +529,20 @@ arguments. The same limits as the Duplicates tab apply: a shape ignores names an
 the match, and two functions can share a shape and nothing else, so a hit is a question for a person, not a
 finding. The logic is `docmap.core.fleet`; the first report over 58 repositories came from it.
 
+The standalone binary answers the same report without Neovim, over the repositories it is given:
+
+```
+docmap --fleet E:/repos/lib.nvim E:/repos/ui.nvim
+docmap --fleet E:/repos/lib.nvim E:/repos/ui.nvim --json --top=10
+```
+
+It takes `<root>...`, `--json`, `--top=<n>` and `--with-generated` with the meanings above (no `--dir`/`--skip`: the
+caller names the repositories) and the same exit codes; a root that is not a folder is listed as not scanned. A
+root whose folder name matches the built-in list of private repositories (`docmap.core.fleet` `PRIVATE`: names
+containing `tricentis` or `wkdbook`, any case) is read because it was named, with a warning on stderr; hosts that
+pick repositories on their own leave them out. `--capabilities` lists `fleet` when the binary has it.
+`docmap-desktop report` runs this over the projects of its workspace.
+
 ### SARIF for CI (`--sarif=<path>`)
 
 The same findings in the format GitHub code scanning ingests, so every drift
