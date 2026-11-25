@@ -19,6 +19,7 @@ return function(H)
     "src/__tests__/a.ts",
     "crate/tests/api.rs",
     "srcwin.test.ts",
+    "crates/sink/src/tests.rs",
   }) do
     eq(check.is_test_path(p), true, "test path: " .. p .. " is a test file")
   end

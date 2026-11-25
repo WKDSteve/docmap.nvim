@@ -163,7 +163,7 @@ end
 --- above `import { test } from "vitest"` repeats the file name. Measured over
 --- the fleet: 430 of 700 `missing-summary` findings were such files. Path
 --- conventions only, never the content: `*.test.*`, `*.spec.*`, `test_*`,
---- `*_test.*`, and a directory named `test`, `tests`, `__tests__`, `spec` or `e2e`.
+--- `*_test.*`, `tests.*` (Rust's `mod tests;` file), and a directory named `test`, `tests`, `__tests__`, `spec` or `e2e`.
 ---@param path string?
 ---@return boolean
 function M.is_test_path(path)
@@ -175,7 +175,7 @@ function M.is_test_path(path)
   if name:find(".test.", 1, true) or name:find(".spec.", 1, true) then
     return true
   end
-  if name:match("^test_") or name:match("_test%.%w+$") then
+  if name:match("^test_") or name:match("_test%.%w+$") or name:match("^tests%.%w+$") then
     return true
   end
   local dir = p:match("^(.*)/[^/]+$") or ""
