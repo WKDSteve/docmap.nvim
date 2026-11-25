@@ -596,6 +596,17 @@ function M.missing_member(idx, text)
   if text:match("%.lua$") then
     return nil
   end
+  -- `pult-app.exe`, `takt-player.exe` -- the file a crate builds, named after
+  -- the crate (the module). Same shape as `.lua$`: a filename, not a member.
+  -- Measured across the fleet: 25 of 173 findings, in five Rust workspaces.
+  if
+    text:match("%.exe$")
+    or text:match("%.dll$")
+    or text:match("%.so$")
+    or text:match("%.dylib$")
+  then
+    return nil
+  end
   -- `bindings.mappings.init`, `config.neotree.init` -- naming a module's
   -- init.lua explicitly. `require("x.init")` and `require("x")` load the
   -- same file, so a doc pointing at the ".init" form is not naming a

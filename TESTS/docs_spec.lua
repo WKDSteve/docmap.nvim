@@ -136,6 +136,13 @@ return function(H)
     nil,
     "docs: `x.lua` is excluded even when `x` is a deeper module path"
   )
+  for _, ext in ipairs({ "exe", "dll", "so", "dylib" }) do
+    eq(
+      docs.missing_member(idx, "demo." .. ext),
+      nil,
+      "docs: `x." .. ext .. "` is a built file named after the module, not a member access"
+    )
+  end
   eq(
     docs.missing_member(idx, "demo.core.scan.init"),
     nil,
