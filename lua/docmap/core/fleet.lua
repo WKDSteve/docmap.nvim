@@ -272,7 +272,33 @@ function M.join(repos)
   }
 end
 
+---The name each root goes by in the report: its folder name, or, where two roots share it (two checkouts called
+---`app` in different places), the parent folder with it (`work/app`, `forks/app`). The join tells repositories apart
+---by this name, so two that shared one were taken for one repository and nothing they have in common was found.
+---@param cleans string[] Roots with forward slashes and no trailing one, each once.
+---@return string[] names In the order of `cleans`.
+function M.names_of(cleans)
+  local count = {}
+  for _, clean in ipairs(cleans) do
+    local base = clean:match("([^/]+)$") or clean
+    count[base] = (count[base] or 0) + 1
+  end
+  local names, taken = {}, {}
+  for i, clean in ipairs(cleans) do
+    local base = clean:match("([^/]+)$") or clean
+    local name = count[base] > 1 and (clean:match("([^/]+/[^/]+)$") or clean) or base
+    -- still the same (`a/x/app` and `b/x/app`): the whole path, which is unique since every root is there once
+    if taken[name] then
+      name = clean
+    end
+    taken[name] = true
+    names[i] = name
+  end
+  return names
+end
+
 ---Scan every root and collect it. A root that cannot be scanned is reported in `failed` and does not stop the others.
+---A root given twice is scanned once.
 ---@param roots string[]
 ---@param opts { with_generated: boolean?, progress: fun(line: string)? }?
 ---@return table[] repos
@@ -289,9 +315,17 @@ function M.scan_roots(roots, opts)
       end
     end,
   }
+  local cleans, seen = {}, {}
   for _, root in ipairs(roots) do
     local clean = root:gsub("\\", "/"):gsub("/+$", "")
-    local name = clean:match("([^/]+)$") or clean
+    if not seen[clean] then
+      seen[clean] = true
+      cleans[#cleans + 1] = clean
+    end
+  end
+  local names = M.names_of(cleans)
+  for i, clean in ipairs(cleans) do
+    local name = names[i]
     local ok, result = pcall(function()
       local built = config.build(clean, { out_dir = "docs/map" }, notify)
       local ir, findings = docmap.scan_full(built)

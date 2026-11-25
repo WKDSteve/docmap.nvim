@@ -194,5 +194,30 @@ return function(H)
     )
   end
 
+  -- Two repositories with the same folder name in different places are two repositories: they go by the parent
+  -- folder with the name, and what they share is found. The same root given twice is read once.
+  ok(
+    vim.deep_equal(
+      fleet.names_of({ "E:/work/app", "E:/forks/app", "E:/repos/lib" }),
+      { "work/app", "forks/app", "lib" }
+    ),
+    "a shared folder name takes its parent"
+  )
+  ok(
+    vim.deep_equal(fleet.names_of({ "/a/x/app", "/b/x/app" }), { "x/app", "/b/x/app" }),
+    "still the same: the whole path"
+  )
+  local same_a, same_b = base .. "/work/app", base .. "/forks/app"
+  H.write(same_a .. "/lua/app/a.lua", body("collect", "found"))
+  H.write(same_b .. "/lua/app/b.lua", body("gather", "hits"))
+  local same = fleet.join((fleet.scan_roots({ same_a, same_b, same_a .. "/" })))
+  eq(#same.repos, 2, "two repositories, the root given twice is read once")
+  eq(#same.shapes, 1, "the shape they share is found")
+  eq(
+    same.pairs[1] and same.pairs[1].pair,
+    "forks/app + work/app",
+    "the pair names both by parent and name"
+  )
+
   vim.fn.delete(base, "rf")
 end
