@@ -3,7 +3,7 @@
 > **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**8 modules** · 8 namespaces · 164 helper files
+**8 modules** · 8 namespaces · 165 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
@@ -342,10 +342,12 @@ flowchart LR
 
 ## Drift
 
-0 errors · 0 warnings · 47 info
+0 errors · 2 warnings · 47 info
 
-No errors or warnings.
-
+| Severity | Check | Message |
+|---|---|---|
+| warn | `layer-violation` | docmap.core.lang.cfamily requires docmap.core.lang.line_header, but docmap.core.lang.cfamily must not reach into docmap.core.lang.line_header — a backend stands alone; what two backends share lives in a shared module, not in one of them |
+| warn | `layer-violation` | docmap.core.lang.rust requires docmap.core.lang.line_header, but docmap.core.lang.rust must not reach into docmap.core.lang.line_header — a backend stands alone; what two backends share lives in a shared module, not in one of them |
 
 <details>
 <summary>47 informational findings</summary>
