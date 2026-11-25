@@ -667,6 +667,8 @@ function M.missing_member(idx, text)
     or text:match("%.dll$")
     or text:match("%.so$")
     or text:match("%.dylib$")
+    -- `fake-app.log`: the log a test program writes beside itself.
+    or text:match("%.log$")
   then
     return nil
   end

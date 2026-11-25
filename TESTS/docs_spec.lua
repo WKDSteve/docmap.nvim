@@ -136,7 +136,7 @@ return function(H)
     nil,
     "docs: `x.lua` is excluded even when `x` is a deeper module path"
   )
-  for _, ext in ipairs({ "exe", "dll", "so", "dylib" }) do
+  for _, ext in ipairs({ "exe", "dll", "so", "dylib", "log" }) do
     eq(
       docs.missing_member(idx, "demo." .. ext),
       nil,
