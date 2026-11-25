@@ -157,6 +157,36 @@ function M.not_applicable(ir, opts)
   return out
 end
 
+--- Is this path a test file by the conventions of the languages the map reads?
+---
+--- A test says what it is in its name and its suite title; a header sentence
+--- above `import { test } from "vitest"` repeats the file name. Measured over
+--- the fleet: 430 of 700 `missing-summary` findings were such files. Path
+--- conventions only, never the content: `*.test.*`, `*.spec.*`, `test_*`,
+--- `*_test.*`, and a directory named `test`, `tests`, `__tests__`, `spec` or `e2e`.
+---@param path string?
+---@return boolean
+function M.is_test_path(path)
+  if type(path) ~= "string" or path == "" then
+    return false
+  end
+  local p = path:gsub("\\", "/"):lower()
+  local name = p:match("([^/]+)$") or p
+  if name:find(".test.", 1, true) or name:find(".spec.", 1, true) then
+    return true
+  end
+  if name:match("^test_") or name:match("_test%.%w+$") then
+    return true
+  end
+  local dir = p:match("^(.*)/[^/]+$") or ""
+  for seg in dir:gmatch("[^/]+") do
+    if seg == "test" or seg == "tests" or seg == "__tests__" or seg == "spec" or seg == "e2e" then
+      return true
+    end
+  end
+  return false
+end
+
 --- Every module and helper file should say what it is in one sentence — that
 --- sentence is what the map, the README tables and the vimdoc all render.
 ---@param ir Docmap.IR
@@ -167,7 +197,7 @@ local function check_summaries(ir, findings)
     if node.kind ~= "namespace" then
       if M.applies("missing-module-tag", node) and not node.module then
         add(findings, "error", "missing-module-tag", id, { file = node.source or id })
-      elseif node.summary == "" then
+      elseif node.summary == "" and not M.is_test_path(node.path or node.source or id) then
         add(findings, "warn", "missing-summary", id, { file = node.source or id })
       end
     end

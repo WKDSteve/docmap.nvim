@@ -180,6 +180,7 @@ local specs = {
   "example_parse_spec.lua",
   "docs_spec.lua",
   "docs_members_spec.lua",
+  "check_test_files_summary_spec.lua",
   "quicks_spec.lua",
   "lang_js_spec.lua",
   "lang_zig_spec.lua",
