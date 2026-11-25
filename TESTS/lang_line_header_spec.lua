@@ -42,6 +42,11 @@ return function(H)
     "line header: a banner line after the prose is dropped, the prose stays"
   )
   eq(
+    line_header.read("#![deny(warnings)]\n// Not a header.\n\nfn x() {}\n"),
+    nil,
+    "line header: a Rust inner attribute is code, not a shebang to skip"
+  )
+  eq(
     line_header.read("// Only comment"),
     "Only comment",
     "line header: a block at the end of the file"

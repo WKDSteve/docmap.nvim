@@ -31,7 +31,7 @@ function M.read(src)
     lines[#lines + 1] = (line:gsub("\r$", ""))
   end
   local i = 1
-  if lines[i] and lines[i]:match("^#!") then
+  if lines[i] and lines[i]:match("^#!%s*/") then
     i = i + 1
   end
   while lines[i] and lines[i]:match("^%s*$") do

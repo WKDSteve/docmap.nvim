@@ -181,6 +181,7 @@ local specs = {
   "docs_spec.lua",
   "docs_members_spec.lua",
   "lang_line_header_spec.lua",
+  "lang_js_line_header_spec.lua",
   "check_test_files_summary_spec.lua",
   "quicks_spec.lua",
   "lang_js_spec.lua",
