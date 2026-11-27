@@ -319,6 +319,7 @@ local specs = {
   "sheets_spec.lua",
   "min_version_spec.lua",
   "release_script_spec.lua",
+  "release_workflow_spec.lua",
   "manifest_rules_spec.lua",
 }
 

@@ -43,6 +43,14 @@ on:
       - ".github/workflows/release-engine.yml"
   workflow_dispatch:
 
+# One run per ref at a time: a newer push cancels the older run, so an older
+# run can never delete and recreate `standalone-latest` after a newer one.
+# `publish` checks `!cancelled()` (not `always()`), so a cancelled run never
+# replaces the release, even while it waits for the slow macOS job.
+concurrency:
+  group: release-engine-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux:
     # Not ubuntu-22.04, tried first for no better reason than matching
@@ -273,7 +281,7 @@ jobs:
     # A workflow_dispatch from another branch (a `ci/**` check branch,
     # say) builds all platforms but never replaces the release: only
     # main's own state goes out as `standalone-latest`.
-    if: ${{ always() && github.ref == 'refs/heads/main' && needs.linux.result == 'success' && needs.windows.result == 'success' }}
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.linux.result == 'success' && needs.windows.result == 'success' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
