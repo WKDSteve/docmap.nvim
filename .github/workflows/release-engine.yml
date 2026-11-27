@@ -10,10 +10,12 @@
 # appended to, so a stale asset from three builds ago can never be picked
 # up by accident.
 #
-# macOS is deliberately not built here: the standalone path is
-# confirmed working on Linux and Windows; macOS was never tested and stays
-# out of scope until it is -- building it here would ship a binary nobody
-# has verified starts, let alone works.
+# macOS (arm64) is built by the `macos` job, but is not yet a gate: the standalone
+# path was proven on Linux and Windows by hand first, macOS only by this job. The
+# build's own `--capabilities` probe (REQUIRE_CAPABILITIES) proves the binary
+# starts, so a macOS asset only reaches the release when that passed; a red
+# `macos` job never holds back the Linux/Windows release (see `publish`). Make it
+# a hard `needs` once it has been green for a while.
 #
 # What each platform actually does is scripts/build_engine_release.sh, not
 # this file -- same reason ci.yml keeps its own logic in scripts/ci.sh: a
@@ -225,12 +227,53 @@ jobs:
           path: release-out/*
           retention-days: 1
 
+  macos:
+    # macos-latest is arm64 (Apple silicon), hence the aarch64 triple. Same
+    # steps as the linux job; the script itself handles the Darwin
+    # differences (Lua's `macosx` target, `shasum`, `-dynamiclib`).
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: WKDSteve/lib.nvim
+          path: .deps/lib.nvim
+          ref: ci-verified
+      - uses: actions/checkout@v5
+        with:
+          repository: WKDSteve/runtime-analysis.nvim
+          path: .deps/runtime-analysis.nvim
+          ref: ci-verified
+      - uses: actions/checkout@v5
+        with:
+          repository: WKDSteve/rules.nvim
+          path: .deps/rules.nvim
+          ref: ci-verified
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+      - run: npm install -g tree-sitter-cli
+      - run: bash scripts/build_engine_release.sh
+        env:
+          TRIPLE: aarch64-apple-darwin
+          EXE_EXT: ""
+          OUT_DIR: release-out
+          REQUIRE_CAPABILITIES: rules rules-agent
+      - uses: actions/upload-artifact@v7
+        with:
+          name: engine-macos
+          path: release-out/*
+          retention-days: 1
+
   publish:
-    needs: [linux, windows]
+    # `macos` is listed so the job waits for it, but its result is not
+    # required: only linux and windows must have succeeded (see header).
+    needs: [linux, windows, macos]
     # A workflow_dispatch from another branch (a `ci/**` check branch,
-    # say) builds both platforms but never replaces the release: only
+    # say) builds all platforms but never replaces the release: only
     # main's own state goes out as `standalone-latest`.
-    if: github.ref == 'refs/heads/main'
+    if: ${{ always() && github.ref == 'refs/heads/main' && needs.linux.result == 'success' && needs.windows.result == 'success' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:

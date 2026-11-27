@@ -38,10 +38,14 @@ DKJSON_SHA256=9d3e5c82dcd572a6a4b764d705f72b948094124b0e338cec0d6dfefea59693b7
 LUASTATIC_COMMIT=c3e1b2ef8f998230fb4c47935e4bdcb1610abab5
 LUASTATIC_SHA256=6fbd8a529a3e5ec2c8609d09f02dcf12ce2f54bae179a673ff555217343f3388
 
+# macOS ships `shasum`, not GNU `sha256sum`; HOST_OS also picks Lua's make target and how a dynamic module is linked.
+if command -v sha256sum >/dev/null 2>&1; then SHA256_CHECK=(sha256sum -c -); else SHA256_CHECK=(shasum -a 256 -c -); fi
+HOST_OS="$(uname -s)"
+
 # fetch <url> <file> <sha256>
 fetch() {
   curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 -o "$2" "$1"
-  echo "$3  $2" | sha256sum -c - >/dev/null || {
+  echo "$3  $2" | "${SHA256_CHECK[@]}" >/dev/null || {
     echo "error: $1 does not have the pinned sha256 $3" >&2
     exit 1
   }
@@ -67,6 +71,7 @@ fetch https://www.lua.org/ftp/lua-5.4.8.tar.gz "$work/lua-5.4.8.tar.gz" "$LUA_SH
 tar xzf "$work/lua-5.4.8.tar.gz" -C "$work"
 LUA_MAKE=linux
 [ -n "$EXE_EXT" ] && LUA_MAKE=mingw
+[ "$HOST_OS" = "Darwin" ] && LUA_MAKE=macosx
 (
   cd "$work/lua-5.4.8"
   # `${MAKE:-make}` rather than a bare `make`: on Windows this repo's own
@@ -137,15 +142,20 @@ ar rcs "$work/lfs.a" "$work/lfs.o"
 # link it" fix that looked simplest after finding the first one.
 LTS_LINK_LIBS=()
 [ -n "$EXE_EXT" ] && LTS_LINK_LIBS=("$LUALIBA")
+# macOS: a dynamic module is `-dynamiclib`, and its Lua symbols resolve against the host `lua` at load time
+# (`-undefined dynamic_lookup`), the counterpart of the Linux `-Wl,-E` behaviour described above. Unverified
+# until the first real macOS run (release-engine.yml's `macos` job).
+SHARED_FLAGS=(-fPIC -shared)
+[ "$HOST_OS" = "Darwin" ] && SHARED_FLAGS=(-fPIC -dynamiclib -undefined dynamic_lookup)
 
 echo "== dynamic lfs + dkjson (so the host interpreter running package.lua can require() them)"
-gcc -O2 -fPIC -shared -I"$LUAINC" "$work/luafilesystem/src/lfs.c" "${LTS_LINK_LIBS[@]}" -o "$work/lfs.dyn.so"
+gcc -O2 "${SHARED_FLAGS[@]}" -I"$LUAINC" "$work/luafilesystem/src/lfs.c" "${LTS_LINK_LIBS[@]}" -o "$work/lfs.dyn.so"
 fetch "https://raw.githubusercontent.com/LuaDist/dkjson/$DKJSON_COMMIT/dkjson.lua" "$work/dkjson.lua" "$DKJSON_SHA256"
 
 echo "== dynamic lua_tree_sitter.so (so bundle_manifest.lua's probe run can see the real treesitter closure)"
 (
   cd "$work/lua-tree-sitter"
-  gcc -O2 -fPIC -shared "${LTS_INC[@]}" "${LTS_SRC[@]}" "${LTS_LINK_LIBS[@]}" -o "$work/lua_tree_sitter.dyn.so"
+  gcc -O2 "${SHARED_FLAGS[@]}" "${LTS_INC[@]}" "${LTS_SRC[@]}" "${LTS_LINK_LIBS[@]}" -o "$work/lua_tree_sitter.dyn.so"
 )
 
 echo "== luastatic (a plain Lua script, not a build target)"
