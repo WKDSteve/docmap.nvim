@@ -16,7 +16,13 @@ return function(H)
   local curls, in_fetch = 0, 0
   local body = text:match("\nfetch%(%) {\n(.-)\n}\n")
   ok(body ~= nil, "the script has its fetch helper")
-  ok(body and body:find("sha256sum -c -", 1, true) ~= nil, "fetch checks the sum")
+  -- the checker is a variable so macOS (no GNU sha256sum) can use `shasum -a 256`; both must stay a real `-c` check
+  ok(body and body:find('"${SHA256_CHECK[@]}"', 1, true) ~= nil, "fetch checks the sum")
+  ok(text:find("SHA256_CHECK=(sha256sum -c -)", 1, true) ~= nil, "the GNU checker verifies with -c")
+  ok(
+    text:find("SHA256_CHECK=(shasum -a 256 -c -)", 1, true) ~= nil,
+    "the macOS checker verifies with -c"
+  )
   ok(body and body:find("--retry", 1, true) ~= nil, "fetch retries a broken download")
   for line in text:gmatch("[^\n]+") do
     if not line:match("^%s*#") and line:find("curl ", 1, true) then
