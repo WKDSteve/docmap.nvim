@@ -149,13 +149,14 @@ SHARED_FLAGS=(-fPIC -shared)
 [ "$HOST_OS" = "Darwin" ] && SHARED_FLAGS=(-fPIC -dynamiclib -undefined dynamic_lookup)
 
 echo "== dynamic lfs + dkjson (so the host interpreter running package.lua can require() them)"
-gcc -O2 "${SHARED_FLAGS[@]}" -I"$LUAINC" "$work/luafilesystem/src/lfs.c" "${LTS_LINK_LIBS[@]}" -o "$work/lfs.dyn.so"
+# `${A[@]+"${A[@]}"}`: macOS' bash 3.2 treats an empty array as unset under `set -u` (found by the first macOS run).
+gcc -O2 "${SHARED_FLAGS[@]}" -I"$LUAINC" "$work/luafilesystem/src/lfs.c" ${LTS_LINK_LIBS[@]+"${LTS_LINK_LIBS[@]}"} -o "$work/lfs.dyn.so"
 fetch "https://raw.githubusercontent.com/LuaDist/dkjson/$DKJSON_COMMIT/dkjson.lua" "$work/dkjson.lua" "$DKJSON_SHA256"
 
 echo "== dynamic lua_tree_sitter.so (so bundle_manifest.lua's probe run can see the real treesitter closure)"
 (
   cd "$work/lua-tree-sitter"
-  gcc -O2 "${SHARED_FLAGS[@]}" "${LTS_INC[@]}" "${LTS_SRC[@]}" "${LTS_LINK_LIBS[@]}" -o "$work/lua_tree_sitter.dyn.so"
+  gcc -O2 "${SHARED_FLAGS[@]}" "${LTS_INC[@]}" "${LTS_SRC[@]}" ${LTS_LINK_LIBS[@]+"${LTS_LINK_LIBS[@]}"} -o "$work/lua_tree_sitter.dyn.so"
 )
 
 echo "== luastatic (a plain Lua script, not a build target)"
