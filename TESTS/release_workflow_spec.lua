@@ -29,6 +29,30 @@ return function(H)
     "publish requires the windows build"
   )
 
+  -- SHA256SUMS: computed from the downloaded artifacts in `release-out`, before the release is created from that
+  -- directory, so the file goes out with the assets it describes. Never from what is already on the release.
+  publish = publish or ""
+  local download = publish:find("actions/download-artifact@", 1, true)
+  local sums = publish:find("sha256sum -- *", 1, true)
+  local create = publish:find("gh release create standalone-latest release-out/*", 1, true)
+  ok(sums ~= nil, "publish computes the sums with sha256sum over every downloaded asset")
+  ok(
+    download ~= nil and sums ~= nil and create ~= nil and download < sums and sums < create,
+    "the sums are computed after the artifacts are downloaded and before the release is created"
+  )
+  ok(
+    publish:find('mv "$RUNNER_TEMP/SHA256SUMS" release-out/SHA256SUMS', 1, true) ~= nil,
+    "SHA256SUMS lands in release-out, so `release-out/*` uploads it with the assets"
+  )
+  ok(
+    publish:find("sha256sum -c SHA256SUMS", 1, true) ~= nil,
+    "publish checks the written SHA256SUMS against the files before uploading"
+  )
+  ok(
+    publish:find("gh release download", 1, true) == nil,
+    "the sums never come from the existing release"
+  )
+
   local group = text:match("\nconcurrency:\n%s+group: ([^\n]+)\n%s+cancel%-in%-progress: true")
   ok(group ~= nil, "the workflow has a concurrency group that cancels an older run")
 end

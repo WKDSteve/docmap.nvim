@@ -293,6 +293,21 @@ jobs:
           path: release-out
           merge-multiple: true
       - run: ls -la release-out
+      # SHA256SUMS (`<hash>  <file>`, one line per asset) so a consumer --
+      # docmap-desktop's engine-sidecar -- can check it got the file this run
+      # built. Computed from the downloaded artifacts, never from what is
+      # already on the release; written outside release-out first so the
+      # glob never lists the file itself, then moved in, where
+      # `release-out/*` below uploads it with the assets it describes.
+      - name: checksums of the assets
+        run: |
+          cd release-out
+          if [ -e SHA256SUMS ]; then echo "error: an artifact is named SHA256SUMS" >&2; exit 1; fi
+          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS"
+          cd ..
+          mv "$RUNNER_TEMP/SHA256SUMS" release-out/SHA256SUMS
+          (cd release-out && sha256sum -c SHA256SUMS)
+          cat release-out/SHA256SUMS
       - name: replace the rolling release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -301,5 +316,5 @@ jobs:
           gh release create standalone-latest release-out/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "Standalone engine (rolling build)" \
-            --notes "Built from $GITHUB_SHA by this repository's own release-engine.yml. Not a numbered release -- consumed by docmap-desktop's release.yml, which always downloads this exact tag." \
+            --notes "Built from $GITHUB_SHA by this repository's own release-engine.yml. Not a numbered release -- consumed by docmap-desktop's release.yml, which always downloads this exact tag. SHA256SUMS lists the sha256 of every other asset." \
             --prerelease

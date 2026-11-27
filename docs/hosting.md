@@ -19,6 +19,7 @@ a second host would have to hold to.
 - [The page talks to its host](#the-page-talks-to-its-host)
 - [The host asks the page](#the-host-asks-the-page)
 - [The artifact is the extension point](#the-artifact-is-the-extension-point)
+- [Getting the engine: `standalone-latest`](#getting-the-engine-standalone-latest)
 - [What a host must not assume](#what-a-host-must-not-assume)
 
 ---
@@ -485,6 +486,27 @@ something standing on it.
 
 Writing extensions are stage 3 and still open; both live in
 [`docmap-desktop`'s plan](https://github.com/WKDSteve/docmap-desktop).
+
+## Getting the engine: `standalone-latest`
+
+A host that does not build the engine itself downloads it from the GitHub
+release `standalone-latest`. It is rolling: every push to `main` that touches
+the engine rebuilds it, and the release is deleted and recreated rather than
+appended to, so its assets always come from one build.
+
+| Asset | What it is |
+|---|---|
+| `docmap-<triple>` (`.exe` on Windows) | The standalone engine, for `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc` and, once its build passed, `aarch64-apple-darwin`. |
+| `grammars-<triple>.tar.gz` | The tree-sitter grammars that engine loads. |
+| `SHA256SUMS` | One line `<sha256>  <file>` per other asset, computed from the files this build produced. |
+
+**Check what you downloaded against `SHA256SUMS`** before running it:
+in the directory you downloaded to,
+`grep '  docmap-x86_64-unknown-linux-gnu$' SHA256SUMS | sha256sum -c -`
+(macOS: `shasum -a 256 -c -` in its place), one line per file you took. A file that
+does not match came from another build or was damaged on the way; the
+release is replaced as a whole, so download `SHA256SUMS` in the same pass as
+the files it describes.
 
 ## What a host must not assume
 
