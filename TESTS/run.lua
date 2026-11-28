@@ -263,6 +263,7 @@ local specs = {
   "fleet_spec.lua",
   "fleet_cli_spec.lua",
   "fleet_report_args_spec.lua",
+  "gen_map_script_spec.lua",
   "annotate_spec.lua",
   "markers_spec.lua",
   "ts_parse_spec.lua",

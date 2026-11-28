@@ -23,11 +23,16 @@ vim.opt.runtimepath:prepend(root)
 ---
 --- Silent when the module already resolves, so a repository that *is* the
 --- dependency — this one, for `docmap` — needs no special case.
+---
+--- `optional`: a missing dependency is not fatal; the caller learns it from
+--- the return value and says what it skips.
 ---@param modname string A module the dependency provides, used as the probe.
 ---@param dirname string Repository directory name.
-local function ensure(modname, dirname)
+---@param optional? boolean
+---@return boolean found
+local function ensure(modname, dirname, optional)
   if pcall(require, modname) then
-    return
+    return true
   end
   -- Built with explicit indices, not a `{a, b, c}` literal fed to `ipairs`:
   -- the environment-variable candidate is `nil` whenever it is unset — the
@@ -47,9 +52,12 @@ local function ensure(modname, dirname)
     if vim.fn.isdirectory(dir) == 1 then
       vim.opt.runtimepath:prepend(dir)
       if pcall(require, modname) then
-        return
+        return true
       end
     end
+  end
+  if optional then
+    return false
   end
   io.stderr:write(("gen_map: %s not found (probed require('%s')).\n"):format(dirname, modname))
   io.stderr:write(
@@ -59,10 +67,15 @@ local function ensure(modname, dirname)
     )
   )
   os.exit(1)
+  return false
 end
 
 ensure("lib.nvim.fs.read", "lib.nvim")
 ensure("docmap.core.cli", "docmap.nvim")
+-- ui.nvim: only `docs/BINDINGS.md` needs it (the browse keys are declared
+-- next to its context menu). Found the same three ways; without it the map is
+-- still written and the page is skipped with a message.
+local has_ui = ensure("ui.contextmenu", "ui.nvim", true)
 
 --- Where `config.build`'s degradation warnings go in this host.
 ---
@@ -98,8 +111,6 @@ local opts = require("docmap.config").build(root, {
   -- `config/file.lua` for the split and docs/reuse.md for what to copy.
 }, notify)
 
-local code = require("docmap.core.cli").run(opts, _G.arg or {})
-
 -- `docs/BINDINGS.md`, generated from the same tables that drive the plugin.
 --
 -- Written here rather than by `cli.run` because it is *this repository's* own
@@ -108,6 +119,10 @@ local code = require("docmap.core.cli").run(opts, _G.arg or {})
 -- `:DocBrowse`'s keys — unlike `layers`, which moved to `.docmap.json`
 -- precisely because it *is* a fact about the tree that every host should
 -- get.
+--
+-- Written *before* the map: the map counts the links of the doc pages, so a
+-- BINDINGS.md written after it left the map one run behind (a changed binding
+-- needed two runs, and `--check` was red after the first).
 --
 -- Skipped under `--check`, which must write nothing — the hook and CI both run
 -- it that way, and a "verify" that rewrites a file is not a verify. A stale
@@ -122,15 +137,20 @@ for _, a in ipairs(_G.arg or {}) do
   end
 end
 
-if not checking then
+if not checking and not has_ui then
+  io.stderr:write(
+    "not writing docs/BINDINGS.md: ui.nvim not found (set UI_NVIM_DIR, clone it to .deps/ui.nvim, "
+      .. "or check it out beside this repo)\n"
+  )
+elseif not checking then
   local ok_bindings, rendered = pcall(function()
     return require("docmap.bindings.docs").render()
   end)
   if ok_bindings then
     -- The map is never written through a link, and neither is this: the same
     -- check `cli.run` makes of the map directory, asked before the file is
-    -- opened. A refusal is said and skipped rather than fatal -- the map above
-    -- is already written, and its exit code stands.
+    -- opened. A refusal is said and skipped rather than fatal -- the map is
+    -- still written below, and its exit code stands.
     local plain, refusal =
       require("docmap.core.safe_fs").check_output(opts.root, "docs", { "BINDINGS.md" })
     if not plain then
@@ -147,5 +167,7 @@ if not checking then
     io.stderr:write("could not render docs/BINDINGS.md: " .. tostring(rendered) .. "\n")
   end
 end
+
+local code = require("docmap.core.cli").run(opts, _G.arg or {})
 
 vim.cmd("cq " .. code)
