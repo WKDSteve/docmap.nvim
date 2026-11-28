@@ -15,26 +15,42 @@
 
 local M = {}
 
----Path fragments that mark built output. Tested against `/<path>`, so a top-level folder matches too.
+---Path fragments that always mark built output. Tested against `/<path>`, so a top-level folder matches too.
 ---@type string[]
 M.GENERATED = {
   "/dist[^/]*/",
-  "/build/",
-  "/out/",
   "/node_modules/",
-  "/target/",
-  "/vendor/",
   "/%.deps/",
   "%.min%.",
   -- a bundler's content hash: `index.web-CdijYthr.js`
   "%-[%w_%-][%w_%-][%w_%-][%w_%-][%w_%-][%w_%-][%w_%-][%w_%-]%.js$",
 }
 
+---Folder names that mark built output only outside a Lua source tree: a Lua plugin may well have a module
+---`lua/<x>/build/` or `lua/<x>/out/`, and that is code, not output. A path counts as Lua source when the node's
+---language is `lua` or the path has a `lua/` folder.
+---@type string[]
+M.GENERATED_OUTSIDE_SOURCE = {
+  "/build/",
+  "/out/",
+  "/target/",
+  "/vendor/",
+}
+
 ---@param path string?
+---@param language string? The node's language, when known.
 ---@return boolean
-function M.is_generated(path)
+function M.is_generated(path, language)
   local p = "/" .. (path or ""):gsub("\\", "/"):gsub("^%./", "")
   for _, pattern in ipairs(M.GENERATED) do
+    if p:find(pattern) then
+      return true
+    end
+  end
+  if language == "lua" or p:find("/lua/", 1, true) then
+    return false
+  end
+  for _, pattern in ipairs(M.GENERATED_OUTSIDE_SOURCE) do
     if p:find(pattern) then
       return true
     end
@@ -55,7 +71,7 @@ local function shapes_of(ir, with_generated)
     local node = ir.nodes[id]
     for _, fn in ipairs((node and node.functions) or {}) do
       if fn.shape and (fn.shape_size or 0) >= floor then
-        if not with_generated and M.is_generated(node.source or node.path or id) then
+        if not with_generated and M.is_generated(node.source or node.path or id, node.language) then
           dropped = dropped + 1
         else
           out[#out + 1] = {
@@ -92,7 +108,8 @@ function M.collect(name, ir, findings, opts)
     for _, g in ipairs(built.duplicates.groups) do
       local members = {}
       for _, m in ipairs(g.members) do
-        if not M.is_generated(m.node) then
+        local member = ir.nodes[m.node]
+        if not M.is_generated(m.node, member and member.language) then
           members[#members + 1] = m
         end
       end

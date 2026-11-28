@@ -527,9 +527,12 @@ nvim -n -i NONE --headless -u NONE -l scripts/fleet_report.lua --dir=E:/repos --
 and only `--include-private` lifts that. The list does not depend on `--skip`, so a mistyped skip pattern cannot let
 one in. A `<root>` named on the command line is read even when it matches, with a warning on stderr.
 
-Built output (`dist-*`, `build/`, `out/`, `node_modules/`, minified and content-hashed bundles) is left out by
-default: the library inside an app bundle is a copy of somebody else's code and would be the biggest "duplicate" of
-the fleet. Nothing is written into any repository. Progress goes to stderr, the report to stdout. Exit `0` when a
+Built output is left out by default: the library inside an app bundle is a copy of somebody else's code and would
+be the biggest "duplicate" of the fleet. `dist-*/`, `node_modules/`, `.deps/`, minified (`.min.`) and
+content-hashed bundles are always left out; `build/`, `out/`, `target/` and `vendor/` only outside a Lua source
+tree (a node whose language is Lua or a path with a `lua/` folder), since a Lua plugin may have a module of that
+name. (The scan itself does not descend into folders named exactly `build`, `out`, `target`, `vendor` or `dist`.)
+Nothing is written into any repository. Progress goes to stderr, the report to stdout. Exit `0` when a
 report was made, `1` when a repository could not be scanned (the others are still reported), `2` for wrong
 arguments. The same limits as the Duplicates tab apply: a shape ignores names and literals, one edited line breaks
 the match, and two functions can share a shape and nothing else, so a hit is a question for a person, not a

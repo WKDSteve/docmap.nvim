@@ -14,6 +14,15 @@ return function(H)
   ok(fleet.is_generated("static/app.min.js"), "a minified file is built output")
   ok(not fleet.is_generated("lua/demo/a.lua"), "a source file is not")
   ok(not fleet.is_generated("src/distance.lua"), "a name that merely starts with dist is not")
+  -- build/, out/, target/, vendor/ are built output only outside a Lua source tree.
+  ok(fleet.is_generated("ui/build/app.js"), "build/ outside Lua is built output")
+  ok(fleet.is_generated("target/debug/x.rs"), "target/ outside Lua is built output")
+  ok(fleet.is_generated("vendor/lib/x.go", "go"), "vendor/ in a Go tree is built output")
+  ok(not fleet.is_generated("lua/x/build/a.lua"), "lua/x/build is a module, not output")
+  ok(not fleet.is_generated("lua/x/out/init.lua"), "lua/x/out is a module, not output")
+  ok(not fleet.is_generated("plugin/build/a.lua", "lua"), "a Lua node under build/ is source")
+  ok(fleet.is_generated("lua/x/dist-web/a.js"), "dist-* is built output even below lua/")
+  ok(fleet.is_generated("lua/x/node_modules/y.js"), "node_modules is built output even below lua/")
 
   -- A function big enough (>= 40 tree nodes) to count; both repositories carry it under other names.
   local function body(name, local_a)
