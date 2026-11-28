@@ -52,7 +52,21 @@ return {
     -- /a:l ...` to list links. The guard judges a shell string by its first word, hence `set`.
     -- git_run_spec runs the standalone git runner, whose shell line starts `cd <root> && git ...`.
     -- standalone_telemetry_spec runs the standalone engine under a PUC Lua (lua, lua5.4, lua5.3).
-    spawn = { "git", "nvim", "node", "rm", "cmd", "uname", "set", "cd", "lua", "lua5.4", "lua5.3" },
+    -- release_script_spec runs scripts/check_dll_imports.sh with bash against a fake objdump.
+    spawn = {
+      "git",
+      "nvim",
+      "node",
+      "rm",
+      "cmd",
+      "uname",
+      "set",
+      "cd",
+      "lua",
+      "lua5.4",
+      "lua5.3",
+      "bash",
+    },
     -- Fixtures of the generate-all spec live below .deps/generate-all-*; the callhierarchy spec
     -- makes the runtime append to the Neovim LSP log in the state directory.
     -- Not listed: the telemetry store runtime-analysis.nvim writes below stdpath('state'). The

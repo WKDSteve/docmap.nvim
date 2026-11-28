@@ -191,6 +191,13 @@ fi
 mkdir -p "$work/grammars"
 GSUF="so"
 [ -n "$EXE_EXT" ] && GSUF="dll"
+# On Windows `tree-sitter build` compiles with MSVC (cl.exe), whose default /MD links the C runtime from
+# VCRUNTIME140.dll: part of the VC++ redistributable, not of Windows, so on a machine without it no grammar loads.
+# cl appends `_CL_` after its own arguments, so -MT (written with a dash: MSYS turns a leading / into a path) wins
+# over the /MD the CLI passes and links the runtime statically. scripts/check_dll_imports.sh checks the result below.
+if [ -n "$EXE_EXT" ]; then
+  export _CL_="${_CL_:+$_CL_ }-MT"
+fi
 git clone --quiet --depth 1 https://github.com/tree-sitter-grammars/tree-sitter-lua.git "$work/tree-sitter-lua"
 git clone --quiet --depth 1 https://github.com/tree-sitter/tree-sitter-javascript.git "$work/tree-sitter-javascript"
 git clone --quiet --depth 1 https://github.com/tree-sitter/tree-sitter-typescript.git "$work/tree-sitter-typescript"
@@ -335,6 +342,11 @@ if [ -n "${REQUIRE_CAPABILITIES:-}" ]; then
         ;;
     esac
   done
+fi
+
+if [ -n "$EXE_EXT" ]; then
+  echo "== grammar imports (KERNEL32 and the Universal CRT only)"
+  bash "$repo/scripts/check_dll_imports.sh" "$work/grammars"/*."$GSUF"
 fi
 
 echo "== staging release assets"

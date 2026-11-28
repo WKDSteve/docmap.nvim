@@ -54,4 +54,57 @@ return function(H)
       name .. " is a sha256"
     )
   end
+
+  -- The Windows grammars link the C runtime statically (no VCRUNTIME140.dll), and the build checks their imports.
+  local mt_at = text:find('export _CL_="${_CL_:+$_CL_ }-MT"', 1, true)
+  local first_build = text:find('"$TSC" build', 1, true)
+  ok(mt_at ~= nil, "the Windows grammar build passes -MT to cl through _CL_")
+  ok(mt_at and first_build and mt_at < first_build, "...before the first grammar is built")
+  ok(
+    text:find('bash "$repo/scripts/check_dll_imports.sh" "$work/grammars"/*."$GSUF"', 1, true)
+      ~= nil,
+    "the build checks the imports of every grammar"
+  )
+
+  -- scripts/check_dll_imports.sh against a fake objdump that prints the file it is given.
+  if vim.fn.executable("bash") ~= 1 then
+    print("n/a  check_dll_imports: no bash on PATH")
+    return
+  end
+  local dir = (vim.fn.tempname():gsub("\\", "/")) .. "-dll-imports"
+  vim.fn.mkdir(dir, "p")
+  H.write(dir .. "/objdump", { "#!/usr/bin/env bash", 'cat "$2"' })
+  H.write(dir .. "/static.dll", {
+    "The Import Tables",
+    "\tDLL Name: KERNEL32.dll",
+    "\tDLL Name: api-ms-win-crt-heap-l1-1-0.dll",
+  })
+  H.write(dir .. "/dynamic.dll", {
+    "\tDLL Name: KERNEL32.dll",
+    "\tDLL Name: VCRUNTIME140.dll",
+  })
+  local script = vim.fs.dirname(here) .. "/scripts/check_dll_imports.sh"
+  ---@param files string[]
+  ---@return integer code
+  ---@return string stderr
+  local function check(files)
+    local cmd = { "bash", script }
+    for _, file in ipairs(files) do
+      cmd[#cmd + 1] = dir .. "/" .. file
+    end
+    local r = vim.system(cmd, { env = { OBJDUMP = dir .. "/objdump" }, text = true }):wait(30000)
+    return r.code, r.stderr or ""
+  end
+  local code = check({ "static.dll" })
+  H.eq(code, 0, "check_dll_imports: KERNEL32 and the UCRT API sets pass")
+  local stderr
+  code, stderr = check({ "static.dll", "dynamic.dll" })
+  H.eq(code, 1, "check_dll_imports: VCRUNTIME140.dll fails the check")
+  ok(
+    stderr:find("dynamic.dll imports VCRUNTIME140.dll", 1, true) ~= nil,
+    "...and names file and DLL"
+  )
+  code = check({})
+  H.eq(code, 2, "check_dll_imports: no file is a usage error")
+  vim.fn.delete(dir, "rf")
 end
