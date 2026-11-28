@@ -406,7 +406,7 @@ end
 ---target and a call to either draws the same edge. Telling them apart would need the argument types.
 ---@param root TSNode
 ---@param src string
----@param ranges { name: string, srow: integer, erow: integer }[]
+---@param ranges { name: string, srow: integer, erow: integer, namespace: string? }[]
 ---@param grammar string
 ---@return Docmap.RawCall[]
 local function extract_calls(root, src, ranges, grammar)
@@ -424,14 +424,15 @@ local function extract_calls(root, src, ranges, grammar)
       local srow = node:range()
       local callee = vim.treesitter.get_node_text(node, src)
       if not callee:find("\n") then
-        local from_fn
+        local from_fn, namespace
         for _, r in ipairs(ranges) do
           if srow >= r.srow and srow <= r.erow then
-            from_fn = r.name
+            from_fn, namespace = r.name, r.namespace
             break
           end
         end
-        out[#out + 1] = { callee = callee, from_fn = from_fn, line = srow + 1 }
+        out[#out + 1] =
+          { callee = callee, from_fn = from_fn, line = srow + 1, namespace = namespace }
       end
     end
   end
@@ -554,6 +555,11 @@ function M.backend(name, grammar, extensions, roots)
     local blocks = doc_blocks(root, src)
     local fns, requires, symbols = {}, {}, {}
 
+    ---The C++ namespace currently being walked into (`a::b` for nested ones), tracked like `owner` below. A function
+    ---declared inside `namespace config { }` is named `mutate`, and only this tells `config::mutate(...)` where it is.
+    ---@type string?
+    local namespace = nil
+
     ---@param node TSNode the declaration or definition
     ---@param decl TSNode the `function_declarator` inside it
     ---@param internal boolean
@@ -590,6 +596,7 @@ function M.backend(name, grammar, extensions, roots)
         -- header, are owned.
         owner = owner,
         owner_kind = owner and owner_kind or nil,
+        namespace = namespace,
         see = parsed.see,
         overload = {},
         todo = parsed.todo,
@@ -789,6 +796,21 @@ function M.backend(name, grammar, extensions, roots)
           )
         end
         return
+      elseif kind == "namespace_definition" then
+        -- `namespace a { }`, `namespace a::b { }` (C++17) and an anonymous `namespace { }`, which adds no segment: its
+        -- names are reached unqualified from the rest of the file.
+        local outer = namespace
+        local name_node = child_of(node, "namespace_identifier")
+          or child_of(node, "nested_namespace_specifier")
+        if name_node then
+          local segment = text_of(name_node, src):gsub("%s+", "")
+          namespace = namespace and (namespace .. "::" .. segment) or segment
+        end
+        for child in node:iter_children() do
+          walk(child)
+        end
+        namespace = outer
+        return
       elseif kind == "class_specifier" or kind == "struct_specifier" then
         local outer, outer_owner, outer_kind = access, owner, owner_kind
         access = kind == "class_specifier" and "private" or "public"
@@ -817,7 +839,8 @@ function M.backend(name, grammar, extensions, roots)
     -- `fns` already carry the span, 1-based; the extractor wants 0-based rows.
     local ranges = {}
     for _, fn in ipairs(fns) do
-      ranges[#ranges + 1] = { name = fn.name, srow = fn.line - 1, erow = fn.line_end - 1 }
+      ranges[#ranges + 1] =
+        { name = fn.name, srow = fn.line - 1, erow = fn.line_end - 1, namespace = fn.namespace }
     end
 
     return fns, extract_calls(root, src, ranges, grammar), requires, symbols, {}, {}, lines, {}

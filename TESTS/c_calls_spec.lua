@@ -85,4 +85,32 @@ return function(H)
     not edges["./app.cpp#main_app>./shape.hpp#area"],
     "c_calls: overloads are one target: no second edge, none to the prototype"
   )
+
+  -- Qualified C++ calls (`TESTS/fixtures/ccalls_ns`), worked out by hand:
+  --   user.cpp use_all -> cfg.cpp mutate      (`cfg::mutate`, declared inside `namespace cfg`)
+  --   user.cpp use_all -> cfg.cpp deep        (`::cfg::inner::deep`, a nested namespace, from the global one)
+  --   user.cpp use_all -> outline.cpp out::ol (`out::ol`, defined out of line as `int out::ol`)
+  --   user.cpp local_call -> cfg.cpp deep     (`inner::deep` written inside `namespace cfg`)
+  -- `std::max` is outside the tree: no edge.                                                         = 4 edges
+  local ns_root = (vim.fn.getcwd():gsub("\\", "/")) .. "/TESTS/fixtures/ccalls_ns"
+  local ns_ir = require("docmap.core.scan").scan(
+    require("docmap.config").build(ns_root, { calls_heuristic = false })
+  )
+  local ns_edges, ns_count = {}, 0
+  for _, e in ipairs(ns_ir.edges or {}) do
+    if e.kind == "call" then
+      ns_count = ns_count + 1
+      ns_edges[e.from .. "#" .. e.from_fn .. ">" .. e.to .. "#" .. e.to_fn] = e
+    end
+  end
+  eq(ns_count, 4, "c_calls ns: four qualified edges, no more")
+  for _, key in ipairs({
+    "./user.cpp#use_all>./cfg.cpp#mutate",
+    "./user.cpp#use_all>./cfg.cpp#deep",
+    "./user.cpp#use_all>./outline.cpp#out::ol",
+    "./user.cpp#local_call>./cfg.cpp#deep",
+  }) do
+    ok(ns_edges[key], "c_calls ns: " .. key)
+    eq(ns_edges[key] and ns_edges[key].confidence, "exact", "c_calls ns: exact, " .. key)
+  end
 end

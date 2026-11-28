@@ -3823,3 +3823,17 @@ its web page could not ask for Trusted Types.
 - **Check:** `TESTS/trusted_types_spec.lua` (no sink in the script source) and `TESTS/browser/trusted_types_check.js`
   (Chromium under the header, every tab, view, menu and popup; a violation, console error or page error fails; skips
   without node, playwright or chromium). The page before this change fails it with the `innerHTML` violation.
+
+## C++: qualified calls resolve through namespaces (2026-11-28)
+
+`ns::f(x)` was a call site since the C/C++ call edges, but nothing resolved it: a function declared inside
+`namespace ns { }` is named `f`, and the `::` branch of `core/calls.lua` only knew Rust's module paths. Measured on a
+real C++ tree, every one of the 14 missing edges of a file was such a call (recall 52 %). Now the backend records the
+enclosing namespace (`FunctionInfo.namespace`, `a::b` for nested ones, nothing for an anonymous one) and each call's
+own, and a qualified call is looked up as `<caller's namespace>::<callee>` from the innermost namespace outwards (a
+leading `::` means the global one only): in the calling file, then through its includes to the definition in the
+header's own source, as for a bare name; with `calls_heuristic` also the one source file in the tree that defines it.
+An out-of-line `int ns::f() {}` is found under its declared name. `obj.m()` stays no call site.
+
+- **Modules:** `core/lang/cfamily.lua` (`namespace_definition`), `core/calls.lua` (`resolve_qualified`), `@types`
+- **Tests:** `c_calls_spec` (`TESTS/fixtures/ccalls_ns`: four qualified edges counted by hand, `std::max` none)

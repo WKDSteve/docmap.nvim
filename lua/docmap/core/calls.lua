@@ -335,6 +335,26 @@ function M.build(ir, opts)
     index[id] = { by_name = by_name, prefixes = prefixes, receiver_only = receiver }
   end
 
+  -- C++: every function under the name a qualified call spells it, `ns::name` for one declared inside
+  -- `namespace ns { }` (`fn.namespace`) and the declared name itself for an out-of-line `void ns::name() {}`.
+  -- Per node, and per name the nodes that hold it, for the tree-wide fallback.
+  local qualified = {} ---@type table<string, table<string, string>>
+  local qualified_nodes = {} ---@type table<string, string[]>
+  for _, id in ipairs(ir.order) do
+    for _, fn in ipairs(ir.nodes[id].functions) do
+      local key = fn.namespace and (fn.namespace .. "::" .. fn.name) or fn.name
+      if key:find("::", 1, true) then
+        qualified[id] = qualified[id] or {}
+        if not qualified[id][key] then
+          qualified[id][key] = fn.name
+          local list = qualified_nodes[key] or {}
+          list[#list + 1] = id
+          qualified_nodes[key] = list
+        end
+      end
+    end
+  end
+
   -- Only built when the heuristic is on: a bare name is a usable hint exactly
   -- when the whole tree declares it once. Names owned by two modules are
   -- ambiguous, and an ambiguous guess is the failure mode this whole flag is
@@ -390,6 +410,81 @@ function M.build(ir, opts)
       end
     end
     return nil
+  end
+
+  local SOURCE_EXTS = { "c", "cc", "cpp", "cxx", "c++" }
+  local SOURCE_EXT = {}
+  for _, ext in ipairs(SOURCE_EXTS) do
+    SOURCE_EXT[ext] = true
+  end
+
+  ---Is this node a C/C++ source file rather than a header?
+  ---@param node_id string
+  ---@return boolean
+  local function is_source_file(node_id)
+    local ext = (ir.nodes[node_id].path or ""):match("%.([%w+]+)$")
+    return ext ~= nil and SOURCE_EXT[ext:lower()] == true
+  end
+
+  ---A qualified C++ call `ns::f(...)`: the names it can mean, innermost first. Written inside `namespace a`, `b::f`
+  ---is `a::b::f` before it is `b::f`; a leading `::` means the global one only.
+  ---@param callee string
+  ---@param namespace string?
+  ---@return string[]
+  local function qualified_keys(callee, namespace)
+    if callee:sub(1, 2) == "::" then
+      return { callee:sub(3) }
+    end
+    local keys = {}
+    local ns = namespace
+    while ns and ns ~= "" do
+      keys[#keys + 1] = ns .. "::" .. callee
+      ns = ns:match("^(.*)::[^:]+$")
+    end
+    keys[#keys + 1] = callee
+    return keys
+  end
+
+  ---Resolve a qualified C++ call: this file first, then the headers it includes (to the definition in the header's own
+  ---source when there is one, as for a bare name), then, with the heuristic on, the one source file in the tree that
+  ---defines the name.
+  ---@param id string
+  ---@param call Docmap.RawCall
+  ---@param included string[]
+  ---@return string? to_id
+  ---@return string? to_fn
+  ---@return Docmap.Confidence? confidence
+  local function resolve_qualified(id, call, included)
+    for _, key in ipairs(qualified_keys(call.callee, call.namespace)) do
+      if qualified[id] and qualified[id][key] then
+        return id, qualified[id][key], "exact"
+      end
+      for _, header in ipairs(included) do
+        if qualified[header] and qualified[header][key] then
+          local path = ir.nodes[header].path
+          local stem = path and path:match("^(.*)%.[%w+]+$")
+          for _, ext in ipairs(SOURCE_EXTS) do
+            local body = stem and by_path[stem .. "." .. ext]
+            if body and body ~= header and qualified[body] and qualified[body][key] then
+              return body, qualified[body][key], "exact"
+            end
+          end
+          return header, qualified[header][key], "exact"
+        end
+      end
+      if opts.calls_heuristic and qualified_nodes[key] then
+        local sources = {}
+        for _, holder in ipairs(qualified_nodes[key]) do
+          if is_source_file(holder) then
+            sources[#sources + 1] = holder
+          end
+        end
+        if #sources == 1 then
+          return sources[1], qualified[sources[1]][key], "heuristic"
+        end
+      end
+    end
+    return nil, nil, nil
   end
 
   local edges = {}
@@ -524,6 +619,10 @@ function M.build(ir, opts)
               to_id = to_fn and target or nil
               confidence = "exact"
             end
+          end
+          -- C++ (`ns::f`, `::f`, `Thing::go`): no module path to anchor it, but a namespace and the includes.
+          if not to_id and include_resolved then
+            to_id, to_fn, confidence = resolve_qualified(id, call, included)
           end
         elseif call.callee:match("^[%w_]+$") then
           -- A bare name is a file-local function first, then a named import,
