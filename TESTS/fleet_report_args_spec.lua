@@ -33,11 +33,12 @@ return function(H)
   vim.fn.mkdir(base .. "/nogit/lua", "p")
 
   ---@param args string[]
+  ---@param cwd? string
   ---@return { code: integer, stdout: string, stderr: string }
-  local function run(args)
+  local function run(args, cwd)
     local cmd = { vim.v.progpath, "-n", "-i", "NONE", "--headless", "-u", "NONE", "-l", script }
     vim.list_extend(cmd, args)
-    local r = vim.system(cmd, { text = true }):wait(120000)
+    local r = vim.system(cmd, { text = true, cwd = cwd }):wait(120000)
     return { code = r.code, stdout = r.stdout or "", stderr = r.stderr or "" }
   end
 
@@ -97,6 +98,29 @@ return function(H)
       r.stderr:find("warning:", 1, true) ~= nil,
       "a named private root warns on stderr\n" .. r.stderr
     )
+  end
+
+  -- `.` inside a private repository is that repository: read, with the warning.
+  do
+    local r = run({ ".", "--json" }, base .. "/" .. private_name)
+    eq(r.code, 0, "`.` in a private root: exit 0\n" .. r.stderr)
+    ok(
+      r.stderr:find("warning:", 1, true) ~= nil,
+      "`.` in a private root warns on stderr\n" .. r.stderr
+    )
+  end
+
+  -- The parent folder named as a root (`--dir=` forgotten) would read the private one inside it unasked: refused.
+  do
+    local r = run({ base, "--json" })
+    eq(r.code, 2, "a root holding a private repository: exit 2\n" .. r.stderr)
+    ok(not r.stdout:find("zz%-"), "a root holding a private repository: nothing of it reported")
+    ok(
+      r.stderr:find(private_name, 1, true) ~= nil,
+      "the refusal names the private folder\n" .. r.stderr
+    )
+    local lifted = run({ base, "--include-private", "--json" })
+    eq(lifted.code, 0, "--include-private lifts it\n" .. lifted.stderr)
   end
 
   -- Wrong arguments exit 2; `--top` wants a positive number.

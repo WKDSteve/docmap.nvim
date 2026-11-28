@@ -14,7 +14,8 @@
 ---   --top=<n>           rows per table (default 25)
 ---   --with-generated    keep built output (`dist-*`, bundles, `node_modules`), left out by default
 ---
---- A `<root>` named on the command line is read even when it matches the private list, with a warning on stderr.
+--- A `<root>` named on the command line is read even when it matches the private list, with a warning on stderr. A
+--- `<root>` that is no repository itself but holds a private one is refused (exit 2) without `--include-private`.
 ---
 --- Reads every repository and writes nothing into any of them. Progress goes to stderr, the report to stdout.
 --- Exit 0 when a report was made, 1 when at least one repository could not be scanned (the report still lists the
@@ -95,9 +96,13 @@ end
 
 local fleet = require("docmap.core.fleet")
 
--- A root named on the command line was asked for: read, but say so when its name looks private.
+-- A root named on the command line was asked for: read, but say so when its name looks private. Its name is the one
+-- of the resolved folder (`.` in a private repository is that repository). A root that is no repository itself but
+-- holds a private one (the parent folder named without `--dir=`) would read it unasked, since the scan walks into
+-- nested checkouts: refused unless `--include-private`.
 for _, root in ipairs(roots) do
-  local private = fleet.private_match(root)
+  local real = vim.uv.fs_realpath(root) or root
+  local private = fleet.private_match(real)
   if private then
     io.stderr:write(
       ("fleet_report: warning: %s looks like a private repository (its name matches %q); read because it was named\n"):format(
@@ -105,6 +110,25 @@ for _, root in ipairs(roots) do
         private
       )
     )
+  elseif
+    not include_private
+    and vim.fn.isdirectory(real) == 1
+    and not vim.uv.fs_stat(real .. "/.git")
+  then
+    for name, kind in vim.fs.dir(real) do
+      local held = kind == "directory"
+        and vim.uv.fs_stat(real .. "/" .. name .. "/.git")
+        and fleet.private_match(name)
+      if held then
+        usage(
+          ("%s holds the private repository %s (its name matches %q): name it as a root, use --dir=, or pass --include-private"):format(
+            root,
+            name,
+            held
+          )
+        )
+      end
+    end
   end
 end
 
