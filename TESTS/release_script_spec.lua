@@ -74,6 +74,8 @@ return function(H)
   local dir = (vim.fn.tempname():gsub("\\", "/")) .. "-dll-imports"
   vim.fn.mkdir(dir, "p")
   H.write(dir .. "/objdump", { "#!/usr/bin/env bash", 'cat "$2"' })
+  -- the script runs it directly: on Linux and macOS it needs the executable bit
+  assert(vim.uv.fs_chmod(dir .. "/objdump", tonumber("755", 8)))
   H.write(dir .. "/static.dll", {
     "The Import Tables",
     "\tDLL Name: KERNEL32.dll",
