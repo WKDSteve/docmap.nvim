@@ -15,7 +15,7 @@
 -- through `telemetry.load()`) only runs when a real checkout is reachable.
 
 return function(H)
-  H.with_restore({ groups = { "ra_telemetry_" } }, function()
+  H.with_restore({ groups = { "ra_telemetry_" }, telemetry_store = true }, function()
     local eq, ok = H.eq, H.ok
     local telemetry_self = require("docmap.core.telemetry_self")
 
@@ -42,7 +42,8 @@ return function(H)
       -- Real runtime-analysis.nvim on the rtp (RUNTIME_ANALYSIS_DIR).
       local telemetry = require("runtime-analysis.telemetry")
       local store = require("runtime-analysis.telemetry.store")
-      -- The store's own default dir (stdpath("state")), the one `setup` flushes to.
+      -- The store's default dir, the one `setup` flushes to: a temp dir for
+      -- this spec (`telemetry_store = true` above, H.telemetry_store).
       local cache_dir = require("runtime-analysis.telemetry.paths").DIR
 
       -- The namespace is docmap's own, whatever tree is mapped: `title` is the

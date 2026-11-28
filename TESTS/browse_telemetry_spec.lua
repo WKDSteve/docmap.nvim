@@ -11,7 +11,7 @@
 -- (`RUNTIME_ANALYSIS_DIR`, wired the same way in TESTS/run.lua).
 
 return function(H)
-  H.with_restore({ groups = { "ra_telemetry_" } }, function()
+  H.with_restore({ groups = { "ra_telemetry_" }, telemetry_store = true }, function()
     local fmsg = require("docmap.core.findings").format
     local eq, ok = H.eq, H.ok
     local check = require("docmap.core.check")
@@ -295,7 +295,8 @@ return function(H)
       -- No `dir` override on the instances below: `telemetry_join.load` (like
       -- the real `:DocMap check`/`:DocBrowse telemetry` it backs) always reads
       -- `telemetry.load(namespace)` with no live instance and no dir override,
-      -- so this has to flush to the same real default store dir to be found
+      -- so this has to flush to the same default store dir to be found (here a
+      -- temp dir: `telemetry_store = true` above points `paths.DIR` there)
       -- at all. `store.clear` itself does *not* default to that dir the way
       -- `telemetry.new`/`telemetry.load` do — it is a thin forward straight to
       -- `lib.nvim.cache.disk`, whose own default differs — so the dir has to

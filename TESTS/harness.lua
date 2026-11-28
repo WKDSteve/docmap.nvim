@@ -316,18 +316,49 @@ function H.restore(snap, opts)
   end
 end
 
+--- Point runtime-analysis.nvim's telemetry store at a fresh temp directory
+--- until the returned function is called, which restores it and removes the
+--- directory. A no-op when runtime-analysis.nvim is not on the rtp.
+---
+--- The store's default is `stdpath("state")/runtime-analysis.nvim`, which is
+--- only a temp directory when the runner sets `XDG_STATE_HOME` to one
+--- (`scripts/test.sh` does). Run any other way, a telemetry spec wrote into
+--- the developer's real store and the fs guard failed it. `LEGACY_DIRS` is
+--- emptied too: the first `paths.dir()` of a process moves data out of the
+--- legacy cache folders, and must not move real data into a directory the
+--- spec deletes afterwards.
+---@return fun() undo
+function H.telemetry_store()
+  local ok, paths = pcall(require, "runtime-analysis.telemetry.paths")
+  if not ok or type(paths) ~= "table" then
+    return function() end
+  end
+  local dir, legacy = paths.DIR, paths.LEGACY_DIRS
+  local tmp = (vim.fn.tempname():gsub("\\", "/")) .. "-telemetry-store"
+  vim.fn.mkdir(tmp, "p")
+  paths.DIR, paths.LEGACY_DIRS = tmp, {}
+  return function()
+    paths.DIR, paths.LEGACY_DIRS = dir, legacy
+    vim.fn.delete(tmp, "rf")
+  end
+end
+
 --- Run a spec body between `H.snapshot(opts)` and its cleanup, and clean up
 --- even when the body raises: a failing spec must not leave its state to the
 --- specs after it (they share one editor), where the state guard would blame
 --- them. The body's error is raised again after the cleanup.
 --- `opts.wipe_only` cleans up with `H.wipe_new` alone (for a spec whose
 --- commands and autocmds are meant to outlive it); otherwise `H.restore`.
----@param opts? { groups?: string[], events?: string[], vars?: string[], wipe_only?: boolean }
+--- `opts.telemetry_store` points runtime-analysis.nvim's telemetry store at a
+--- fresh temp directory for the body (see `H.telemetry_store`).
+---@param opts? { groups?: string[], events?: string[], vars?: string[], wipe_only?: boolean, telemetry_store?: boolean }
 ---@param body fun(snap: table)
 function H.with_restore(opts, body)
   opts = opts or {}
   local snap = H.snapshot(opts)
+  local undo = opts.telemetry_store and H.telemetry_store() or function() end
   local ok, err = pcall(body, snap)
+  undo()
   if opts.wipe_only then
     H.wipe_new(snap)
   else

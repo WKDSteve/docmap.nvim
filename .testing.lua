@@ -55,9 +55,9 @@ return {
     spawn = { "git", "nvim", "node", "rm", "cmd", "uname", "set", "cd", "lua", "lua5.4", "lua5.3" },
     -- Fixtures of the generate-all spec live below .deps/generate-all-*; the callhierarchy spec
     -- makes the runtime append to the Neovim LSP log in the state directory.
-    -- Not listed: the telemetry store runtime-analysis.nvim writes below stdpath('state') (since
-    -- runtime-analysis f15930a). scripts/test.sh points XDG_STATE_HOME at its mktemp scratch
-    -- directory, which the fs guard allows as temp; measured with --guard fs=error, no finding.
+    -- Not listed: the telemetry store runtime-analysis.nvim writes below stdpath('state'). The
+    -- telemetry specs point it at a temp directory of their own (H.telemetry_store in
+    -- TESTS/harness.lua), so they pass however XDG_STATE_HOME is set.
     fs = {
       ".deps",
       vim.fn.stdpath("state") .. "/lsp.log",
