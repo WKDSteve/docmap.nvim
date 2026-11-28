@@ -446,6 +446,48 @@ for _, l in ipairs(libargs) do
 end
 cc_parts[#cc_parts + 1] = "-Iluainc"
 cc_parts[#cc_parts + 1] = "-lm"
+
+-- Windows: a manifest that makes UTF-8 the process's ANSI code page (Windows 10 1903+). PUC Lua and lfs call the
+-- narrow CRT functions (`main`'s argv, `fopen`, `_chdir`, `_getcwd`), which speak the ANSI code page: a project path
+-- with a character outside it (a CJK user name under a Western code page) arrived as `?`, could not be opened, and a
+-- `chdir` into it failed. With the manifest the same functions take and give UTF-8, which is what every path inside
+-- the engine already is. `$WINDRES` overrides the resource compiler (default: `windres` beside a `*gcc` `$CC`).
+if WINDOWS then
+  local manifest = io.open("docmap.manifest", "wb")
+  if not manifest then
+    lfs.chdir(cwd)
+    die("cannot write docmap.manifest")
+  end
+  manifest:write(table.concat({
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">',
+    '  <application xmlns="urn:schemas-microsoft-com:asm.v3">',
+    "    <windowsSettings>",
+    '      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>',
+    "    </windowsSettings>",
+    "  </application>",
+    "</assembly>",
+    "",
+  }, "\n"))
+  manifest:close()
+  local rc = io.open("docmap.rc", "wb")
+  if not rc then
+    lfs.chdir(cwd)
+    die("cannot write docmap.rc")
+  end
+  -- 1 = CREATEPROCESS_MANIFEST_RESOURCE_ID, 24 = RT_MANIFEST
+  rc:write('1 24 "docmap.manifest"\n')
+  rc:close()
+  local windres = os.getenv("WINDRES")
+  if not windres or windres == "" then
+    windres = CC:match("gcc$") and (CC:gsub("gcc$", "windres")) or "windres"
+  end
+  sh(
+    cmdline({ quoted(windres), "docmap.rc", "-O", "coff", "-o", "docmap.res.o" }),
+    "compiling the manifest (docmap.rc)"
+  )
+  cc_parts[#cc_parts + 1] = "docmap.res.o"
+end
 sh(cmdline(cc_parts), "compiling " .. generated)
 
 local bin = io.open(build_out, "rb")

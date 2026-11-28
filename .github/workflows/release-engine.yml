@@ -229,6 +229,30 @@ jobs:
           if ($code -ne 0) { throw "docmap.exe exited with $code outside msys2" }
           if ("$caps" -notmatch '"rules-agent"') { throw "unexpected --capabilities output: $caps" }
           Write-Output "capabilities outside msys2: $caps"
+      # A project path outside the ANSI code page (scripts/package.lua embeds a manifest that makes UTF-8 the
+      # process code page): without it argv arrives with `?` for the character and the root cannot be read. Once
+      # as an argument, once as the working directory (lfs.currentdir).
+      - name: standalone .exe with a non-ANSI project path
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path release-out/docmap-x86_64-pc-windows-msvc.exe).Path
+          $root = Join-Path $env:RUNNER_TEMP ("probe-" + [char]0x4E2D + "-root")
+          New-Item -ItemType Directory -Force (Join-Path $root 'lua/demo') | Out-Null
+          Set-Content -Encoding utf8NoBOM -Path (Join-Path $root 'lua/demo/init.lua') -Value @(
+            "---@module 'demo'", "--- A demo module.", "local M = {}", "return M")
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          & $exe $root --source=lua/demo
+          if ($LASTEXITCODE -ne 0) { throw "docmap.exe <root> exited with $LASTEXITCODE for $root" }
+          $map = Join-Path $root 'docs/map/module_map.json'
+          if (-not (Select-String -Quiet -Path $map -Pattern '"demo"')) { throw "no map for the demo module in $map" }
+          Remove-Item -Recurse -Force (Join-Path $root 'docs')
+          Push-Location $root
+          & $exe . --source=lua/demo
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { throw "docmap.exe . exited with $code in $root" }
+          if (-not (Test-Path $map)) { throw "no map written from the working directory $root" }
+          Write-Output "map written under $root"
       - uses: actions/upload-artifact@v7
         with:
           name: engine-windows
