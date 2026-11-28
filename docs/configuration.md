@@ -110,6 +110,11 @@ A `.docmap.json` at the repository root is read by every one of them:
 }
 ```
 
+`exclude` takes repository-relative paths, written with or without a leading
+`./` (`src/generated` and `./src/generated` are the same entry). An entry is a
+path, not a glob: it excludes that file, or that directory and everything
+under it; `src/gen` does not match `src/generated`.
+
 `layers` feeds two things: the `layer-violation` check, and the **Layers**
 view of the page's Hierarchy, which draws the tree in the bands the rules
 imply and every require that breaks one as a red arrow (see

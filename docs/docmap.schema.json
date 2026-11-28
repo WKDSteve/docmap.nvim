@@ -13,7 +13,7 @@
       "anyOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
     },
     "exclude": {
-      "description": "Repository-relative paths the walk does not descend into. Not a glob language: a path prefix.",
+      "description": "Repository-relative paths the walk does not descend into, such as \"src/generated\"; a leading \"./\" is optional and matches the same path. Not a glob language: a path or a path prefix ending at a separator.",
       "type": "array",
       "items": { "type": "string" }
     },

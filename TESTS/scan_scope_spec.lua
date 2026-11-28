@@ -119,6 +119,48 @@ return function(H)
     eq((ir.meta.unclaimed or {}).rb, nil, "an excluded extension is not counted as unreadable")
   end
 
+  -- A leading `./` is not part of the path, on either side. Under the
+  -- source root `.` the walk builds `./ui/x.ts`; the entry `ui/x.ts` used to
+  -- match nothing there, silently.
+  do
+    ---@param ir Docmap.IR
+    ---@param suffix string
+    ---@return boolean
+    local function has_suffix(ir, suffix)
+      for id in pairs(ir.nodes) do
+        if id == suffix or id:sub(-#suffix - 1) == "/" .. suffix then
+          return true
+        end
+      end
+      return false
+    end
+
+    local files = {
+      ["ui/keep.ts"] = JS,
+      ["ui/x.ts"] = JS,
+      ["lua/app/init.lua"] = LUA,
+      ["lua/app/drop.lua"] = LUA,
+    }
+    for _, case in ipairs({
+      { source = ".", entry = "ui/x.ts" },
+      { source = ".", entry = "./ui/x.ts" },
+      { source = "ui", entry = "./ui/x.ts" },
+      { source = "ui", entry = "ui/x.ts" },
+    }) do
+      local ir = scanned(files, { source = case.source, exclude = { case.entry } })
+      local what = ("source %q, exclude %q"):format(case.source, case.entry)
+      ok(has_suffix(ir, "ui/keep.ts"), what .. ": the sibling is still scanned")
+      ok(not has_suffix(ir, "ui/x.ts"), what .. ": the named file is excluded")
+    end
+
+    -- A directory, both ways, under the root `.`.
+    for _, entry in ipairs({ "lua/app", "./lua/app/" }) do
+      local ir = scanned(files, { source = ".", exclude = { entry } })
+      ok(not has_suffix(ir, "lua/app/drop.lua"), ("exclude %q drops the directory"):format(entry))
+      ok(has_suffix(ir, "ui/keep.ts"), ("exclude %q keeps the rest"):format(entry))
+    end
+  end
+
   -- No exclude is the same tree as before the option existed.
   do
     local files = {

@@ -381,9 +381,20 @@ function M.scan(opts)
   -- `src/generated` — the separator is required, which is the difference
   -- between excluding what was named and excluding whatever happens to
   -- start with the same letters.
+  --
+  -- A leading `./` is not part of the path, on either side: a walk from the
+  -- source root `.` builds `./ui/x.ts`, a walk from `ui` builds `ui/x.ts`,
+  -- and an entry is the same path written either way. Without stripping
+  -- both, `ui/x.ts` silently matched nothing under the root `.`.
+  ---@param p string
+  ---@return string
+  local function undot(p)
+    return (p:gsub("^%./+", ""))
+  end
+
   local exclude = {}
   for _, entry in ipairs(opts.exclude or {}) do
-    local norm = chomp(slash(entry))
+    local norm = undot(chomp(slash(entry)))
     if norm ~= "" then
       exclude[#exclude + 1] = norm
     end
@@ -392,6 +403,7 @@ function M.scan(opts)
   ---@param rel string Repository-relative path, forward-slashed.
   ---@return boolean
   local function excluded(rel)
+    rel = undot(rel)
     for _, entry in ipairs(exclude) do
       if rel == entry or rel:sub(1, #entry + 1) == entry .. "/" then
         return true
