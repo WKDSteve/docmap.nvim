@@ -1055,7 +1055,12 @@ return function(H)
       local haystack = help:lower()
       for _, m in ipairs(vim.api.nvim_buf_get_keymap(q_buf, "n")) do
         local lhs = (vim.fn.keytrans(m.lhs):gsub("<lt>", "<"))
-        if haystack:find(lhs:lower(), 1, true) == nil then
+        -- A double/triple/quadruple click (`<2-RightMouse>`) is the documented
+        -- single click done again quickly on the same cell; lib.nvim's
+        -- contextmenu binds them with `<RightMouse>` (lib.nvim@c0fd2dd), so the
+        -- panel naming the single click documents them.
+        local single = lhs:gsub("^<%d%-(.-Mouse)>$", "<%1>")
+        if haystack:find(single:lower(), 1, true) == nil then
           undocumented[#undocumented + 1] = lhs
         end
       end
@@ -1139,7 +1144,9 @@ return function(H)
         local khay = ktext:lower()
         for _, m in ipairs(vim.api.nvim_buf_get_keymap(k_buf or 0, "n")) do
           local lhs = (vim.fn.keytrans(m.lhs):gsub("<lt>", "<"))
-          if khay:find(lhs:lower(), 1, true) == nil then
+          -- a repeated click counts as its documented single click (see above)
+          local single = lhs:gsub("^<%d%-(.-Mouse)>$", "<%1>")
+          if khay:find(single:lower(), 1, true) == nil then
             missing[#missing + 1] = lhs
           end
         end
