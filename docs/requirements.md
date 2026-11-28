@@ -13,7 +13,6 @@ Optional, each detected at runtime and degrading to nothing when absent:
 | `git` | The History tab, `:DocMap diff` and `:DocMap churn` |
 | [runtime-analysis.nvim](https://github.com/WKDSteve/runtime-analysis.nvim) | The Telemetry and Loaded tabs |
 | [pdfport.nvim](https://github.com/WKDSteve/pdfport.nvim) | `opts.pdf` — `overview.md` rendered to PDF |
-| [nvzone/menu](https://github.com/nvzone/menu) | A host for the context-menu entries — see [integrations.md](integrations.md) |
 | [ui.nvim](https://github.com/WKDSteve/ui.nvim) | `ui.kit`/`ui.contextmenu` back `:DocBrowse` (the editor-side map navigator) and its picker/context menu -- lazily required, so nothing on the generate/check path needs it |
 
 The full list of declared external tools, including how `lib.nvim.deps`

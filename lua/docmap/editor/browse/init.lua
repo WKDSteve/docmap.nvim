@@ -1455,7 +1455,7 @@ cheatsheet = function(st)
   if st.opts.menu ~= false then
     lines[#lines + 1] = ("  %-" .. pad .. "s%s"):format(
       "<RightMouse>",
-      "context menu with the rows above (needs nvzone/menu)"
+      "context menu with the rows above"
     )
     lines[#lines + 1] = ""
   end
@@ -1542,7 +1542,7 @@ local function bind(st)
     require("docmap.editor.browse.whichkey").register(bufnr, list_keys, MODES)
   end
 
-  -- Right-click context menu (nvzone/menu, soft dependency; entries from
+  -- Right-click context menu (entries from
   -- docmap.integrations.menu). Trigger is bound unconditionally;
   -- items() self-gates on the current mode and disabled/detail-only keys,
   -- so an all-disabled config just yields an empty list and the bound

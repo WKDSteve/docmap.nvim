@@ -43,7 +43,7 @@ things CI runs — is [`DEVELOPMENT.md`](DEVELOPMENT.md).
 | `lua/docmap/bindings/` | The `:DocMap` and `:DocBrowse` route trees |
 | `lua/docmap/config/` | `Docmap.Opts`, `.docmap.json` precedence, check grading |
 | `lua/docmap/mcp/` | The MCP server: nine read-only tools over stdio |
-| `lua/docmap/integrations/` | Soft-dependency bridges (nvzone/menu) |
+| `lua/docmap/integrations/` | Soft-dependency bridges (context-menu entries) |
 | `scripts/` | The headless runners, including `gen_map.lua` and `ci.sh` |
 | `action.yml` | The GitHub Action, at the repository root so adopting it copies nothing |
 | `docs/` | Everything the README links to |

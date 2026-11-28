@@ -1,5 +1,5 @@
 ---@module 'docmap.integrations.menu'
----@brief Context-menu entries for nvzone/menu (soft, opt-in integration).
+---@brief Context-menu entries (soft, opt-in integration).
 ---@description
 --- docmap.nvim "owns" the `:DocBrowse` list buffer it creates, so
 --- this ships both the item builder (this file) and the mouse trigger

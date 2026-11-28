@@ -172,14 +172,13 @@ function M.render()
   -- `<RightMouse>` would be a table of one.
   put("### Right-click context menu")
   put("")
-  put("`<RightMouse>` on the list buffer opens a context menu (via")
-  put("[nvzone/menu](https://github.com/nvzone/menu), a soft dependency) mirroring")
+  put("`<RightMouse>` on the list buffer opens a context menu (drawn by")
+  put("`ui.contextmenu`) mirroring")
   put('every row above except the two "detail pane" ones (`detail_back`, `lookup`')
   put("— the trigger lives on the list buffer, not the detail pane) and only")
   put("showing rows whose **Modes** column includes the browser's current mode,")
   put("same as the `?` cheatsheet already does. `opts.menu = false` disables the")
-  put("trigger entirely; a missing `nvzone/menu` install degrades to a single")
-  put("notify, never an error.")
+  put("trigger entirely.")
   put("")
 
   -- Autocommands -----------------------------------------------------------

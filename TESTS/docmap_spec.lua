@@ -483,7 +483,9 @@ return function(H)
       -- table has ANY named field, which an array of specs never does.
       local single_fixture = H.tmpfile(".lua")
       local sf = assert(io.open(single_fixture, "w"))
-      sf:write('return {\n  "nvzone/menu",\n  event = "VeryLazy",\n  config = function() end,\n}\n')
+      sf:write(
+        'return {\n  "folke/which-key.nvim",\n  event = "VeryLazy",\n  config = function() end,\n}\n'
+      )
       sf:close()
       local _, _, _, _, single_specs = functions.scan_file(single_fixture)
       eq(
@@ -491,7 +493,11 @@ return function(H)
         1,
         "docmap.plugins: a single spec returned directly is one entry, not several"
       )
-      eq(single_specs[1].repo, "nvzone/menu", "docmap.plugins: ... with the repo read correctly")
+      eq(
+        single_specs[1].repo,
+        "folke/which-key.nvim",
+        "docmap.plugins: ... with the repo read correctly"
+      )
       eq(
         single_specs[1].event[1],
         "VeryLazy",

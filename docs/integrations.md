@@ -6,7 +6,7 @@ costing nothing when that plugin is absent.
 ## Context menu
 
 `docmap.integrations.menu` contributes context-aware entries in the
-shape [nvzone/menu](https://github.com/nvzone/menu) expects. docmap.nvim
+context-menu entry shape. docmap.nvim
 has **no** dependency on `menu` and never opens a context menu itself; a host —
 typically your own `<RightMouse>` dispatcher — composes these entries into its
 own menu:

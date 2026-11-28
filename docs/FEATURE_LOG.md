@@ -3174,7 +3174,7 @@ card at all rather than an empty one.
 ## Right-click context menu on `:DocBrowse` (2026-08-24)
 
 Part of a cross-plugin push (`ui.contextmenu`, a new shared module for
-building [nvzone/menu](https://github.com/nvzone/menu)-shaped entries and
+building context-menu entries and
 binding a `<RightMouse>` trigger) to give the personal-plugin ecosystem's
 buffer-owning UIs a mouse-driven alternative to their keyboard shortcuts,
 without any of them taking a hard dependency on `menu`.
@@ -3189,8 +3189,8 @@ pane), and only the ones applicable to the browser's *current* mode
 (deps/calls/trail/history/endpoints/…) — `applies_in` is duplicated rather
 than exported, since it is an implementation detail of the state machine,
 not part of `browse/init.lua`'s public surface. `bind(st)` binds the
-trigger unconditionally; an all-disabled config or a missing `nvzone/menu`
-install both degrade to an empty menu / a single notify, never an error.
+trigger unconditionally; an all-disabled config
+degrades to an empty menu, never an error.
 
 - **Modules:** `docmap/integrations/menu.lua` (`M.items`,
   `M.submenu`), `docmap/editor/browse/init.lua` (`bind`, trigger

@@ -248,9 +248,8 @@ definition attached to a word that is not code. Outside a span the key says why
 it is silent instead of guessing.
 
 On the **list** buffer, `<RightMouse>` opens a context menu mirroring the keys
-the `?` cheatsheet already lists — for when you would rather not recall one. It
-needs nvzone/menu, a soft dependency: without it the trigger degrades rather
-than erroring, and `opts.menu = false` turns it off entirely.
+the `?` cheatsheet already lists — for when you would rather not recall one. It is drawn
+by `ui.contextmenu`, and `opts.menu = false` turns it off entirely.
 
 ## Generating for many repos at once: `opts.generate_all`, not a loop
 
