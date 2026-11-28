@@ -113,4 +113,35 @@ return function(H)
     ok(ns_edges[key], "c_calls ns: " .. key)
     eq(ns_edges[key] and ns_edges[key].confidence, "exact", "c_calls ns: exact, " .. key)
   end
+
+  -- With the heuristic on (`TESTS/fixtures/ccalls_ns_order`):
+  --   x.cpp g -> x.cpp f, exact: `b::f` inside `namespace a` is the global `b::f` of the file, never a guess at the
+  --     `a::b::f` of y.cpp, which x.cpp does not include (every key is tried exactly before any is guessed)
+  --   caller.cpp call_free -> nothing: `app::run` is a free function outside the tree, not the member `run` of
+  --     `app::Helper` (a member is keyed with its class)
+  --   caller.cpp call_member -> helper.cpp run: `app::Helper::run` finds the member
+  local order_root = (vim.fn.getcwd():gsub("\\", "/")) .. "/TESTS/fixtures/ccalls_ns_order"
+  local order_ir = require("docmap.core.scan").scan(
+    require("docmap.config").build(order_root, { calls_heuristic = true })
+  )
+  local order = {}
+  for _, e in ipairs(order_ir.edges or {}) do
+    if e.kind == "call" then
+      order[e.from .. "#" .. e.from_fn .. ">" .. e.to .. "#" .. e.to_fn] = e
+    end
+  end
+  local own_f = order["./x.cpp#g>./x.cpp#f"]
+  ok(own_f, "c_calls ns order: the file's own b::f\n" .. vim.inspect(vim.tbl_keys(order)))
+  eq(own_f and own_f.confidence, "exact", "c_calls ns order: exact")
+  ok(not order["./x.cpp#g>./y.cpp#f"], "c_calls ns order: no guess at y.cpp")
+  for key in pairs(order) do
+    ok(
+      not key:find("^%./caller%.cpp#call_free>"),
+      "c_calls ns order: app::run is not the member: " .. key
+    )
+  end
+  ok(
+    order["./caller.cpp#call_member>./helper.cpp#run"],
+    "c_calls ns order: app::Helper::run is the member\n" .. vim.inspect(vim.tbl_keys(order))
+  )
 end

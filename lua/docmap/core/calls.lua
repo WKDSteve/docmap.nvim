@@ -336,13 +336,17 @@ function M.build(ir, opts)
   end
 
   -- C++: every function under the name a qualified call spells it, `ns::name` for one declared inside
-  -- `namespace ns { }` (`fn.namespace`) and the declared name itself for an out-of-line `void ns::name() {}`.
+  -- `namespace ns { }` (`fn.namespace`) and the declared name itself for an out-of-line `void ns::name() {}`. A member
+  -- declared in its class body (`struct T { void go(); }`: name `go`, owner `T`) is `ns::T::go`, never `ns::go`,
+  -- which would be a free function of the namespace.
   -- Per node, and per name the nodes that hold it, for the tree-wide fallback.
   local qualified = {} ---@type table<string, table<string, string>>
   local qualified_nodes = {} ---@type table<string, string[]>
   for _, id in ipairs(ir.order) do
     for _, fn in ipairs(ir.nodes[id].functions) do
-      local key = fn.namespace and (fn.namespace .. "::" .. fn.name) or fn.name
+      local name = (fn.owner and not fn.name:find("::", 1, true)) and (fn.owner .. "::" .. fn.name)
+        or fn.name
+      local key = fn.namespace and (fn.namespace .. "::" .. name) or name
       if key:find("::", 1, true) then
         qualified[id] = qualified[id] or {}
         if not qualified[id][key] then
@@ -447,7 +451,8 @@ function M.build(ir, opts)
 
   ---Resolve a qualified C++ call: this file first, then the headers it includes (to the definition in the header's own
   ---source when there is one, as for a bare name), then, with the heuristic on, the one source file in the tree that
-  ---defines the name.
+  ---defines the name. Every key is tried exactly before any is guessed: a guess for the inner `a::b::f` must not win
+  ---over the `b::f` this file itself declares.
   ---@param id string
   ---@param call Docmap.RawCall
   ---@param included string[]
@@ -455,7 +460,8 @@ function M.build(ir, opts)
   ---@return string? to_fn
   ---@return Docmap.Confidence? confidence
   local function resolve_qualified(id, call, included)
-    for _, key in ipairs(qualified_keys(call.callee, call.namespace)) do
+    local keys = qualified_keys(call.callee, call.namespace)
+    for _, key in ipairs(keys) do
       if qualified[id] and qualified[id][key] then
         return id, qualified[id][key], "exact"
       end
@@ -472,7 +478,9 @@ function M.build(ir, opts)
           return header, qualified[header][key], "exact"
         end
       end
-      if opts.calls_heuristic and qualified_nodes[key] then
+    end
+    for _, key in ipairs(opts.calls_heuristic and keys or {}) do
+      if qualified_nodes[key] then
         local sources = {}
         for _, holder in ipairs(qualified_nodes[key]) do
           if is_source_file(holder) then
