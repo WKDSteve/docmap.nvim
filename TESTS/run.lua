@@ -262,6 +262,7 @@ local specs = {
   "cli_report_spec.lua",
   "fleet_spec.lua",
   "fleet_cli_spec.lua",
+  "fleet_report_args_spec.lua",
   "annotate_spec.lua",
   "markers_spec.lua",
   "ts_parse_spec.lua",

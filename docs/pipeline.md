@@ -517,9 +517,15 @@ nvim -n -i NONE --headless -u NONE -l scripts/fleet_report.lua --dir=E:/repos --
 | `<root>...` | repositories to scan (any number) |
 | `--dir=<folder>` | add every subfolder that holds a `.git`; repeatable |
 | `--skip=<pattern>` | Lua pattern of folder names `--dir` leaves out; repeatable (a Lua pattern has no alternation); `%-wt%-`, worktree copies, is always skipped |
+| `--include-private` | let `--dir` take folders whose name matches the built-in private list |
 | `--top=<n>` | rows per table (default 25) |
 | `--json` | the joined data instead of Markdown |
 | `--with-generated` | keep built output |
+
+`--dir` never reads a folder whose name matches a small built-in list of private repositories
+(`docmap.core.fleet.PRIVATE`, Lua patterns on the last folder name, any case); stderr names each one it left out,
+and only `--include-private` lifts that. The list does not depend on `--skip`, so a mistyped skip pattern cannot let
+one in. A `<root>` named on the command line is read even when it matches, with a warning on stderr.
 
 Built output (`dist-*`, `build/`, `out/`, `node_modules/`, minified and content-hashed bundles) is left out by
 default: the library inside an app bundle is a copy of somebody else's code and would be the biggest "duplicate" of

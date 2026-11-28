@@ -8,9 +8,13 @@
 --- Options:
 ---   --dir=<folder>      add every subfolder that holds a `.git` (repeatable); `--skip=` filters them
 ---   --skip=<pattern>    a Lua pattern of folder names to leave out of `--dir`, repeatable; `%-wt%-` (worktree copies) is always skipped
+---   --include-private   let `--dir` take folders whose name matches the built-in private list (`fleet.PRIVATE`);
+---                       without it they are never read, and stderr names each one left out
 ---   --json              the joined data instead of Markdown
 ---   --top=<n>           rows per table (default 25)
 ---   --with-generated    keep built output (`dist-*`, bundles, `node_modules`), left out by default
+---
+--- A `<root>` named on the command line is read even when it matches the private list, with a warning on stderr.
 ---
 --- Reads every repository and writes nothing into any of them. Progress goes to stderr, the report to stdout.
 --- Exit 0 when a report was made, 1 when at least one repository could not be scanned (the report still lists the
@@ -54,7 +58,8 @@ local function usage(message)
   io.stderr:write("fleet_report: " .. message .. "\n")
   io.stderr:write(
     "usage: nvim -n -i NONE --headless -u NONE -l scripts/fleet_report.lua "
-      .. "[--dir=<folder>]... [--skip=<pattern>]... [--json] [--top=<n>] [--with-generated] [<root>...]\n"
+      .. "[--dir=<folder>]... [--skip=<pattern>]... [--include-private] [--json] [--top=<n>] [--with-generated] "
+      .. "[<root>...]\n"
   )
   os.exit(2)
 end
@@ -63,7 +68,7 @@ local dirs, roots = {}, {}
 -- A folder name that matches one of these Lua patterns is not taken by `--dir`; `--skip=` adds one (a Lua pattern has
 -- no alternation, so each pattern is its own option).
 local skips = { "%-wt%-" }
-local as_json, with_generated = false, false
+local as_json, with_generated, include_private = false, false, false
 local top = 25
 for _, a in ipairs(_G.arg or {}) do
   if a:match("^%-%-dir=") then
@@ -74,6 +79,8 @@ for _, a in ipairs(_G.arg or {}) do
     as_json = true
   elseif a == "--with-generated" then
     with_generated = true
+  elseif a == "--include-private" then
+    include_private = true
   elseif a:match("^%-%-top=") then
     top = tonumber(a:sub(#"--top=" + 1))
     if not top or top < 1 then
@@ -86,6 +93,23 @@ for _, a in ipairs(_G.arg or {}) do
   end
 end
 
+local fleet = require("docmap.core.fleet")
+
+-- A root named on the command line was asked for: read, but say so when its name looks private.
+for _, root in ipairs(roots) do
+  local private = fleet.private_match(root)
+  if private then
+    io.stderr:write(
+      ("fleet_report: warning: %s looks like a private repository (its name matches %q); read because it was named\n"):format(
+        root,
+        private
+      )
+    )
+  end
+end
+
+-- `--dir` never takes a private one unless asked: a mistyped `--skip` (a Lua pattern has no `|`) must not be what
+-- keeps it out.
 for _, dir in ipairs(dirs) do
   if vim.fn.isdirectory(dir) == 0 then
     usage(dir .. " is not a folder")
@@ -100,7 +124,17 @@ for _, dir in ipairs(dirs) do
       end
     end
     if kind == "directory" and not skipped and vim.uv.fs_stat(dir .. "/" .. name .. "/.git") then
-      names[#names + 1] = name
+      local private = not include_private and fleet.private_match(name)
+      if private then
+        io.stderr:write(
+          ("fleet_report: skipped %s: a private repository (its name matches %q; --include-private reads it)\n"):format(
+            name,
+            private
+          )
+        )
+      else
+        names[#names + 1] = name
+      end
     end
   end
   table.sort(names)
@@ -112,7 +146,6 @@ if #roots == 0 then
   usage("no repository given")
 end
 
-local fleet = require("docmap.core.fleet")
 local repos, failed = fleet.scan_roots(roots, {
   with_generated = with_generated,
   progress = function(line)
